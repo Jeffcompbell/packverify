@@ -290,20 +290,7 @@ const App: React.FC = () => {
         />
       </div>
 
-      {isProcessing && (
-        <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px] z-50 pointer-events-none flex items-start justify-center pt-32">
-          <div className="bg-slate-900 px-6 py-4 rounded-xl shadow-2xl border border-indigo-500/50 flex items-center gap-4">
-            <div className="relative">
-              <div className="animate-spin h-6 w-6 border-2 border-indigo-500 border-t-transparent rounded-full" />
-              <div className="absolute inset-0 animate-pulse bg-indigo-500/20 rounded-full blur-md" />
-            </div>
-            <div>
-              <span className="text-sm font-bold text-white block">AI Processing</span>
-              <span className="text-xs text-slate-400">Analyzing layout & content...</span>
-            </div>
-          </div>
-        </div>
-      )}
+
     </div>
   );
 };
