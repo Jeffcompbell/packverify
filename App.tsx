@@ -2,83 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { InfiniteCanvas } from './components/InfiniteCanvas';
 import { InspectorSidebar } from './components/InspectorSidebar';
 import { FloatingToolbar } from './components/FloatingToolbar';
-import { diagnoseImage, fileToGenerativePart, parseSourceText, performSmartDiff } from './services/geminiService';
+import { diagnoseImage, fileToGenerativePart, parseSourceText, performSmartDiff } from './services/openaiService';
 import { DiagnosisIssue, SourceField, DiffResult, ViewLayers, CanvasTransform } from './types';
 import { Table, Zap, LayoutGrid } from 'lucide-react';
-
-// --- MOCK DATA FOR DEMO ---
-const MOCK_DATA = {
-  imageSrc: "https://images.unsplash.com/photo-1627483297929-37f416fec7cd?q=80&w=2670&auto=format&fit=crop", // Coffee Bag / Packaging
-  sourceFields: [
-    { key: "Product Name", value: "Ethiopian Yirgacheffe Reserve", category: "content" },
-    { key: "Net Weight", value: "340g (12oz)", category: "specs" },
-    { key: "Roast Level", value: "Medium-Light", category: "specs" },
-    { key: "Process", value: "Washed", category: "specs" },
-    { key: "Ingredients", value: "100% Arabica Coffee Beans", category: "compliance" },
-    { key: "Best Before", value: "12 months from roast date", category: "compliance" },
-    { key: "Origin", value: "Gedeo Zone, Ethiopia", category: "content" }
-  ] as SourceField[],
-  diagnosisIssues: [
-    {
-      id: "mock-d1",
-      type: "color",
-      text: "Rich Black Detected",
-      suggestion: "Small text body text uses 4-color black (C70 M60 Y40 K100). Change to K100 for sharp printing.",
-      severity: "high",
-      location_desc: "Back label text",
-      box_2d: { ymin: 600, xmin: 300, ymax: 750, xmax: 700 }
-    },
-    {
-      id: "mock-d2",
-      type: "bleed",
-      text: "Safe Zone Violation",
-      suggestion: "The 'Organic' logo is too close to the die-cut line (< 3mm).",
-      severity: "medium",
-      location_desc: "Bottom right corner",
-      box_2d: { ymin: 850, xmin: 800, ymax: 950, xmax: 950 }
-    },
-    {
-      id: "mock-d3",
-      type: "font",
-      text: "Font Warning",
-      suggestion: "Text appears to use 'Arial' system font. Ensure it is outlined or embedded.",
-      severity: "low",
-      location_desc: "Nutrition facts header",
-      box_2d: { ymin: 400, xmin: 100, ymax: 450, xmax: 300 }
-    }
-  ] as DiagnosisIssue[],
-  diffResults: [
-    {
-      id: "mock-diff1",
-      field: "Product Name",
-      sourceValue: "Ethiopian Yirgacheffe Reserve",
-      imageValue: "Ethiopian Yirgacheffe",
-      status: "warning",
-      matchType: "strict",
-      reason: "Missing 'Reserve' suffix on front panel.",
-      box_2d: { ymin: 200, xmin: 200, ymax: 300, xmax: 800 }
-    },
-    {
-      id: "mock-diff2",
-      field: "Net Weight",
-      sourceValue: "340g (12oz)",
-      imageValue: "340g",
-      status: "match",
-      matchType: "logic",
-      reason: "Unit matches, imperial unit omitted but acceptable.",
-      box_2d: { ymin: 800, xmin: 100, ymax: 850, xmax: 250 }
-    },
-    {
-      id: "mock-diff3",
-      field: "Ingredients",
-      sourceValue: "100% Arabica Coffee Beans",
-      imageValue: "100% Arabica Coffee",
-      status: "match",
-      matchType: "semantic",
-      box_2d: { ymin: 500, xmin: 300, ymax: 550, xmax: 700 }
-    }
-  ] as DiffResult[]
-};
 
 const App: React.FC = () => {
   const [isProcessing, setIsProcessing] = useState(false);
@@ -98,21 +24,20 @@ const App: React.FC = () => {
 
   // Load Mock Data on Mount
   useEffect(() => {
-    // Simulate a loading delay for realism
-    const timer = setTimeout(() => {
-      setImageSrc(MOCK_DATA.imageSrc);
-      setSourceFields(MOCK_DATA.sourceFields);
-      setDiagnosisIssues(MOCK_DATA.diagnosisIssues);
-      setDiffResults(MOCK_DATA.diffResults);
-      // Center the mock image
-      setTransform({ x: window.innerWidth * 0.1, y: 50, scale: 0.45 });
-    }, 500);
-    return () => clearTimeout(timer);
+    // Start with empty state
+    setTransform({ x: window.innerWidth * 0.1, y: 50, scale: 0.45 });
   }, []);
 
   // --- Handlers ---
 
-  const handleFileUpload = async (file: File) => {
+  // --- Handlers ---
+
+  const processFile = async (file: File) => {
+    if (!file.type.startsWith('image/')) {
+      setErrorMessage("Please upload an image file.");
+      return;
+    }
+
     setIsProcessing(true);
     setErrorMessage(null);
     try {
@@ -145,6 +70,10 @@ const App: React.FC = () => {
     } finally {
       setIsProcessing(false);
     }
+  };
+
+  const handleFileUpload = (file: File) => {
+    processFile(file);
   };
 
   const handleParseSource = async (text: string) => {
@@ -184,8 +113,44 @@ const App: React.FC = () => {
     setTransform(prev => ({ ...prev, scale: 0.45, x: 100, y: 50 }));
   };
 
+  // Global Paste Handler
+  useEffect(() => {
+    const handlePaste = (e: ClipboardEvent) => {
+      const items = e.clipboardData?.items;
+      if (!items) return;
+
+      for (let i = 0; i < items.length; i++) {
+        if (items[i].type.indexOf('image') !== -1) {
+          const file = items[i].getAsFile();
+          if (file) processFile(file);
+          break;
+        }
+      }
+    };
+    window.addEventListener('paste', handlePaste);
+    return () => window.removeEventListener('paste', handlePaste);
+  }, [sourceFields]); // Re-bind if sourceFields change so processFile has latest closure (or use ref)
+  // Note: processFile depends on sourceFields, so we need to be careful. 
+  // Better: use a ref for sourceFields or useCallback for processFile.
+  // For simplicity here, adding sourceFields to dependency array.
+
+  // Global Drag & Drop Handlers
+  const onDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+  };
+
+  const onDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    const file = e.dataTransfer.files?.[0];
+    if (file) processFile(file);
+  };
+
   return (
-    <div className="h-screen w-screen bg-slate-950 flex font-sans text-slate-200 selection:bg-indigo-500/30 overflow-hidden">
+    <div
+      className="h-screen w-screen bg-slate-950 flex font-sans text-slate-200 selection:bg-indigo-500/30 overflow-hidden"
+      onDragOver={onDragOver}
+      onDrop={onDrop}
+    >
 
       {/* --- LEFT COLUMN (Image + Specs) --- */}
       <div className="flex-1 flex flex-col min-w-0 border-r border-slate-800">
