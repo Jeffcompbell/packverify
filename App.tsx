@@ -6,7 +6,7 @@ import {
   loadSessionFromCloud, clearSessionInCloud, CloudImageData, CloudSession,
   getUserSessions, createNewSession, updateSessionProductName, getQuotaUsageHistory, QuotaUsageRecord
 } from './services/firebase';
-import { DiagnosisIssue, SourceField, DiffResult, ImageItem, ImageSpec, BoundingBox, DeterministicCheck } from './types';
+import { DiagnosisIssue, SourceField, DiffResult, ImageItem, ImageSpec, BoundingBox, DeterministicCheck, IndustryType } from './types';
 import {
   Table, Zap, AlertCircle, XCircle, ChevronDown, ChevronLeft, ChevronRight,
   ImagePlus, Trash2, RefreshCw, Copy, CheckCheck, Upload, Eye, EyeOff,
@@ -62,6 +62,10 @@ const App: React.FC = () => {
   const [selectedIssueId, setSelectedIssueId] = useState<string | null>(null);
   const [currentModel, setCurrentModel] = useState(getModelId());
   const [showModelSelector, setShowModelSelector] = useState(false);
+  const [industry, setIndustry] = useState<IndustryType>('general');
+  const [showIndustryMenu, setShowIndustryMenu] = useState(false);
+  const [showAllProducts, setShowAllProducts] = useState(false);
+  const [activeModelTab, setActiveModelTab] = useState<string>(currentModel);
   const [imageScale, setImageScale] = useState(1);
   const [showOverlay, setShowOverlay] = useState(true);
   const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -475,7 +479,14 @@ const App: React.FC = () => {
       // 云同步 - 更新图片数据
       if (cloudSyncEnabled && sessionId) {
         try {
-          const updatedImage = images.find(img => img.id === imageId);
+          const existingImage = images.find(img => img.id === imageId);
+          const newIssuesByModel = {
+            ...existingImage?.issuesByModel,
+            [usedModelId]: {
+              issues: diagResult.issues,
+              deterministicIssues: diagResult.deterministicIssues
+            }
+          };
           await updateImageInCloud(user.uid, sessionId, imageId, {
             description: diagResult.description,
             ocrText: diagResult.ocrText,
@@ -483,7 +494,7 @@ const App: React.FC = () => {
             issues: diagResult.issues,
             deterministicIssues: diagResult.deterministicIssues,
             diffs: diffs,
-            issuesByModel: updatedImage?.issuesByModel
+            issuesByModel: newIssuesByModel
           });
           console.log('Image updated in cloud:', imageId);
         } catch (syncError) {
@@ -890,6 +901,17 @@ const App: React.FC = () => {
         />
       )}
 
+      {/* 全部产品页面 */}
+      {user && (
+        <AllProductsPage
+          isOpen={showAllProducts}
+          onClose={() => setShowAllProducts(false)}
+          sessions={historySessions}
+          isLoading={isLoadingHistory}
+          onSelectSession={handleSwitchSession}
+        />
+      )}
+
       {/* TOP BAR */}
       <div className="h-12 border-b border-border bg-white flex items-center justify-between px-2 md:px-4 shrink-0">
         {/* Left: Product Name */}
@@ -980,6 +1002,19 @@ const App: React.FC = () => {
                         ))
                       )}
                     </div>
+
+                    {/* 查看全部 */}
+                    {historySessions.length > 0 && (
+                      <div className="p-2 border-t border-border">
+                        <button
+                          onClick={() => { setShowProductList(false); setShowAllProducts(true); }}
+                          className="w-full px-3 py-1.5 text-xs text-text-muted hover:text-text-primary hover:bg-surface-100 rounded flex items-center justify-center gap-1"
+                        >
+                          <List size={12} />
+                          查看全部
+                        </button>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -1006,19 +1041,37 @@ const App: React.FC = () => {
 
         {/* Center: Image Tools - 桌面端显示 */}
         <div className="hidden md:flex items-center gap-2">
+          {/* 行业选择 */}
+          <div className="relative">
+            <button
+              onClick={() => setShowIndustryMenu(!showIndustryMenu)}
+              className="flex items-center gap-1 px-2 py-1 bg-surface-100 hover:bg-surface-200 text-text-secondary text-[10px] rounded transition-colors"
+            >
+              <Package size={12} />
+              <span>{{ cosmetics: '化妆品', food: '食品', pharma: '药品', general: '通用' }[industry]}</span>
+              <ChevronDown size={10} className={`transition-transform ${showIndustryMenu ? 'rotate-180' : ''}`} />
+            </button>
+            {showIndustryMenu && (
+              <div className="absolute top-full left-0 mt-1 bg-white border border-border rounded-lg shadow-lg overflow-hidden z-50">
+                {(['cosmetics', 'food', 'pharma', 'general'] as IndustryType[]).map((ind) => (
+                  <button
+                    key={ind}
+                    onClick={() => { setIndustry(ind); setShowIndustryMenu(false); }}
+                    className={`w-full px-3 py-1.5 text-left text-[10px] transition-colors ${industry === ind ? 'bg-primary-50 text-primary-600' : 'text-text-secondary hover:bg-surface-50'}`}
+                  >
+                    {{ cosmetics: '化妆品', food: '食品', pharma: '药品', general: '通用' }[ind]}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
           {/* 添加图片 */}
-          <label className="flex items-center gap-1.5 px-3 py-1.5 bg-surface-100 hover:bg-surface-200 text-text-secondary text-xs font-medium rounded border border-border cursor-pointer transition-colors">
-            <ImagePlus size={14} />
+          <label className="flex items-center gap-1 px-2 py-1 bg-surface-100 hover:bg-surface-200 text-text-secondary text-[10px] rounded cursor-pointer transition-colors">
+            <ImagePlus size={12} />
             <span>添加图片</span>
             <input type="file" accept="image/*" className="hidden" onChange={(e) => e.target.files?.[0] && processFile(e.target.files[0])} />
           </label>
-
-          {/* 图片计数 */}
-          {images.length > 0 && (
-            <div className="px-2 py-1 bg-surface-100 rounded text-[10px] text-text-muted">
-              {images.length}/8
-            </div>
-          )}
 
           {/* 分隔线 */}
           {currentImage && <div className="h-5 w-px bg-surface-200" />}
@@ -1071,42 +1124,7 @@ const App: React.FC = () => {
         </div>
 
         {/* Right: User & Settings */}
-        <div className="flex items-center gap-1.5 md:gap-3">
-          {/* Model Selector - 桌面端 */}
-          <div className="relative hidden md:block">
-            <button
-              onClick={() => setShowModelSelector(!showModelSelector)}
-              className="bg-surface-100 px-2.5 py-1 rounded border border-border text-[11px] flex items-center gap-1.5 hover:border-border-hover transition-colors"
-            >
-              <span className="text-text-muted">
-                {AVAILABLE_MODELS.find(m => m.id === currentModel)?.name || 'Gemini'}
-              </span>
-              <ChevronDown size={12} className={`text-text-muted transition-transform ${showModelSelector ? 'rotate-180' : ''}`} />
-            </button>
-
-            {showModelSelector && (
-              <div className="absolute top-full right-0 mt-1 bg-surface-100 border border-border rounded-lg shadow-xl overflow-hidden min-w-[180px] z-50">
-                {AVAILABLE_MODELS.map(model => (
-                  <button
-                    key={model.id}
-                    onClick={() => handleModelChange(model.id)}
-                    className={`w-full px-3 py-2 text-left hover:bg-surface-200 transition-colors flex items-center justify-between ${
-                      currentModel === model.id ? 'bg-surface-200' : ''
-                    }`}
-                  >
-                    <div>
-                      <div className={`text-xs font-medium ${currentModel === model.id ? 'text-text-primary' : 'text-text-secondary'}`}>
-                        {model.name}
-                      </div>
-                      <div className="text-[10px] text-text-muted">{model.description}</div>
-                    </div>
-                    {currentModel === model.id && <div className="w-1.5 h-1.5 bg-white rounded-full"></div>}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-
+        <div className="flex items-center gap-2 md:gap-3">
           {user ? (
             <>
               {/* 配额 */}
@@ -1287,7 +1305,7 @@ const App: React.FC = () => {
                     </>
                   )}
 
-                  {showOverlay && !isCurrentProcessing && currentImage.issues.map(issue => (
+                  {showOverlay && !isCurrentProcessing && (currentImage.issuesByModel?.[activeModelTab]?.issues || currentImage.issues).map(issue => (
                     issue.box_2d && (
                       <div
                         key={issue.id}
@@ -1378,6 +1396,8 @@ const App: React.FC = () => {
               } catch (e) { console.error('Cloud sync failed:', e); }
             }
           }}
+          activeModelTab={activeModelTab}
+          onActiveModelChange={setActiveModelTab}
         />
       </div>
 
@@ -1748,11 +1768,15 @@ const App: React.FC = () => {
         >
           <AlertTriangle size={18} />
           <span className="text-[9px]">问题</span>
-          {currentImage && (currentImage.issues.length + (currentImage.deterministicIssues?.length || 0)) > 0 && (
-            <span className="absolute -top-0.5 -right-0.5 min-w-4 h-4 px-1 bg-red-500 text-text-primary text-[8px] rounded-full flex items-center justify-center">
-              {currentImage.issues.length + (currentImage.deterministicIssues?.length || 0)}
-            </span>
-          )}
+          {currentImage && (() => {
+            const modelData = currentImage.issuesByModel?.[activeModelTab];
+            const count = (modelData?.issues?.length || currentImage.issues.length) + (modelData?.deterministicIssues?.length || currentImage.deterministicIssues?.length || 0);
+            return count > 0 && (
+              <span className="absolute -top-0.5 -right-0.5 min-w-4 h-4 px-1 bg-red-500 text-text-primary text-[8px] rounded-full flex items-center justify-center">
+                {count}
+              </span>
+            );
+          })()}
         </button>
         <button
           onClick={() => setMobileTab('qil')}

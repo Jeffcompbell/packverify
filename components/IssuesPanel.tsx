@@ -19,7 +19,9 @@ interface IssuesPanelProps {
   issueListRef: React.RefObject<HTMLDivElement>;
   currentModelId: string;
   onAddModel: (modelId: string) => void;
-  onRemoveModel: (modelId: string) => void; // 删除模型分析结果
+  onRemoveModel: (modelId: string) => void;
+  activeModelTab: string;
+  onActiveModelChange: (modelId: string) => void;
 }
 
 export const IssuesPanel: React.FC<IssuesPanelProps> = ({
@@ -37,11 +39,11 @@ export const IssuesPanel: React.FC<IssuesPanelProps> = ({
   issueListRef,
   currentModelId,
   onAddModel,
-  onRemoveModel
+  onRemoveModel,
+  activeModelTab,
+  onActiveModelChange
 }) => {
-  // 当前选中的模型 tab - 使用默认模型 ID 作为后备
   const defaultModelId = currentModelId || 'gemini-3-pro-preview';
-  const [activeModelTab, setActiveModelTab] = useState<string>(defaultModelId);
   const [showModelMenu, setShowModelMenu] = useState(false);
   const [showCompareModal, setShowCompareModal] = useState(false);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; modelId: string } | null>(null);
@@ -58,7 +60,7 @@ export const IssuesPanel: React.FC<IssuesPanelProps> = ({
   // 确保 activeModelTab 在 analyzedModels 中
   React.useEffect(() => {
     if (!analyzedModels.includes(activeModelTab)) {
-      setActiveModelTab(analyzedModels[0] || defaultModelId);
+      onActiveModelChange(analyzedModels[0] || defaultModelId);
     }
   }, [analyzedModels, activeModelTab, defaultModelId]);
 
@@ -112,14 +114,14 @@ export const IssuesPanel: React.FC<IssuesPanelProps> = ({
     if (detIssues.length > 0) {
       text += `确定性问题（${detIssues.length}）:\n`;
       detIssues.forEach((issue, i) => {
-        text += `${i + 1}. ${issue.description}\n`;
+        const typeLabel = issue.type === 'bracket_mismatch' ? '括号不配对' : issue.type === 'encoding_error' ? '编码错误' : '格式错误';
+        text += `${i + 1}. [${typeLabel}] ${issue.description}\n   位置: ${issue.location}\n\n`;
       });
-      text += '\n';
     }
     if (issues.length > 0) {
       text += `AI建议（${issues.length}）:\n`;
       issues.forEach((issue, i) => {
-        text += `${i + 1}. ${issue.original || issue.text}\n   问题: ${issue.problem || ''}\n   建议: ${issue.suggestion}\n`;
+        text += `${i + 1}. 原文: ${issue.original || issue.text}\n   问题: ${issue.problem || ''}\n   建议: ${issue.suggestion}\n\n`;
       });
     }
     navigator.clipboard.writeText(text);
@@ -130,7 +132,7 @@ export const IssuesPanel: React.FC<IssuesPanelProps> = ({
     if (analyzedModels.length > 1) {
       onRemoveModel(modelId);
       if (activeModelTab === modelId) {
-        setActiveModelTab(analyzedModels.find(m => m !== modelId) || defaultModelId);
+        onActiveModelChange(analyzedModels.find(m => m !== modelId) || defaultModelId);
       }
     }
     setContextMenu(null);
@@ -174,7 +176,7 @@ export const IssuesPanel: React.FC<IssuesPanelProps> = ({
         </div>
       </div>
       {/* 模型 Tabs - 可换行 */}
-      <div className="px-2 py-1.5 border-b border-border bg-surface-50 flex flex-wrap gap-1">
+      <div className="px-2 py-1.5 border-b border-border bg-white flex flex-wrap gap-1">
         {analyzedModels.map((modelId) => {
           const model = AVAILABLE_MODELS.find(m => m.id === modelId);
           const modelData = currentImage?.issuesByModel?.[modelId];
@@ -184,7 +186,7 @@ export const IssuesPanel: React.FC<IssuesPanelProps> = ({
           return (
             <button
               key={modelId}
-              onClick={() => setActiveModelTab(modelId)}
+              onClick={() => onActiveModelChange(modelId)}
               onContextMenu={(e) => handleContextMenu(e, modelId)}
               className={`relative flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-medium transition-all group ${
                 activeModelTab === modelId
@@ -218,7 +220,7 @@ export const IssuesPanel: React.FC<IssuesPanelProps> = ({
                 onClick={() => {
                   onAddModel(model.id);
                   setShowModelMenu(false);
-                  setActiveModelTab(model.id);
+                  onActiveModelChange(model.id);
                 }}
                 className="w-full px-3 py-2 text-left hover:bg-surface-200 transition-colors"
               >
@@ -232,11 +234,13 @@ export const IssuesPanel: React.FC<IssuesPanelProps> = ({
       )}
 
       {currentImage?.description && (
-        <div className="px-4 py-2 border-b border-border/50 bg-surface-100/30">
-          <div className="flex items-center gap-1.5 text-[10px] text-text-muted mb-1">
+        <div>
+          <div className="flex items-center gap-2 px-3 py-2 text-[10px] font-medium text-text-muted bg-surface-50 border-b border-border/50">
             <FileText size={10} /> 图片描述
           </div>
-          <p className="text-xs text-text-secondary">{currentImage.description}</p>
+          <div className="px-3 py-2 border-b border-border/50 bg-white">
+            <p className="text-xs text-text-secondary">{currentImage.description}</p>
+          </div>
         </div>
       )}
 
@@ -252,34 +256,42 @@ export const IssuesPanel: React.FC<IssuesPanelProps> = ({
             <p className="text-xs">正在分析...</p>
           </div>
         ) : (
-          <div className="p-3 space-y-3">
+          <div>
             {currentTabData.deterministicIssues && currentTabData.deterministicIssues.length > 0 && (
-              <div className="space-y-2">
-                <div className="flex items-center gap-2 text-[10px] font-medium text-text-muted uppercase tracking-wider">
-                  <Brackets size={12} />
+              <div>
+                <div className="flex items-center gap-2 px-3 py-2 text-[10px] font-medium text-text-muted bg-surface-50 border-b border-border/50">
+                  <Brackets size={10} />
                   确定性问题
                 </div>
-                {currentTabData.deterministicIssues.map((issue) => (
-                  <div key={issue.id} className="p-3 rounded-xl bg-white border border-border shadow-sm">
-                    <div className="flex items-center gap-2 mb-2">
-                      <span className="w-1.5 h-1.5 rounded-full bg-red-500 shrink-0"></span>
-                      <span className="text-[10px] font-medium text-text-secondary">
-                        {issue.type === 'bracket_mismatch' ? '括号不配对' : issue.type === 'encoding_error' ? '编码错误' : '格式错误'}
-                      </span>
+                {currentTabData.deterministicIssues.map((issue) => {
+                  const copyText = `类型: ${issue.type === 'bracket_mismatch' ? '括号不配对' : issue.type === 'encoding_error' ? '编码错误' : '格式错误'}\n问题: ${issue.description}\n位置: ${issue.location}`;
+                  return (
+                    <div key={issue.id} className="px-3 py-2 border-b border-border/50 last:border-b-0 bg-white group">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-red-500 shrink-0"></span>
+                        <span className="text-[10px] font-medium text-red-600">
+                          {issue.type === 'bracket_mismatch' ? '括号不配对' : issue.type === 'encoding_error' ? '编码错误' : '格式错误'}
+                        </span>
+                        <button
+                          onClick={() => onCopy(copyText, issue.id)}
+                          className="p-1 rounded hover:bg-surface-100 transition-colors opacity-0 group-hover:opacity-100 ml-auto"
+                          title="复制"
+                        >
+                          {copiedId === issue.id ? <CheckCheck size={12} className="text-primary-500" /> : <Copy size={12} className="text-text-muted" />}
+                        </button>
+                      </div>
+                      <p className="text-xs text-text-primary mb-1">{issue.description}</p>
+                      <div className="text-[10px] text-text-muted font-mono">{issue.location}</div>
                     </div>
-                    <p className="text-xs text-text-primary mb-1.5">{issue.description}</p>
-                    <div className="text-[10px] text-text-muted font-mono bg-surface-50 px-2 py-1.5 rounded">
-                      {issue.location}
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
 
             {currentTabData.issues.length > 0 && (
-              <div className="space-y-2">
-                <div className="flex items-center gap-2 text-[10px] font-medium text-text-muted uppercase tracking-wider">
-                  <ShieldAlert size={12} />
+              <div>
+                <div className="flex items-center gap-2 px-3 py-2 text-[10px] font-medium text-text-muted bg-surface-50 border-b border-border/50">
+                  <ShieldAlert size={10} />
                   AI 建议
                 </div>
                 {currentTabData.issues.map((issue) => {
@@ -292,17 +304,17 @@ export const IssuesPanel: React.FC<IssuesPanelProps> = ({
                       key={issue.id}
                       data-issue-id={issue.id}
                       onClick={() => onSelectIssue(issue.id)}
-                      className={`p-3 rounded-xl cursor-pointer transition-all group ${
-                        selectedIssueId === issue.id
-                          ? 'bg-white border border-primary-500 shadow-md'
-                          : 'bg-white border border-border shadow-sm hover:shadow-md hover:border-border-hover'
+                      className={`px-3 py-2 border-b border-border/50 last:border-b-0 cursor-pointer transition-all group bg-white ${
+                        selectedIssueId === issue.id ? 'bg-primary-50/50' : 'hover:bg-surface-50'
                       }`}
                     >
-                      <div className="flex items-center gap-2 mb-2">
+                      <div className="flex items-center gap-2 mb-1">
                         <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${
                           issue.severity === 'high' ? 'bg-red-500' : issue.severity === 'medium' ? 'bg-amber-500' : 'bg-surface-300'
                         }`}></span>
-                        <span className="text-[10px] font-medium text-text-secondary">
+                        <span className={`text-[10px] font-medium ${
+                          issue.severity === 'high' ? 'text-red-600' : issue.severity === 'medium' ? 'text-amber-600' : 'text-text-muted'
+                        }`}>
                           {issue.severity === 'high' ? '紧急' : issue.severity === 'medium' ? '警告' : '提示'}
                         </span>
                         <button
@@ -314,21 +326,14 @@ export const IssuesPanel: React.FC<IssuesPanelProps> = ({
                         </button>
                       </div>
 
-                      <div className="mb-2">
-                        <div className="text-xs text-text-primary font-mono bg-surface-50 px-2 py-1.5 rounded leading-relaxed">
-                          {renderOriginal(displayOriginal)}
-                        </div>
-                      </div>
+                      <p className="text-xs text-text-primary mb-1">{renderOriginal(displayOriginal)}</p>
 
                       {displayProblem && (
-                        <p className="text-xs text-text-secondary mb-1.5">{displayProblem}</p>
+                        <p className="text-[11px] text-text-secondary mb-1">{displayProblem}</p>
                       )}
 
                       {issue.suggestion && (
-                        <div className="flex items-start gap-1.5 text-[11px] text-primary-600 bg-primary-50 px-2 py-1.5 rounded">
-                          <span className="shrink-0">→</span>
-                          <span>{issue.suggestion}</span>
-                        </div>
+                        <p className="text-[11px] text-primary-600">→ {issue.suggestion}</p>
                       )}
                     </div>
                   );
