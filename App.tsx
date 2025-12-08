@@ -1,13 +1,17 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { diagnoseImage, fileToGenerativePart, parseSourceText, performSmartDiff, extractProductSpecs, AVAILABLE_MODELS, getModelId, setModelId, parseQILImage, localDiffSpecs } from './services/openaiService';
-import { login, logout, getCurrentUser, canProcessImage, getRemainingQuota, useQuota, User } from './services/authService';
-import { DiagnosisIssue, SourceField, DiffResult, ViewLayers, ImageItem, ImageSpec, BoundingBox, DeterministicCheck } from './types';
+import {
+  signInWithGoogle, signOutUser, onAuthChange, getOrCreateUser, getUserData, useQuotaFirebase, UserData,
+  getOrCreateSession, saveImageToCloud, updateImageInCloud, deleteImageFromCloud, saveQilToCloud,
+  loadSessionFromCloud, clearSessionInCloud, CloudImageData
+} from './services/firebase';
+import { DiagnosisIssue, SourceField, DiffResult, ImageItem, ImageSpec, BoundingBox, DeterministicCheck } from './types';
 import {
   Table, Zap, AlertCircle, XCircle, ChevronDown, ChevronLeft, ChevronRight,
   ImagePlus, Trash2, RefreshCw, Copy, CheckCheck, Upload, Eye, EyeOff,
   ZoomIn, ZoomOut, RotateCcw, RotateCw, FileText, AlertTriangle, CheckCircle,
-  ClipboardCheck, Image, Search, FileSpreadsheet, Loader2, Maximize2, ImageIcon,
-  Type, Brackets, ShieldAlert, GitCompare, List, LogOut, User as UserIcon
+  ClipboardCheck, Image, Search, FileSpreadsheet, Loader2, Maximize2,
+  Type, Brackets, ShieldAlert, GitCompare, LogOut, User as UserIcon, X, Cloud, CloudOff
 } from 'lucide-react';
 
 // 存储接口 - 用于 localStorage 持久化
@@ -49,85 +53,103 @@ const createVirtualFile = (base64: string, mimeType: string, fileName: string): 
 
 const STORAGE_KEY = 'packverify_data';
 
-// 登录组件
-const LoginPage: React.FC<{ onLogin: (user: User) => void }> = ({ onLogin }) => {
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
+// Google 图标组件
+const GoogleIcon = () => (
+  <svg className="w-5 h-5" viewBox="0 0 24 24">
+    <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+    <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+    <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+    <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+  </svg>
+);
+
+// 登录弹窗组件 - 简洁专业设计
+const LoginModal: React.FC<{
+  isOpen: boolean;
+  onClose: () => void;
+  onLogin: (user: UserData) => void;
+}> = ({ isOpen, onClose, onLogin }) => {
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+  if (!isOpen) return null;
+
+  const handleGoogleLogin = async () => {
     setIsLoading(true);
     setError('');
-
-    setTimeout(() => {
-      const user = login(username.trim(), password);
-      if (user) {
-        onLogin(user);
-      } else {
-        setError('用户名或密码错误');
+    try {
+      const userData = await signInWithGoogle();
+      if (userData) {
+        onLogin(userData);
+        onClose();
       }
+    } catch (err: any) {
+      console.error('Login error:', err);
+      if (err.code === 'auth/popup-closed-by-user') {
+        setError('登录已取消');
+      } else {
+        setError(err.message || '登录失败，请重试');
+      }
+    } finally {
       setIsLoading(false);
-    }, 300);
+    }
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4">
-      <div className="w-full max-w-sm">
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center gap-2 mb-4">
-            <div className="bg-indigo-500/20 p-2 rounded-lg">
-              <Zap size={24} className="text-indigo-400" fill="currentColor" />
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      {/* Backdrop */}
+      <div
+        className="absolute inset-0 bg-black/70"
+        onClick={onClose}
+      />
+
+      {/* Modal */}
+      <div className="relative w-full max-w-sm bg-slate-900 rounded-2xl shadow-2xl border border-slate-800">
+        {/* Close button */}
+        <button
+          onClick={onClose}
+          className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-lg text-slate-500 hover:text-slate-300 hover:bg-slate-800 transition-all"
+        >
+          <X size={18} />
+        </button>
+
+        {/* Content */}
+        <div className="p-8">
+          {/* Logo */}
+          <div className="text-center mb-8">
+            <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-slate-800 mb-4">
+              <Zap size={24} className="text-slate-300" fill="currentColor" />
             </div>
-            <span className="text-xl font-bold text-white">包装稿审核 Pro</span>
-          </div>
-          <p className="text-slate-500 text-sm">请登录后使用</p>
-        </div>
-
-        <form onSubmit={handleSubmit} className="bg-slate-900 rounded-xl p-6 border border-slate-800">
-          <div className="mb-4">
-            <label className="block text-xs text-slate-500 mb-1.5">用户名</label>
-            <input
-              type="text"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-              placeholder="输入用户名"
-              autoFocus
-            />
+            <h1 className="text-xl font-semibold text-white mb-1">登录</h1>
+            <p className="text-sm text-slate-500">登录后使用图片分析功能</p>
           </div>
 
-          <div className="mb-6">
-            <label className="block text-xs text-slate-500 mb-1.5">密码</label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-              placeholder="输入密码"
-            />
-          </div>
-
+          {/* Error */}
           {error && (
-            <div className="mb-4 px-3 py-2 bg-red-500/10 border border-red-500/30 rounded-lg text-red-400 text-xs">
+            <div className="mb-4 px-3 py-2 bg-red-500/10 border border-red-500/20 rounded-lg text-red-400 text-sm">
               {error}
             </div>
           )}
 
+          {/* Login button */}
           <button
-            type="submit"
-            disabled={!username || !password || isLoading}
-            className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white py-2.5 rounded-lg font-medium text-sm transition-colors flex items-center justify-center gap-2"
+            onClick={handleGoogleLogin}
+            disabled={isLoading}
+            className="w-full bg-white hover:bg-slate-100 disabled:opacity-50 text-slate-900 py-3 rounded-xl font-medium text-sm transition-all flex items-center justify-center gap-3"
           >
-            {isLoading ? <Loader2 size={16} className="animate-spin" /> : null}
-            {isLoading ? '登录中...' : '登录'}
+            {isLoading ? (
+              <Loader2 size={18} className="animate-spin" />
+            ) : (
+              <GoogleIcon />
+            )}
+            {isLoading ? '登录中...' : '使用 Google 继续'}
           </button>
-        </form>
 
-        <p className="text-center text-slate-600 text-xs mt-4">
-          v3.3 · 首次使用请联系管理员获取账号
-        </p>
+          {/* Footer */}
+          <p className="mt-4 text-center text-xs text-slate-600">
+            首次登录赠送 50 次分析额度
+          </p>
+        </div>
       </div>
     </div>
   );
@@ -135,8 +157,20 @@ const LoginPage: React.FC<{ onLogin: (user: User) => void }> = ({ onLogin }) => 
 
 const App: React.FC = () => {
   // 用户认证状态
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<UserData | null>(null);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
+  const [showLoginModal, setShowLoginModal] = useState(false);
+
+  // 产品/会话状态
+  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [productName, setProductName] = useState<string>('未命名产品');
+  const [isEditingProductName, setIsEditingProductName] = useState(false);
+  const [showProductList, setShowProductList] = useState(false);
+
+  // 云同步状态
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [isLoadingFromCloud, setIsLoadingFromCloud] = useState(false);
+  const [cloudSyncEnabled, setCloudSyncEnabled] = useState(true);
 
   const [isProcessing, setIsProcessing] = useState(false);
   const [processingImageId, setProcessingImageId] = useState<string | null>(null);
@@ -195,7 +229,6 @@ const App: React.FC = () => {
         const data = JSON.parse(stored);
         const storedImages: StoredImageItem[] = data.images || [];
 
-        // 恢复图片
         const restoredImages: ImageItem[] = storedImages.map(item => ({
           id: item.id,
           src: base64ToBlobUrl(item.base64, item.mimeType),
@@ -214,15 +247,12 @@ const App: React.FC = () => {
           setCurrentImageIndex(data.currentIndex || 0);
         }
 
-        // 恢复 QIL 数据
         if (data.manualSourceFields) {
           setManualSourceFields(data.manualSourceFields);
         }
         if (data.qilInputText) {
           setQilInputText(data.qilInputText);
         }
-
-        console.log('Restored data from localStorage:', restoredImages.length, 'images');
       }
     } catch (err) {
       console.error('Failed to restore data:', err);
@@ -272,12 +302,86 @@ const App: React.FC = () => {
 
   // 检查登录状态
   useEffect(() => {
-    const existingUser = getCurrentUser();
-    if (existingUser) {
-      setUser(existingUser);
-    }
-    setIsCheckingAuth(false);
+    const unsubscribe = onAuthChange(async (firebaseUser) => {
+      if (firebaseUser) {
+        const userData = await getUserData(firebaseUser.uid);
+        if (userData) {
+          setUser(userData);
+        } else {
+          const newUserData = await getOrCreateUser(firebaseUser);
+          setUser(newUserData);
+        }
+      } else {
+        setUser(null);
+        setSessionId(null);
+      }
+      setIsCheckingAuth(false);
+    });
+    return () => unsubscribe();
   }, []);
+
+  // 用户登录后，加载云端会话数据
+  useEffect(() => {
+    if (!user || !cloudSyncEnabled) return;
+
+    const loadCloudData = async () => {
+      try {
+        setIsLoadingFromCloud(true);
+
+        // 获取或创建会话
+        const sid = await getOrCreateSession(user.uid);
+        setSessionId(sid);
+
+        // 从云端加载数据
+        const { session, images: cloudImages } = await loadSessionFromCloud(user.uid, sid);
+
+        if (session && cloudImages.length > 0) {
+          // 将云端数据转换为本地格式
+          const loadedImages: ImageItem[] = await Promise.all(
+            cloudImages.map(async (cloudImg: CloudImageData) => {
+              // 从 Storage URL 获取图片并转为 base64
+              const response = await fetch(cloudImg.storageUrl);
+              const blob = await response.blob();
+              const base64 = await new Promise<string>((resolve) => {
+                const reader = new FileReader();
+                reader.onloadend = () => {
+                  const result = reader.result as string;
+                  // 移除 data:image/xxx;base64, 前缀
+                  const base64Data = result.split(',')[1] || result;
+                  resolve(base64Data);
+                };
+                reader.readAsDataURL(blob);
+              });
+
+              return {
+                id: cloudImg.id,
+                src: cloudImg.storageUrl,
+                base64,
+                file: new File([blob], cloudImg.fileName, { type: cloudImg.mimeType }),
+                description: cloudImg.description,
+                ocrText: cloudImg.ocrText,
+                specs: cloudImg.specs || [],
+                issues: cloudImg.issues || [],
+                deterministicIssues: cloudImg.deterministicIssues || [],
+                diffs: cloudImg.diffs || []
+              };
+            })
+          );
+
+          setImages(loadedImages);
+          setManualSourceFields(session.qilFields || []);
+          setQilInputText(session.qilInputText || '');
+          console.log(`Loaded ${loadedImages.length} images from cloud`);
+        }
+      } catch (error) {
+        console.error('Failed to load cloud data:', error);
+      } finally {
+        setIsLoadingFromCloud(false);
+      }
+    };
+
+    loadCloudData();
+  }, [user, cloudSyncEnabled]);
 
   // Check for API Key on mount
   useEffect(() => {
@@ -285,31 +389,6 @@ const App: React.FC = () => {
       setErrorMessage("Missing VITE_OPENAI_API_KEY in .env.local");
     }
   }, []);
-
-  // 登录回调
-  const handleLogin = (loggedInUser: User) => {
-    setUser(loggedInUser);
-  };
-
-  // 登出回调
-  const handleLogout = () => {
-    logout();
-    setUser(null);
-  };
-
-  // 如果正在检查登录状态，显示加载
-  if (isCheckingAuth) {
-    return (
-      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
-        <Loader2 size={24} className="animate-spin text-indigo-400" />
-      </div>
-    );
-  }
-
-  // 如果未登录，显示登录页
-  if (!user) {
-    return <LoginPage onLogin={handleLogin} />;
-  }
 
   const handleCopy = async (text: string, id: string) => {
     try {
@@ -323,6 +402,12 @@ const App: React.FC = () => {
 
   // --- Handlers ---
   const processFile = useCallback(async (file: File) => {
+    // 未登录时弹出登录框
+    if (!user) {
+      setShowLoginModal(true);
+      return;
+    }
+
     if (!file.type.startsWith('image/')) {
       setErrorMessage("请上传图片文件");
       return;
@@ -334,8 +419,8 @@ const App: React.FC = () => {
     }
 
     // 检查配额
-    if (!canProcessImage()) {
-      setErrorMessage(`配额已用完（${user?.used}/${user?.quota}），请联系管理员`);
+    if (user.used >= user.quota) {
+      setErrorMessage(`配额已用完（${user.used}/${user.quota}），请联系管理员`);
       return;
     }
 
@@ -357,7 +442,7 @@ const App: React.FC = () => {
       };
 
       setImages(prev => [...prev, newImage]);
-      setCurrentImageIndex(images.length); // Switch to new image
+      setCurrentImageIndex(images.length);
 
       setIsProcessing(true);
       setProcessingImageId(newImageId);
@@ -399,8 +484,35 @@ const App: React.FC = () => {
       }
 
       // 消耗配额
-      useQuota(1);
-      setUser(getCurrentUser());
+      await useQuotaFirebase(user.uid, 1);
+      const updatedUser = await getUserData(user.uid);
+      if (updatedUser) setUser(updatedUser);
+
+      // 云同步 - 保存到 Firebase
+      if (cloudSyncEnabled && sessionId) {
+        setIsSyncing(true);
+        try {
+          // 获取最新的图片数据
+          const finalImage: ImageItem = {
+            id: newImageId,
+            src: url,
+            base64,
+            file,
+            description: diagResult.description,
+            ocrText: diagResult.ocrText,
+            specs: imageSpecs,
+            issues: diagResult.issues,
+            deterministicIssues: diagResult.deterministicIssues,
+            diffs: manualSourceFields.length > 0 ? await performSmartDiff(base64, manualSourceFields) : []
+          };
+          await saveImageToCloud(user.uid, sessionId, finalImage);
+          console.log('Image synced to cloud:', newImageId);
+        } catch (syncError) {
+          console.error('Cloud sync failed:', syncError);
+        } finally {
+          setIsSyncing(false);
+        }
+      }
 
     } catch (error: any) {
       console.error("Processing failed:", error);
@@ -409,11 +521,23 @@ const App: React.FC = () => {
       setIsProcessing(false);
       setProcessingImageId(null);
     }
-  }, [images.length, manualSourceFields]);
+  }, [user, images.length, manualSourceFields, cloudSyncEnabled, sessionId]);
 
   const handleRetryAnalysis = useCallback(async (imageId: string) => {
+    // 未登录时弹出登录框
+    if (!user) {
+      setShowLoginModal(true);
+      return;
+    }
+
     const image = images.find(img => img.id === imageId);
     if (!image) return;
+
+    // 检查配额
+    if (user.used >= user.quota) {
+      setErrorMessage(`配额已用完（${user.used}/${user.quota}），请联系管理员`);
+      return;
+    }
 
     try {
       setIsProcessing(true);
@@ -452,15 +576,37 @@ const App: React.FC = () => {
         ));
       }
 
+      // 消耗配额
+      await useQuotaFirebase(user.uid, 1);
+      const updatedUser = await getUserData(user.uid);
+      if (updatedUser) setUser(updatedUser);
+
+      // 云同步 - 更新图片数据
+      if (cloudSyncEnabled && sessionId) {
+        try {
+          await updateImageInCloud(user.uid, sessionId, imageId, {
+            description: diagResult.description,
+            ocrText: diagResult.ocrText,
+            specs: imageSpecs,
+            issues: diagResult.issues,
+            deterministicIssues: diagResult.deterministicIssues,
+            diffs: manualSourceFields.length > 0 ? await performSmartDiff(image.base64, manualSourceFields) : []
+          });
+          console.log('Image updated in cloud:', imageId);
+        } catch (syncError) {
+          console.error('Cloud sync failed:', syncError);
+        }
+      }
+
     } catch (error: any) {
       setErrorMessage(error.message || "重新分析失败");
     } finally {
       setIsProcessing(false);
       setProcessingImageId(null);
     }
-  }, [images, manualSourceFields]);
+  }, [user, images, manualSourceFields, cloudSyncEnabled, sessionId]);
 
-  const handleParseSource = async (text: string) => {
+  const handleParseSource = useCallback(async (text: string) => {
     setIsProcessing(true);
     try {
       const fields = await parseSourceText(text);
@@ -472,27 +618,47 @@ const App: React.FC = () => {
           img.id === currentImage.id ? { ...img, diffs } : img
         ));
       }
+
+      // 云同步 - 保存 QIL 数据
+      if (cloudSyncEnabled && sessionId && user) {
+        try {
+          await saveQilToCloud(user.uid, sessionId, fields, text);
+          console.log('QIL data synced to cloud');
+        } catch (error) {
+          console.error('Failed to sync QIL to cloud:', error);
+        }
+      }
     } catch (err) {
       setErrorMessage("Failed to parse source text.");
     } finally {
       setIsProcessing(false);
     }
-  };
+  }, [currentImage, cloudSyncEnabled, sessionId, user]);
 
-  const handleModelChange = (modelId: string) => {
+  const handleModelChange = useCallback((modelId: string) => {
     setModelId(modelId);
     setCurrentModel(modelId);
     setShowModelSelector(false);
-  };
+  }, []);
 
-  const handleRemoveImage = (id: string) => {
+  const handleRemoveImage = useCallback(async (id: string) => {
     setImages(prev => prev.filter(i => i.id !== id));
     if (currentImageIndex >= images.length - 1 && currentImageIndex > 0) {
       setCurrentImageIndex(currentImageIndex - 1);
     }
-  };
 
-  const handleReset = () => {
+    // 云同步 - 删除图片
+    if (cloudSyncEnabled && sessionId && user) {
+      try {
+        await deleteImageFromCloud(user.uid, sessionId, id);
+        console.log('Image deleted from cloud:', id);
+      } catch (error) {
+        console.error('Failed to delete image from cloud:', error);
+      }
+    }
+  }, [currentImageIndex, images.length, cloudSyncEnabled, sessionId, user]);
+
+  const handleReset = useCallback(async () => {
     setImages([]);
     setCurrentImageIndex(0);
     setManualSourceFields([]);
@@ -501,12 +667,21 @@ const App: React.FC = () => {
     setImageScale(1);
     setQilImages([]);
     setQilInputText('');
-    // 清除 localStorage
     localStorage.removeItem(STORAGE_KEY);
-  };
+
+    // 云同步 - 清空会话
+    if (cloudSyncEnabled && sessionId && user) {
+      try {
+        await clearSessionInCloud(user.uid, sessionId);
+        console.log('Session cleared in cloud');
+      } catch (error) {
+        console.error('Failed to clear session in cloud:', error);
+      }
+    }
+  }, [cloudSyncEnabled, sessionId, user]);
 
   // QIL 图片处理 - 支持多张
-  const handleQilImageFile = async (file: File) => {
+  const handleQilImageFile = useCallback(async (file: File) => {
     if (!file.type.startsWith('image/')) return;
     if (qilImages.length >= 4) {
       setErrorMessage('QIL 最多支持 4 张图片');
@@ -523,15 +698,15 @@ const App: React.FC = () => {
     };
     setQilImages(prev => [...prev, newQilImage]);
     setQilInputMode('image');
-  };
+  }, [qilImages.length]);
 
   // QIL 图片删除
-  const handleRemoveQilImage = (id: string) => {
+  const handleRemoveQilImage = useCallback((id: string) => {
     setQilImages(prev => prev.filter(img => img.id !== id));
-  };
+  }, []);
 
   // QIL 解析所有图片
-  const handleParseAllQilImages = async () => {
+  const handleParseAllQilImages = useCallback(async () => {
     const unparsedImages = qilImages.filter(img => !img.parsed);
     if (unparsedImages.length === 0) return;
 
@@ -545,13 +720,12 @@ const App: React.FC = () => {
         setParsingQilId(qilImg.id);
         const fields = await parseQILImage(qilImg.base64, qilImg.mimeType);
         allFields = [...allFields, ...fields];
-        // 标记为已解析
         setQilImages(prev => prev.map(img =>
           img.id === qilImg.id ? { ...img, parsed: true } : img
         ));
       }
 
-      // 去重（按 key）
+      // 去重
       const uniqueFields = allFields.reduce((acc, field) => {
         if (!acc.find(f => f.key === field.key)) {
           acc.push(field);
@@ -560,22 +734,20 @@ const App: React.FC = () => {
       }, [] as SourceField[]);
 
       setManualSourceFields(uniqueFields);
-      console.log('All QIL images parsed, total fields:', uniqueFields.length);
     } catch (error: any) {
       setErrorMessage(error.message || 'QIL 图片解析失败');
     } finally {
       setIsParsingQil(false);
       setParsingQilId(null);
     }
-  };
+  }, [qilImages, manualSourceFields]);
 
-  // Global Paste Handler - 智能判断粘贴目标
+  // Global Paste Handler
   useEffect(() => {
     const handlePaste = (e: ClipboardEvent) => {
       const items = e.clipboardData?.items;
       if (!items) return;
 
-      // 检查是否聚焦在 QIL 区域
       const activeElement = document.activeElement;
       const isQilFocused = activeElement?.closest('.qil-input-area');
 
@@ -584,10 +756,8 @@ const App: React.FC = () => {
           const file = items[i].getAsFile();
           if (file) {
             if (isQilFocused || qilInputMode === 'image') {
-              // 粘贴到 QIL 区域
               handleQilImageFile(file);
             } else {
-              // 粘贴到主画布
               processFile(file);
             }
           }
@@ -597,18 +767,18 @@ const App: React.FC = () => {
     };
     window.addEventListener('paste', handlePaste);
     return () => window.removeEventListener('paste', handlePaste);
-  }, [processFile, qilInputMode]);
+  }, [processFile, qilInputMode, handleQilImageFile]);
 
   // Global Drag & Drop
-  const onDragOver = (e: React.DragEvent) => e.preventDefault();
-  const onDrop = (e: React.DragEvent) => {
+  const onDragOver = useCallback((e: React.DragEvent) => e.preventDefault(), []);
+  const onDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     const file = e.dataTransfer.files?.[0];
     if (file) processFile(file);
-  };
+  }, [processFile]);
 
   // Resize handler for bottom panel
-  const handleResizeStart = (e: React.MouseEvent) => {
+  const handleResizeStart = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
     setIsResizing(true);
     const startY = e.clientY;
@@ -628,16 +798,37 @@ const App: React.FC = () => {
 
     document.addEventListener('mousemove', handleMouseMove);
     document.addEventListener('mouseup', handleMouseUp);
-  };
+  }, [bottomHeight]);
 
-  const getStyleForBox = (box: BoundingBox) => ({
+  const getStyleForBox = useCallback((box: BoundingBox) => ({
     top: `${box.ymin / 10}%`,
     left: `${box.xmin / 10}%`,
     height: `${(box.ymax - box.ymin) / 10}%`,
     width: `${(box.xmax - box.xmin) / 10}%`,
-  });
+  }), []);
+
+  const handleLogout = useCallback(async () => {
+    await signOutUser();
+    setUser(null);
+  }, []);
+
+  const handleLogin = useCallback((loggedInUser: UserData) => {
+    setUser(loggedInUser);
+  }, []);
 
   const isCurrentProcessing = currentImage && processingImageId === currentImage.id;
+
+  // 加载中状态
+  if (isCheckingAuth) {
+    return (
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
+        <div className="flex items-center gap-3">
+          <Loader2 size={24} className="animate-spin text-indigo-400" />
+          <span className="text-slate-400">加载中...</span>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div
@@ -645,86 +836,241 @@ const App: React.FC = () => {
       onDragOver={onDragOver}
       onDrop={onDrop}
     >
+      {/* 登录弹窗 */}
+      <LoginModal
+        isOpen={showLoginModal}
+        onClose={() => setShowLoginModal(false)}
+        onLogin={handleLogin}
+      />
+
       {/* TOP BAR */}
-      <div className="h-14 border-b border-slate-800 bg-slate-900 flex items-center justify-between px-4 shrink-0">
-        <div className="flex items-center gap-4">
-          {/* Logo */}
+      <div className="h-12 border-b border-slate-800 bg-slate-900 flex items-center justify-between px-4 shrink-0">
+        {/* Left: Product Name */}
+        <div className="flex items-center gap-3">
+          {/* 产品名称 - 可编辑 */}
           <div className="flex items-center gap-2">
-            <div className="bg-indigo-500/20 p-1.5 rounded text-indigo-400">
-              <Zap size={18} fill="currentColor" />
-            </div>
-            <div>
-              <div className="text-sm font-bold text-white">包装稿审核 Pro</div>
-              <div className="text-[10px] text-slate-500">v3.3 • QIL 对比</div>
-            </div>
+            {isEditingProductName ? (
+              <input
+                type="text"
+                value={productName}
+                onChange={(e) => setProductName(e.target.value)}
+                onBlur={() => setIsEditingProductName(false)}
+                onKeyDown={(e) => e.key === 'Enter' && setIsEditingProductName(false)}
+                className="bg-slate-800 border border-slate-600 rounded px-2 py-1 text-sm text-white w-40 focus:outline-none focus:border-slate-500"
+                autoFocus
+              />
+            ) : (
+              <button
+                onClick={() => user && setIsEditingProductName(true)}
+                className="text-sm font-medium text-white hover:text-slate-300 transition-colors flex items-center gap-1"
+                title="点击编辑产品名称"
+              >
+                {productName}
+                {user && <span className="text-slate-600 text-xs">✎</span>}
+              </button>
+            )}
+
+            {/* 产品切换下拉 */}
+            {user && (
+              <div className="relative">
+                <button
+                  onClick={() => setShowProductList(!showProductList)}
+                  className="p-1 text-slate-500 hover:text-slate-300 hover:bg-slate-800 rounded transition-colors"
+                  title="切换产品"
+                >
+                  <ChevronDown size={14} className={`transition-transform ${showProductList ? 'rotate-180' : ''}`} />
+                </button>
+
+                {showProductList && (
+                  <div className="absolute top-full left-0 mt-1 w-48 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-50">
+                    <div className="p-2 border-b border-slate-700">
+                      <button
+                        onClick={() => {
+                          setProductName('未命名产品');
+                          setImages([]);
+                          setManualSourceFields([]);
+                          setQilInputText('');
+                          setShowProductList(false);
+                        }}
+                        className="w-full px-3 py-2 text-xs text-slate-300 hover:bg-slate-700 rounded flex items-center gap-2"
+                      >
+                        <ImagePlus size={12} />
+                        新建产品
+                      </button>
+                    </div>
+                    <div className="p-1 text-[10px] text-slate-500 text-center">
+                      历史产品（开发中）
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
+          {/* 分隔线 */}
+          <div className="h-5 w-px bg-slate-700" />
+
+          {/* 云同步状态 */}
+          {user && (
+            <div className="flex items-center gap-1.5" title={cloudSyncEnabled ? '云同步已开启' : '云同步已关闭'}>
+              {isSyncing || isLoadingFromCloud ? (
+                <Loader2 size={12} className="animate-spin text-slate-500" />
+              ) : (
+                <Cloud size={12} className="text-slate-500" />
+              )}
+              <span className="text-[10px] text-slate-500">
+                {isSyncing ? '同步中' : isLoadingFromCloud ? '加载中' : '已同步'}
+              </span>
+            </div>
+          )}
+        </div>
+
+        {/* Center: Image Tools */}
+        <div className="flex items-center gap-2">
+          {/* 添加图片 */}
+          <label className="flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-slate-100 text-slate-900 text-xs font-medium rounded cursor-pointer transition-colors">
+            <ImagePlus size={14} />
+            <span>添加图片</span>
+            <input type="file" accept="image/*" className="hidden" onChange={(e) => e.target.files?.[0] && processFile(e.target.files[0])} />
+          </label>
+
+          {/* 图片计数 */}
+          {images.length > 0 && (
+            <div className="px-2 py-1 bg-slate-800 rounded text-[10px] text-slate-400">
+              {images.length}/8
+            </div>
+          )}
+
+          {/* 分隔线 */}
+          {currentImage && <div className="h-5 w-px bg-slate-700" />}
+
+          {/* 图片查看工具 */}
+          {currentImage && (
+            <>
+              <button
+                onClick={() => setShowOverlay(!showOverlay)}
+                className={`p-1.5 rounded transition-colors ${showOverlay ? 'bg-slate-800 text-white' : 'text-slate-500 hover:bg-slate-800'}`}
+                title="显示/隐藏标注"
+              >
+                {showOverlay ? <Eye size={14} /> : <EyeOff size={14} />}
+              </button>
+              <button onClick={() => setImageScale(s => Math.min(3, s * 1.2))} className="p-1.5 text-slate-500 hover:bg-slate-800 hover:text-white rounded transition-colors" title="放大">
+                <ZoomIn size={14} />
+              </button>
+              <button onClick={() => setImageScale(s => Math.max(0.3, s / 1.2))} className="p-1.5 text-slate-500 hover:bg-slate-800 hover:text-white rounded transition-colors" title="缩小">
+                <ZoomOut size={14} />
+              </button>
+              <span className="text-[10px] text-slate-500 px-1 min-w-[36px] text-center">{Math.round(imageScale * 100)}%</span>
+              <button onClick={() => { setImageScale(1); setImageRotation(0); }} className="p-1.5 text-slate-500 hover:bg-slate-800 hover:text-white rounded transition-colors" title="重置">
+                <Maximize2 size={14} />
+              </button>
+              <button onClick={() => setImageRotation(r => r - 90)} className="p-1.5 text-slate-500 hover:bg-slate-800 hover:text-white rounded transition-colors" title="逆时针旋转">
+                <RotateCcw size={14} />
+              </button>
+              <button onClick={() => setImageRotation(r => r + 90)} className="p-1.5 text-slate-500 hover:bg-slate-800 hover:text-white rounded transition-colors" title="顺时针旋转">
+                <RotateCw size={14} />
+              </button>
+            </>
+          )}
+
+          {/* 清空 */}
+          {images.length > 0 && (
+            <>
+              <div className="h-5 w-px bg-slate-700" />
+              <button
+                onClick={handleReset}
+                className="p-1.5 text-slate-500 hover:text-white hover:bg-slate-800 rounded transition-colors"
+                title="清空全部"
+              >
+                <Trash2 size={14} />
+              </button>
+            </>
+          )}
+        </div>
+
+        {/* Right: User & Settings */}
+        <div className="flex items-center gap-3">
           {/* Model Selector */}
           <div className="relative">
             <button
               onClick={() => setShowModelSelector(!showModelSelector)}
-              className="bg-slate-800 px-3 py-1.5 rounded-lg border border-slate-700 text-xs flex items-center gap-2 hover:border-indigo-500/50 transition-colors"
+              className="bg-slate-800 px-2.5 py-1 rounded border border-slate-700 text-[11px] flex items-center gap-1.5 hover:border-slate-600 transition-colors"
             >
-              <span className="text-emerald-400 font-medium">
-                {AVAILABLE_MODELS.find(m => m.id === currentModel)?.name || 'GPT-4o'}
+              <span className="text-slate-400">
+                {AVAILABLE_MODELS.find(m => m.id === currentModel)?.name || 'Gemini'}
               </span>
-              <ChevronDown size={14} className={`text-slate-500 transition-transform ${showModelSelector ? 'rotate-180' : ''}`} />
+              <ChevronDown size={12} className={`text-slate-500 transition-transform ${showModelSelector ? 'rotate-180' : ''}`} />
             </button>
 
             {showModelSelector && (
-              <div className="absolute top-full left-0 mt-1 bg-slate-900 border border-slate-700 rounded-lg shadow-2xl overflow-hidden min-w-[200px] z-50">
+              <div className="absolute top-full right-0 mt-1 bg-slate-800 border border-slate-700 rounded-lg shadow-xl overflow-hidden min-w-[180px] z-50">
                 {AVAILABLE_MODELS.map(model => (
                   <button
                     key={model.id}
                     onClick={() => handleModelChange(model.id)}
-                    className={`w-full px-4 py-2 text-left hover:bg-slate-800 transition-colors flex items-center justify-between ${
-                      currentModel === model.id ? 'bg-indigo-500/10' : ''
+                    className={`w-full px-3 py-2 text-left hover:bg-slate-700 transition-colors flex items-center justify-between ${
+                      currentModel === model.id ? 'bg-slate-700' : ''
                     }`}
                   >
                     <div>
-                      <div className={`text-sm font-medium ${currentModel === model.id ? 'text-indigo-400' : 'text-slate-300'}`}>
+                      <div className={`text-xs font-medium ${currentModel === model.id ? 'text-white' : 'text-slate-300'}`}>
                         {model.name}
                       </div>
                       <div className="text-[10px] text-slate-500">{model.description}</div>
                     </div>
-                    {currentModel === model.id && <div className="w-2 h-2 bg-indigo-400 rounded-full"></div>}
+                    {currentModel === model.id && <div className="w-1.5 h-1.5 bg-white rounded-full"></div>}
                   </button>
                 ))}
               </div>
             )}
           </div>
-        </div>
 
-        {/* Right controls */}
-        <div className="flex items-center gap-3">
-          {/* 配额显示 */}
-          <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-800 rounded-lg">
-            <div className="text-[10px] text-slate-500">配额</div>
-            <div className={`text-xs font-bold ${
-              (user?.quota || 0) - (user?.used || 0) <= 5 ? 'text-red-400' : 'text-emerald-400'
-            }`}>
-              {(user?.quota || 0) - (user?.used || 0)} / {user?.quota || 0}
-            </div>
-          </div>
+          {user ? (
+            <>
+              {/* 配额 */}
+              <div className="flex items-center gap-1.5 px-2 py-1 bg-slate-800 rounded text-[10px]">
+                <span className="text-slate-500">额度</span>
+                <span className="text-slate-300 font-medium tabular-nums">{user.quota - user.used}/{user.quota}</span>
+              </div>
 
-          {/* 用户信息 */}
-          <div className="flex items-center gap-2">
-            <div className="flex items-center gap-1.5 px-2 py-1 bg-slate-800 rounded-lg">
-              <UserIcon size={12} className="text-slate-500" />
-              <span className="text-xs text-slate-300">{user?.username}</span>
-            </div>
+              {/* 用户头像 */}
+              <div className="relative group">
+                <button className="flex items-center gap-1.5 p-1 rounded hover:bg-slate-800 transition-all">
+                  <div className="w-6 h-6 rounded-full bg-slate-700 overflow-hidden">
+                    {user.photoURL ? (
+                      <img src={user.photoURL} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-[10px] font-medium text-slate-400">
+                        {(user.displayName || user.email || 'U')[0].toUpperCase()}
+                      </div>
+                    )}
+                  </div>
+                  <ChevronDown size={12} className="text-slate-500" />
+                </button>
+
+                {/* 下拉菜单 */}
+                <div className="absolute top-full right-0 mt-1 w-44 py-1 bg-slate-800 border border-slate-700 rounded-lg shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50">
+                  <div className="px-3 py-2 border-b border-slate-700">
+                    <div className="text-xs font-medium text-slate-300 truncate">{user.displayName || '用户'}</div>
+                    <div className="text-[10px] text-slate-500 truncate">{user.email}</div>
+                  </div>
+                  <button
+                    onClick={handleLogout}
+                    className="w-full px-3 py-2 text-left text-xs text-slate-400 hover:text-slate-200 hover:bg-slate-700 transition-colors flex items-center gap-2"
+                  >
+                    <LogOut size={12} />
+                    退出登录
+                  </button>
+                </div>
+              </div>
+            </>
+          ) : (
             <button
-              onClick={handleLogout}
-              className="p-1.5 text-slate-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
-              title="退出登录"
+              onClick={() => setShowLoginModal(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-slate-100 text-slate-900 rounded text-xs font-medium transition-colors"
             >
-              <LogOut size={14} />
-            </button>
-          </div>
-
-          {images.length > 0 && (
-            <button onClick={handleReset} className="px-3 py-1.5 text-xs text-red-400 hover:bg-red-500/10 rounded-lg transition-colors">
-              清空全部
+              <GoogleIcon />
+              登录
             </button>
           )}
         </div>
@@ -733,15 +1079,11 @@ const App: React.FC = () => {
       {/* MAIN CONTENT */}
       <div className="flex-1 flex min-h-0">
         {/* LEFT: Thumbnails */}
-        <div className="w-[140px] border-r border-slate-800 bg-slate-950 p-2 overflow-y-auto shrink-0">
-          <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2 flex items-center justify-between">
-            <span>图片 ({images.length}/8)</span>
-            <label className="text-indigo-400 hover:text-indigo-300 cursor-pointer">
-              <ImagePlus size={12} />
-              <input type="file" accept="image/*" className="hidden" onChange={(e) => e.target.files?.[0] && processFile(e.target.files[0])} />
-            </label>
+        <div className="w-[140px] border-r border-slate-800 bg-slate-950 p-2 overflow-y-auto shrink-0 flex flex-col">
+          <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">
+            图片列表
           </div>
-          <div className="space-y-2">
+          <div className="space-y-2 flex-1">
             {images.map((img, idx) => (
               <div
                 key={img.id}
@@ -774,11 +1116,10 @@ const App: React.FC = () => {
               </div>
             ))}
             {images.length === 0 && (
-              <label className="block p-4 border-2 border-dashed border-slate-700 rounded-lg text-center cursor-pointer hover:border-indigo-500/50 transition-colors">
-                <ImagePlus size={20} className="mx-auto text-slate-600 mb-1" />
-                <span className="text-[9px] text-slate-600">添加图片</span>
-                <input type="file" accept="image/*" className="hidden" onChange={(e) => e.target.files?.[0] && processFile(e.target.files[0])} />
-              </label>
+              <div className="p-4 border-2 border-dashed border-slate-800 rounded-lg text-center">
+                <ImagePlus size={20} className="mx-auto text-slate-700 mb-1" />
+                <span className="text-[9px] text-slate-600">点击顶部按钮添加</span>
+              </div>
             )}
           </div>
         </div>
@@ -794,40 +1135,8 @@ const App: React.FC = () => {
             }}
           />
 
-          {/* Floating Toolbar - Top Center */}
-          {currentImage && (
-            <div className="absolute top-4 left-1/2 -translate-x-1/2 z-20 flex items-center gap-1 bg-slate-900/90 backdrop-blur-md px-2 py-1.5 rounded-lg border border-slate-700/50 shadow-xl">
-              <button
-                onClick={() => setShowOverlay(!showOverlay)}
-                className={`p-1.5 rounded transition-colors ${showOverlay ? 'bg-indigo-500/20 text-indigo-400' : 'text-slate-500 hover:bg-slate-800'}`}
-                title="显示/隐藏标注"
-              >
-                {showOverlay ? <Eye size={14} /> : <EyeOff size={14} />}
-              </button>
-              <div className="w-px h-4 bg-slate-700 mx-1" />
-              <button onClick={() => setImageScale(s => Math.min(3, s * 1.2))} className="p-1.5 text-slate-400 hover:bg-slate-800 rounded transition-colors" title="放大">
-                <ZoomIn size={14} />
-              </button>
-              <button onClick={() => setImageScale(s => Math.max(0.3, s / 1.2))} className="p-1.5 text-slate-400 hover:bg-slate-800 rounded transition-colors" title="缩小">
-                <ZoomOut size={14} />
-              </button>
-              <span className="text-[10px] text-slate-500 px-1 min-w-[40px] text-center">{Math.round(imageScale * 100)}%</span>
-              <button onClick={() => { setImageScale(1); setImageRotation(0); }} className="p-1.5 text-slate-400 hover:bg-slate-800 rounded transition-colors" title="重置">
-                <Maximize2 size={14} />
-              </button>
-              <div className="w-px h-4 bg-slate-700 mx-1" />
-              <button onClick={() => setImageRotation(r => r - 90)} className="p-1.5 text-slate-400 hover:bg-slate-800 rounded transition-colors" title="逆时针旋转">
-                <RotateCcw size={14} />
-              </button>
-              <button onClick={() => setImageRotation(r => r + 90)} className="p-1.5 text-slate-400 hover:bg-slate-800 rounded transition-colors" title="顺时针旋转">
-                <RotateCw size={14} />
-              </button>
-            </div>
-          )}
-
           {currentImage ? (
             <>
-              {/* Image with transform */}
               <div
                 className="relative"
                 style={{
@@ -835,7 +1144,6 @@ const App: React.FC = () => {
                   transition: 'transform 0.2s'
                 }}
               >
-                {/* Image with overlay container - overlays positioned relative to actual image */}
                 <div className="relative inline-block">
                   <img
                     src={currentImage.src}
@@ -845,7 +1153,6 @@ const App: React.FC = () => {
                     style={{ maxWidth: '100%', height: 'auto' }}
                   />
 
-                  {/* Issue overlays - show if box_2d exists */}
                   {showOverlay && !isCurrentProcessing && currentImage.issues.map(issue => (
                     issue.box_2d && (
                       <div
@@ -860,7 +1167,6 @@ const App: React.FC = () => {
                         }`}
                         style={getStyleForBox(issue.box_2d)}
                       >
-                        {/* Tooltip on hover */}
                         <div className={`absolute -top-8 left-1/2 -translate-x-1/2 bg-slate-900 text-white text-[10px] px-2 py-1 rounded shadow-lg whitespace-nowrap pointer-events-none border border-slate-700 transition-opacity ${selectedIssueId === issue.id ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
                           {issue.original || issue.text}
                         </div>
@@ -870,7 +1176,6 @@ const App: React.FC = () => {
                 </div>
               </div>
 
-              {/* Processing overlay - NOT affected by rotation */}
               {isCurrentProcessing && (
                 <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                   <div className="bg-slate-900/90 backdrop-blur px-6 py-4 rounded-xl border border-indigo-500/50">
@@ -895,16 +1200,18 @@ const App: React.FC = () => {
                 <ImagePlus className="text-slate-500" size={48} />
               </div>
               <p className="text-slate-400 font-medium mb-2">Ctrl+V 粘贴图片</p>
-              <p className="text-slate-600 text-sm">或拖拽图片到此处</p>
-              <label className="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium rounded-lg cursor-pointer transition-colors">
+              <p className="text-slate-600 text-sm mb-4">或拖拽图片到此处</p>
+              <label className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium rounded-lg cursor-pointer transition-colors">
                 <Upload size={16} />
                 选择文件
                 <input type="file" accept="image/*" className="hidden" onChange={(e) => e.target.files?.[0] && processFile(e.target.files[0])} />
               </label>
+              {!user && (
+                <p className="text-slate-600 text-xs mt-4">上传图片需要先登录</p>
+              )}
             </div>
           )}
 
-          {/* Image nav arrows */}
           {images.length > 1 && (
             <>
               <button
@@ -927,7 +1234,6 @@ const App: React.FC = () => {
 
         {/* RIGHT: Issues Panel */}
         <div className="w-[380px] border-l border-slate-800 bg-slate-900 flex flex-col">
-          {/* Tab Header */}
           <div className="px-2 py-2 border-b border-slate-800 flex items-center gap-1 bg-slate-900">
             <button
               onClick={() => setRightPanelTab('issues')}
@@ -966,7 +1272,6 @@ const App: React.FC = () => {
             </button>
           </div>
 
-          {/* Description */}
           {currentImage?.description && (
             <div className="px-4 py-2 border-b border-slate-800/50 bg-slate-800/30">
               <div className="flex items-center gap-1.5 text-[10px] text-slate-500 mb-1">
@@ -976,7 +1281,6 @@ const App: React.FC = () => {
             </div>
           )}
 
-          {/* Tab Content */}
           <div ref={issueListRef} className="flex-1 overflow-y-auto">
             {!currentImage ? (
               <div className="text-center py-12 text-slate-600">
@@ -989,7 +1293,6 @@ const App: React.FC = () => {
                 <p className="text-xs">正在分析...</p>
               </div>
             ) : rightPanelTab === 'ocr' ? (
-              /* OCR 原文展示 */
               <div className="p-3">
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">识别文字</span>
@@ -1013,9 +1316,7 @@ const App: React.FC = () => {
                 )}
               </div>
             ) : (
-              /* 检测问题展示 */
               <div className="p-3 space-y-3">
-                {/* 确定性问题（100% 准确） */}
                 {currentImage.deterministicIssues && currentImage.deterministicIssues.length > 0 && (
                   <div className="space-y-2">
                     <div className="flex items-center gap-2 text-[10px] font-bold text-red-400 uppercase tracking-wider">
@@ -1039,7 +1340,6 @@ const App: React.FC = () => {
                   </div>
                 )}
 
-                {/* AI 建议问题（需人工确认） */}
                 {currentImage.issues.length > 0 && (
                   <div className="space-y-2">
                     <div className="flex items-center gap-2 text-[10px] font-bold text-amber-400 uppercase tracking-wider">
@@ -1119,7 +1419,6 @@ const App: React.FC = () => {
                   </div>
                 )}
 
-                {/* 无问题 */}
                 {currentImage.issues.length === 0 && (!currentImage.deterministicIssues || currentImage.deterministicIssues.length === 0) && (
                   <div className="text-center py-12 text-slate-600">
                     <CheckCircle size={24} className="mx-auto mb-2 text-emerald-500/50" />
@@ -1133,9 +1432,8 @@ const App: React.FC = () => {
         </div>
       </div>
 
-      {/* BOTTOM BAR - Resizable */}
+      {/* BOTTOM BAR */}
       <div style={{ height: bottomHeight }} className="border-t border-slate-800 bg-slate-950 flex flex-col shrink-0 relative">
-        {/* Resize Handle */}
         <div
           onMouseDown={handleResizeStart}
           className={`absolute top-0 left-0 right-0 h-1.5 cursor-ns-resize hover:bg-indigo-500/50 transition-colors ${isResizing ? 'bg-indigo-500/50' : ''}`}
@@ -1149,7 +1447,6 @@ const App: React.FC = () => {
               QIL 源数据
             </div>
 
-            {/* Mode Toggle */}
             <div className="flex gap-1 mb-2 bg-slate-900 p-0.5 rounded">
               <button
                 onClick={() => setQilInputMode('text')}
@@ -1216,19 +1513,16 @@ const App: React.FC = () => {
                       {qilImages.map((qilImg) => (
                         <div key={qilImg.id} className="relative group">
                           <img src={qilImg.src} alt="QIL" className="w-full h-24 object-cover rounded border border-slate-700" />
-                          {/* 已解析标记 */}
                           {qilImg.parsed && (
                             <div className="absolute top-1 left-1 bg-emerald-500/80 text-white text-[8px] px-1 rounded">
                               已解析
                             </div>
                           )}
-                          {/* 解析中 */}
                           {parsingQilId === qilImg.id && (
                             <div className="absolute inset-0 bg-slate-900/80 flex items-center justify-center rounded">
                               <Loader2 size={16} className="animate-spin text-indigo-400" />
                             </div>
                           )}
-                          {/* 删除按钮 */}
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
@@ -1240,7 +1534,6 @@ const App: React.FC = () => {
                           </button>
                         </div>
                       ))}
-                      {/* 添加更多按钮 */}
                       {qilImages.length < 4 && (
                         <div className="h-24 border-2 border-dashed border-slate-700 rounded flex flex-col items-center justify-center text-slate-600 hover:border-indigo-500/50 hover:text-slate-500 transition-colors">
                           <ImagePlus size={16} />
@@ -1248,7 +1541,6 @@ const App: React.FC = () => {
                         </div>
                       )}
                     </div>
-                    {/* 解析按钮 */}
                     {qilImages.some(img => !img.parsed) && (
                       <button
                         onClick={(e) => {
@@ -1281,9 +1573,8 @@ const App: React.FC = () => {
             )}
           </div>
 
-          {/* Specs Table with Tabs */}
+          {/* Specs Table */}
           <div className="flex-1 flex flex-col min-w-0">
-            {/* Tab Bar */}
             <div className="px-3 py-2 bg-slate-900 border-b border-slate-800 flex items-center gap-1 overflow-x-auto shrink-0">
               <FileSpreadsheet size={12} className="text-emerald-400 shrink-0 mr-1" />
               <button
@@ -1320,18 +1611,10 @@ const App: React.FC = () => {
               >
                 对比汇总
               </button>
-              <span className="ml-auto text-[10px] text-slate-600 shrink-0">
-                {specsTab === 'all'
-                  ? `共 ${images.reduce((sum, img) => sum + (img.specs?.length || 0), 0)} 个字段`
-                  : `${images.find(img => img.id === specsTab)?.specs?.length || 0} 个字段`
-                }
-              </span>
             </div>
 
-            {/* Table Content */}
             <div className="flex-1 overflow-auto p-3">
               {specsTab === 'qil' ? (
-                /* QIL 源数据表格 */
                 manualSourceFields.length === 0 ? (
                   <div className="h-full flex flex-col items-center justify-center text-slate-700">
                     <Table size={24} className="mb-2 opacity-30" />
@@ -1359,7 +1642,6 @@ const App: React.FC = () => {
                   </table>
                 )
               ) : specsTab === 'diff' ? (
-                /* 对比汇总 - 简洁表格，差异优先 */
                 (() => {
                   if (images.length === 0 || manualSourceFields.length === 0) {
                     return (
@@ -1373,7 +1655,6 @@ const App: React.FC = () => {
                     );
                   }
 
-                  // 计算所有对比结果
                   const allResults = manualSourceFields.map(field => {
                     const imageResults = images.map(img => {
                       if (!img.specs?.length) return { value: '-', status: 'pending' };
@@ -1400,7 +1681,6 @@ const App: React.FC = () => {
                     return { field, imageResults, hasError, hasWarning };
                   });
 
-                  // 排序：差异 > 警告 > 匹配
                   const sortedResults = [...allResults].sort((a, b) => {
                     if (a.hasError && !b.hasError) return -1;
                     if (!a.hasError && b.hasError) return 1;
@@ -1409,7 +1689,6 @@ const App: React.FC = () => {
                     return 0;
                   });
 
-                  // 统计
                   const errorCount = allResults.filter(r => r.hasError).length;
                   const warningCount = allResults.filter(r => r.hasWarning && !r.hasError).length;
                   const matchCount = allResults.length - errorCount - warningCount;
@@ -1417,7 +1696,6 @@ const App: React.FC = () => {
 
                   return (
                     <div className="flex flex-col h-full">
-                      {/* 结论 */}
                       <div className={`px-3 py-2 mb-2 rounded flex items-center justify-between ${
                         allPass ? 'bg-emerald-500/10' : errorCount > 0 ? 'bg-red-500/10' : 'bg-amber-500/10'
                       }`}>
@@ -1431,7 +1709,6 @@ const App: React.FC = () => {
                         </span>
                       </div>
 
-                      {/* 表格 */}
                       <div className="flex-1 overflow-auto">
                         <table className="w-full text-[11px]">
                           <thead className="bg-slate-800 sticky top-0">
@@ -1496,7 +1773,6 @@ const App: React.FC = () => {
                   );
                 })()
               ) : (
-                /* 单张图片规格 */
                 (() => {
                   const currentSpecs = images.find(img => img.id === specsTab)?.specs || [];
 
@@ -1520,7 +1796,7 @@ const App: React.FC = () => {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-800/50">
-                        {currentSpecs.map((spec: any, idx: number) => (
+                        {currentSpecs.map((spec: ImageSpec, idx: number) => (
                           <tr key={idx} className="hover:bg-slate-800/30">
                             <td className="px-3 py-2 text-slate-500">{spec.category}</td>
                             <td className="px-3 py-2 text-slate-300 font-medium">{spec.key}</td>
