@@ -18,6 +18,9 @@ export type IssueType =
   | 'format'         // 8. Output Format
   | 'compliance';    // Extra: Ads law/Regulations
 
+// 置信度级别
+export type ConfidenceLevel = 'certain' | 'likely' | 'possible';
+
 export interface DiagnosisIssue {
   id: string;
   type: IssueType;
@@ -27,7 +30,17 @@ export interface DiagnosisIssue {
   suggestion: string;
   location_desc?: string;
   severity: 'high' | 'medium' | 'low';
+  confidence?: ConfidenceLevel; // 置信度
   box_2d?: BoundingBox; // Normalized 0-1000
+}
+
+// 确定性检查结果（括号配对等）
+export interface DeterministicCheck {
+  id: string;
+  type: 'bracket_mismatch' | 'encoding_error' | 'format_error';
+  description: string;
+  location: string; // 在 OCR 文本中的位置描述
+  severity: 'high' | 'medium';
 }
 
 export interface SourceField {
@@ -72,13 +85,17 @@ export interface ImageItem {
   base64: string;
   file: File;
   description?: string; // 图片内容描述
+  ocrText?: string;     // OCR 提取的原文（新增）
   specs: ImageSpec[];   // 图片提取的参数
   issues: DiagnosisIssue[];
+  deterministicIssues?: DeterministicCheck[]; // 确定性问题（新增）
   diffs: DiffResult[];
 }
 
 // 诊断结果包含描述
 export interface DiagnosisResult {
   description: string;
+  ocrText: string;      // OCR 原文（新增）
   issues: DiagnosisIssue[];
+  deterministicIssues: DeterministicCheck[]; // 确定性问题（新增）
 }

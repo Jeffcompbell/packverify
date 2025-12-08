@@ -1,5 +1,5 @@
 import OpenAI from 'openai';
-import { DiagnosisIssue, DiffResult, SourceField, DiagnosisResult } from "../types";
+import { DiagnosisIssue, DiffResult, SourceField, DiagnosisResult, DeterministicCheck } from "../types";
 
 // Helper to convert file to base64
 export const fileToGenerativePart = async (file: File): Promise<string> => {
@@ -16,22 +16,52 @@ export const fileToGenerativePart = async (file: File): Promise<string> => {
     });
 };
 
-const getClient = () => {
-    const apiKey = import.meta.env.VITE_OPENAI_API_KEY;
-    if (!apiKey) {
-        console.error("API Key not found. Please set VITE_OPENAI_API_KEY");
-    } else {
-        console.log("API Key found (length):", apiKey.length);
-    }
-    return new OpenAI({
-        apiKey: apiKey || 'dummy', // Prevent crash if key missing, will fail on request
-        baseURL: "https://zenmux.ai/api/v1",
-        dangerouslyAllowBrowser: true // Required for client-side usage
-    });
-};
+// 模型配置 - 支持不同的 baseURL
+interface ModelConfig {
+    id: string;
+    name: string;
+    description: string;
+    baseURL: string;
+}
 
-// 从环境变量获取模型ID，默认为 gpt-5.1（最新最强模型）
-let currentModelId = import.meta.env.VITE_OPENAI_MODEL || "openai/gpt-5.1";
+// 可用的模型列表 - 统一使用 /api/v1 端点
+export const AVAILABLE_MODELS: ModelConfig[] = [
+    // Gemini 系列（推荐）
+    {
+        id: "google/gemini-3-pro-preview",
+        name: "Gemini 3 Pro",
+        description: "最新预览版，多模态最强",
+        baseURL: "https://zenmux.ai/api/v1"
+    },
+    {
+        id: "google/gemini-2.5-pro",
+        name: "Gemini 2.5 Pro",
+        description: "稳定版（推荐）",
+        baseURL: "https://zenmux.ai/api/v1"
+    },
+    {
+        id: "google/gemini-2.5-flash",
+        name: "Gemini 2.5 Flash",
+        description: "快速版，性价比高",
+        baseURL: "https://zenmux.ai/api/v1"
+    },
+    // OpenAI 系列（备选）
+    {
+        id: "openai/gpt-4o",
+        name: "GPT-4o",
+        description: "OpenAI 多模态",
+        baseURL: "https://zenmux.ai/api/v1"
+    },
+    {
+        id: "openai/gpt-4o-mini",
+        name: "GPT-4o Mini",
+        description: "快速轻量版",
+        baseURL: "https://zenmux.ai/api/v1"
+    },
+];
+
+// 默认使用 Gemini 2.5 Pro
+let currentModelId = import.meta.env.VITE_OPENAI_MODEL || "google/gemini-2.5-pro";
 
 export const getModelId = () => currentModelId;
 
@@ -40,224 +70,181 @@ export const setModelId = (modelId: string) => {
     console.log("Model changed to:", currentModelId);
 };
 
-// 可用的模型列表 - zenmux.ai 代理已测试验证
-// 注意：模型ID需要使用 openai/ 前缀
-export const AVAILABLE_MODELS = [
-    // GPT-5.1 (2025年最新，已验证可用)
-    { id: "openai/gpt-5.1", name: "GPT-5.1", description: "最新旗舰模型（推荐）" },
-    // GPT-4.1 系列 (已验证可用)
-    { id: "openai/gpt-4.1", name: "GPT-4.1", description: "百万上下文，长文本专家" },
-    // GPT-4o 系列 (已验证可用)
-    { id: "openai/gpt-4o", name: "GPT-4o", description: "多模态模型，稳定可靠" },
-    { id: "openai/gpt-4o-mini", name: "GPT-4o Mini", description: "快速轻量版" },
-];
-
-// Step 1: Initial image analysis - GPT vision first pass
-export const initialImageAnalysis = async (base64Image: string, mimeType: string): Promise<{ description: string; initialIssues: any[]; observedText: string }> => {
-    try {
-        const client = getClient();
-        const modelId = getModelId();
-        console.log("Step 1: Initial vision analysis with model:", modelId);
-
-        const prompt = `你是资深印前QC专员，专门检查包装印刷品的文字错误。请仔细分析这张包装设计图片。
-
-## 任务
-1. 描述图片内容
-2. 识别图片上的所有语言（英文、法文、中文、西班牙文等）
-3. 逐字逐句列出你看到的所有文字（按语言分组）
-4. 检查并标记文字错误
-
-## 多语言检查
-包装通常包含多种语言，请按各语言标准检查：
-- **英文**：拼写、语法、空格
-- **法文**：拼写、重音符号（é, è, ê, à, ç）
-- **中文**：错别字、漏字
-- **西班牙文**：拼写、重音符号
-
-## 必须检查的错误
-- 拼写错误（按各语言标准）
-- 括号不配对
-- 标点错误
-- 空格缺失
-
-## 不要报告
-- 设计风格、布局
-- 颜色、字体选择
-
-## 输出JSON
-{
-  "description": "一句话描述图片",
-  "observedText": "按语言分组列出所有文字，格式：[English] xxx [Français] xxx [中文] xxx",
-  "initialIssues": [
-    {
-      "type": "content",
-      "text": "[语言] 具体错误",
-      "original": "原文",
-      "location": "位置",
-      "confidence": "high/medium/low"
+// 根据模型 ID 获取对应的 client
+const getClient = () => {
+    const apiKey = import.meta.env.VITE_OPENAI_API_KEY;
+    if (!apiKey) {
+        console.error("API Key not found. Please set VITE_OPENAI_API_KEY");
     }
-  ]
-}
 
-只关注文字错误，不评论设计。请返回json格式。`;
+    // 统一使用 /api/v1 端点
+    const baseURL = "https://zenmux.ai/api/v1";
+    console.log(`Using model: ${currentModelId}, baseURL: ${baseURL}`);
 
-        const response = await client.chat.completions.create({
-            model: modelId,
-            messages: [
-                {
-                    role: "user",
-                    content: [
-                        { type: "text", text: prompt },
-                        {
-                            type: "image_url",
-                            image_url: {
-                                url: `data:${mimeType};base64,${base64Image}`,
-                                detail: "high"
-                            }
-                        }
-                    ]
-                }
-            ],
-            response_format: { type: "json_object" }
-        });
+    return new OpenAI({
+        apiKey: apiKey || 'dummy',
+        baseURL,
+        dangerouslyAllowBrowser: true
+    });
+};
 
-        const text = response.choices[0].message.content;
-        if (!text) return { description: '', initialIssues: [], observedText: '' };
-
-        const parsed = JSON.parse(text);
-        return {
-            description: parsed.description || '',
-            initialIssues: parsed.initialIssues || [],
-            observedText: parsed.observedText || ''
-        };
-    } catch (error) {
-        console.error("Initial analysis failed:", error);
-        throw error;
+// 解析 JSON，处理 Gemini 返回的 markdown 包裹格式
+const parseJSON = (text: string): any => {
+    // 先尝试直接解析
+    try {
+        return JSON.parse(text);
+    } catch (e) {
+        // 如果失败，尝试提取 ```json ... ``` 中的内容
+        const jsonMatch = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+        if (jsonMatch && jsonMatch[1]) {
+            return JSON.parse(jsonMatch[1]);
+        }
+        // 再尝试找第一个 { 到最后一个 } 之间的内容
+        const braceMatch = text.match(/\{[\s\S]*\}/);
+        if (braceMatch) {
+            return JSON.parse(braceMatch[0]);
+        }
+        throw new Error('Failed to parse JSON from response');
     }
 };
 
-// Step 2: OCR text extraction - 高精度模式
-export const ocrExtractText = async (base64Image: string, mimeType: string): Promise<string> => {
-    try {
-        const client = getClient();
-        const modelId = getModelId();
-        console.log("Step 2: OCR text extraction with model:", modelId);
+// ============================================
+// 确定性规则检查（不依赖 GPT，100% 准确）
+// ============================================
+export const runDeterministicChecks = (text: string): DeterministicCheck[] => {
+    const issues: DeterministicCheck[] = [];
+    let idCounter = 0;
 
-        const prompt = `你是专业OCR系统，请**极度精确**地提取图片中的所有文字。
+    // 1. 括号配对检查
+    const brackets = [
+        { open: '(', close: ')', name: '圆括号' },
+        { open: '[', close: ']', name: '方括号' },
+        { open: '{', close: '}', name: '花括号' },
+        { open: '（', close: '）', name: '中文圆括号' },
+        { open: '【', close: '】', name: '中文方括号' },
+    ];
 
-## 最高优先级：准确性
-- 如果某个字/词看不清楚，用 [?] 标记，例如：ingred[?]ents
-- 绝对不要猜测或补全任何内容
-- 宁可标记不确定，也不要输出错误内容
+    for (const bracket of brackets) {
+        const openCount = (text.match(new RegExp('\\' + bracket.open, 'g')) || []).length;
+        const closeCount = (text.match(new RegExp('\\' + bracket.close, 'g')) || []).length;
 
-## 提取要求
-1. 提取所有可见文字（标题、正文、小字、警告语）
-2. 保持原样，不修正任何内容
-3. 模糊/不清晰的部分用 [?] 标记
+        if (openCount !== closeCount) {
+            // 找到不配对的位置
+            let stack: number[] = [];
+            let unmatchedPositions: { pos: number; char: string }[] = [];
 
-## 特殊字符处理
-- 容易混淆的字符要仔细辨认：
-  - l (小写L) vs I (大写i) vs 1 (数字1)
-  - O (字母O) vs 0 (数字0)
-  - rn vs m
-- 如果不确定，用 [l/I/1] 这样的格式标记
-
-## 输出格式
-按从上到下、从左到右顺序输出。
-每个独立文本块换行。
-只输出提取的文字，不要任何解释。`;
-
-        const response = await client.chat.completions.create({
-            model: modelId,
-            messages: [
-                {
-                    role: "user",
-                    content: [
-                        { type: "text", text: prompt },
-                        {
-                            type: "image_url",
-                            image_url: {
-                                url: `data:${mimeType};base64,${base64Image}`,
-                                detail: "high"
-                            }
-                        }
-                    ]
+            for (let i = 0; i < text.length; i++) {
+                if (text[i] === bracket.open) {
+                    stack.push(i);
+                } else if (text[i] === bracket.close) {
+                    if (stack.length > 0) {
+                        stack.pop();
+                    } else {
+                        unmatchedPositions.push({ pos: i, char: bracket.close });
+                    }
                 }
-            ]
-        });
+            }
+            // 剩余的开括号也是不配对的
+            stack.forEach(pos => unmatchedPositions.push({ pos, char: bracket.open }));
 
-        return response.choices[0].message.content || '';
-    } catch (error) {
-        console.error("OCR extraction failed:", error);
-        throw error;
+            for (const unmatched of unmatchedPositions) {
+                // 获取上下文
+                const start = Math.max(0, unmatched.pos - 20);
+                const end = Math.min(text.length, unmatched.pos + 20);
+                const context = text.substring(start, end);
+
+                issues.push({
+                    id: `det-${idCounter++}-${Date.now()}`,
+                    type: 'bracket_mismatch',
+                    description: `${bracket.name}不配对：发现 "${unmatched.char}" 缺少匹配`,
+                    location: `...${context}...`,
+                    severity: 'high'
+                });
+            }
+        }
     }
+
+    // 2. 常见编码问题检查
+    const encodingPatterns = [
+        { pattern: /\ufffd/g, name: '替换字符（乱码）' },
+        { pattern: /[\x00-\x08\x0b\x0c\x0e-\x1f]/g, name: '控制字符' },
+    ];
+
+    for (const enc of encodingPatterns) {
+        const matches = text.match(enc.pattern);
+        if (matches && matches.length > 0) {
+            issues.push({
+                id: `det-${idCounter++}-${Date.now()}`,
+                type: 'encoding_error',
+                description: `发现${enc.name}，共 ${matches.length} 处`,
+                location: '文本中存在异常字符',
+                severity: 'high'
+            });
+        }
+    }
+
+    return issues;
 };
 
-// Step 3: Final verification - combine initial analysis + OCR for definitive conclusions
-export const finalVerification = async (
-    initialAnalysis: { description: string; initialIssues: any[]; observedText: string },
-    ocrText: string,
+// ============================================
+// 单步分析：OCR + 问题检测（合并原来的三步）
+// ============================================
+export const analyzeImageSinglePass = async (
     base64Image: string,
     mimeType: string
-): Promise<DiagnosisResult> => {
+): Promise<{ description: string; ocrText: string; issues: DiagnosisIssue[] }> => {
     try {
         const client = getClient();
         const modelId = getModelId();
-        console.log("Step 3: Final verification with model:", modelId);
+        console.log("Single-pass analysis with model:", modelId);
 
-        const prompt = `你是资深印前QC终审专员。你的任务是**极度谨慎地**检查印刷品文字错误。
+        const prompt = `你是资深印前QC专员，请分析这张包装设计图片。
 
-## 第一轮分析结果（视觉）
-描述：${initialAnalysis.description}
-观察文字：${initialAnalysis.observedText}
-初步问题：${JSON.stringify(initialAnalysis.initialIssues, null, 2)}
+## 任务（按顺序执行）
 
-## 第二轮分析结果（OCR）
-${ocrText}
+### 1. OCR 提取（最重要）
+- 提取图片上**所有可见文字**
+- 按从上到下、从左到右顺序
+- 保持原样，**绝对不要修正任何内容**
+- 模糊/不清晰的部分用 [?] 标记
+- 包括：标题、正文、成分表、警告语、小字等
 
-## ⚠️ 极其重要的验证规则
-
-### 误报风险说明
-GPT Vision 和 OCR 都可能出现识别错误，特别是：
-- 小字体文字容易漏读字母
-- 相似字符容易混淆（l/I/1, O/0, rn/m）
-- 模糊区域容易误读
-
-### 验证流程
-1. **对比两轮结果**：如果 Vision 和 OCR 结果不一致，说明识别不可靠，**不要报告**
-2. **检查 [?] 标记**：OCR 中标记为不确定的内容，**绝对不要作为错误报告**
-3. **常见词检查**：如果一个"错误"看起来像是常见英文词被误读（如 intimate, ingredients, preservatives），**不要报告**
-4. **多次出现验证**：如果同一个词在图片上多次出现，检查是否一致
-
-### 只报告这些确定性错误
-- 明显的拼写错误（两轮分析都确认的）
-- 明显的括号不配对
+### 2. 问题检测（极其谨慎）
+只报告你 **100% 确定** 的错误：
+- 明显的拼写错误（必须是确定的，不是猜测）
+- 括号/引号不配对
 - 明显的标点问题
 
-### 绝对不要报告
-- 任何只在一轮分析中发现的"错误"
-- OCR 中带 [?] 标记附近的内容
-- 可能是识别问题而非真正错误的内容
-- 常见单词的"变体"（很可能是误读）
+## ⚠️ 极其重要的原则
 
-## 输出json格式
+### 必须遵守
+- **宁可漏报10个真错误，也不要误报1个正确内容**
+- 如果不确定，**不要报告**
+- 外语词汇（法语、西语、德语等）有特殊拼写，不要随意判断
+
+### 绝对不要报告
+- 品牌名、产品名（可能是故意的创意拼写）
+- 外语专有名词
+- 你不确定的任何内容
+- 设计风格、布局、颜色问题
+
+## 输出 JSON 格式
 {
-  "description": "图片内容描述",
+  "description": "一句话描述图片内容",
+  "ocrText": "提取的全部文字，每个文本块换行，保持原样",
   "issues": [
     {
-      "type": "content",
-      "language": "English/Français/中文",
-      "original": "完整句子（20-50字），用 **双星号** 标记错误词",
-      "problem": "简洁说明：xxx 应为 yyy",
+      "original": "包含错误的原文（20-50字），用 **双星号** 标记错误词",
+      "problem": "简述问题：xxx 应为 yyy",
       "suggestion": "正确写法",
-      "severity": "high",
+      "severity": "high/medium/low",
+      "confidence": "certain/likely/possible",
       "box_2d": [ymin, xmin, ymax, xmax]
     }
   ]
 }
 
-**最高原则：宁可漏报10个真错误，也不要误报1个正确内容！**
-如果没有100%确定的错误，返回空 issues 数组。`;
+如果没有100%确定的错误，返回空 issues 数组。这是完全正常的。`;
 
         const response = await client.chat.completions.create({
             model: modelId,
@@ -280,57 +267,70 @@ GPT Vision 和 OCR 都可能出现识别错误，特别是：
         });
 
         const text = response.choices[0].message.content;
-        if (!text) return { description: initialAnalysis.description, issues: [] };
+        if (!text) {
+            return { description: '', ocrText: '', issues: [] };
+        }
 
-        const parsed = JSON.parse(text);
-        const description = parsed.description || initialAnalysis.description;
-        const data = parsed.issues || [];
+        const parsed = parseJSON(text);
 
-        const issues = Array.isArray(data) ? data.map((item: any, idx: number) => ({
-            ...item,
-            id: `diag-${idx}-${Date.now()}`,
-            box_2d: item.box_2d && item.box_2d.length === 4 ? {
-                ymin: item.box_2d[0],
-                xmin: item.box_2d[1],
-                ymax: item.box_2d[2],
-                xmax: item.box_2d[3]
-            } : undefined
-        })) : [];
+        // 处理 issues，添加 id 和格式化 box_2d
+        const issues: DiagnosisIssue[] = Array.isArray(parsed.issues)
+            ? parsed.issues.map((item: any, idx: number) => ({
+                id: `issue-${idx}-${Date.now()}`,
+                type: 'content' as const,
+                original: item.original || '',
+                problem: item.problem || '',
+                suggestion: item.suggestion || '',
+                severity: item.severity || 'medium',
+                confidence: item.confidence || 'possible',
+                box_2d: item.box_2d && item.box_2d.length === 4 ? {
+                    ymin: item.box_2d[0],
+                    xmin: item.box_2d[1],
+                    ymax: item.box_2d[2],
+                    xmax: item.box_2d[3]
+                } : undefined
+            }))
+            : [];
 
-        return { description, issues };
+        return {
+            description: parsed.description || '',
+            ocrText: parsed.ocrText || '',
+            issues
+        };
     } catch (error) {
-        console.error("Final verification failed:", error);
+        console.error("Single-pass analysis failed:", error);
         throw error;
     }
 };
 
-// Main diagnosis function - three-step process for maximum accuracy
+// Main diagnosis function - 简化为两步：AI分析 + 本地规则检查
 export const diagnoseImage = async (
     base64Image: string,
     mimeType: string,
     onStepChange?: (step: number) => void
 ): Promise<DiagnosisResult> => {
     try {
-        console.log("Starting three-step analysis (Vision → OCR → Verification)...");
+        console.log("Starting analysis (AI → Rules)...");
 
-        // Step 1: Initial vision analysis
+        // Step 1: AI 单步分析（OCR + 问题检测）
         onStepChange?.(1);
-        const initialAnalysis = await initialImageAnalysis(base64Image, mimeType);
-        console.log("Step 1 complete. Description:", initialAnalysis.description);
-        console.log("Initial issues found:", initialAnalysis.initialIssues.length);
+        const aiResult = await analyzeImageSinglePass(base64Image, mimeType);
+        console.log("AI analysis complete. Description:", aiResult.description);
+        console.log("OCR text length:", aiResult.ocrText.length);
+        console.log("AI issues found:", aiResult.issues.length);
+        console.log("=== OCR提取的文字 ===\n", aiResult.ocrText, "\n=== END ===");
 
-        // Step 2: OCR text extraction
+        // Step 2: 本地确定性规则检查（100% 准确）
         onStepChange?.(2);
-        const ocrText = await ocrExtractText(base64Image, mimeType);
-        console.log("Step 2 complete. OCR text length:", ocrText.length);
-        console.log("=== OCR提取的文字 ===\n", ocrText, "\n=== END ===");
+        const deterministicIssues = runDeterministicChecks(aiResult.ocrText);
+        console.log("Deterministic checks found:", deterministicIssues.length, "issues");
 
-        // Step 3: Final verification combining both results
-        onStepChange?.(3);
-        const result = await finalVerification(initialAnalysis, ocrText, base64Image, mimeType);
-        console.log("Step 3 complete. Final issues:", result.issues.length);
-
-        return result;
+        return {
+            description: aiResult.description,
+            ocrText: aiResult.ocrText,
+            issues: aiResult.issues,
+            deterministicIssues
+        };
     } catch (error) {
         console.error("Diagnosis failed:", error);
         throw error;
@@ -364,7 +364,7 @@ export const parseSourceText = async (sourceText: string): Promise<SourceField[]
 
         const text = response.choices[0].message.content;
         if (!text) return [];
-        const parsed = JSON.parse(text);
+        const parsed = parseJSON(text);
         return parsed.fields || [];
 
     } catch (error) {
@@ -424,7 +424,7 @@ export const extractProductSpecs = async (base64Image: string, mimeType: string)
 
         const text = response.choices[0].message.content;
         if (!text) return [];
-        const parsed = JSON.parse(text);
+        const parsed = parseJSON(text);
         return parsed.fields || [];
 
     } catch (error) {
@@ -477,7 +477,7 @@ export const performSmartDiff = async (
                         {
                             type: "image_url",
                             image_url: {
-                                url: `data:image/jpeg;base64,${base64Image}`, // TODO: Should pass mimeType here too if possible, but jpeg usually works for most
+                                url: `data:image/jpeg;base64,${base64Image}`,
                                 detail: "high"
                             }
                         }
@@ -490,7 +490,7 @@ export const performSmartDiff = async (
         const text = response.choices[0].message.content;
         if (!text) return [];
 
-        const parsed = JSON.parse(text);
+        const parsed = parseJSON(text);
         const data = parsed.diffs || parsed;
 
         if (!Array.isArray(data)) return [];

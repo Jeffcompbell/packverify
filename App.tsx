@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { diagnoseImage, fileToGenerativePart, parseSourceText, performSmartDiff, extractProductSpecs, AVAILABLE_MODELS, getModelId, setModelId } from './services/openaiService';
-import { DiagnosisIssue, SourceField, DiffResult, ViewLayers, ImageItem, ImageSpec, BoundingBox } from './types';
+import { DiagnosisIssue, SourceField, DiffResult, ViewLayers, ImageItem, ImageSpec, BoundingBox, DeterministicCheck } from './types';
 import {
   Table, Zap, AlertCircle, XCircle, ChevronDown, ChevronLeft, ChevronRight,
   ImagePlus, Trash2, RefreshCw, Copy, CheckCheck, Upload, Eye, EyeOff,
   ZoomIn, ZoomOut, RotateCcw, RotateCw, FileText, AlertTriangle, CheckCircle,
-  ClipboardCheck, Image, Search, FileSpreadsheet, Loader2, Maximize2, ImageIcon
+  ClipboardCheck, Image, Search, FileSpreadsheet, Loader2, Maximize2, ImageIcon,
+  Type, Brackets, ShieldAlert
 } from 'lucide-react';
 
 // 存储接口 - 用于 localStorage 持久化
@@ -15,8 +16,10 @@ interface StoredImageItem {
   mimeType: string;
   fileName: string;
   description?: string;
+  ocrText?: string;
   specs: ImageSpec[];
   issues: DiagnosisIssue[];
+  deterministicIssues?: DeterministicCheck[];
   diffs: DiffResult[];
 }
 
@@ -72,6 +75,9 @@ const App: React.FC = () => {
   // Specs tab
   const [specsTab, setSpecsTab] = useState<string>('all');
 
+  // Right panel tab
+  const [rightPanelTab, setRightPanelTab] = useState<'issues' | 'ocr'>('issues');
+
   // QIL Input
   const [qilInputMode, setQilInputMode] = useState<'text' | 'image'>('text');
   const [qilInputText, setQilInputText] = useState('');
@@ -97,8 +103,10 @@ const App: React.FC = () => {
           base64: item.base64,
           file: createVirtualFile(item.base64, item.mimeType, item.fileName),
           description: item.description,
+          ocrText: item.ocrText,
           specs: item.specs || [],
           issues: item.issues || [],
+          deterministicIssues: item.deterministicIssues || [],
           diffs: item.diffs || []
         }));
 
@@ -133,8 +141,10 @@ const App: React.FC = () => {
         mimeType: img.file.type,
         fileName: img.file.name,
         description: img.description,
+        ocrText: img.ocrText,
         specs: img.specs,
         issues: img.issues,
+        deterministicIssues: img.deterministicIssues,
         diffs: img.diffs
       }));
 
@@ -220,7 +230,13 @@ const App: React.FC = () => {
       });
 
       setImages(prev => prev.map(img =>
-        img.id === newImageId ? { ...img, issues: diagResult.issues, description: diagResult.description } : img
+        img.id === newImageId ? {
+          ...img,
+          issues: diagResult.issues,
+          description: diagResult.description,
+          ocrText: diagResult.ocrText,
+          deterministicIssues: diagResult.deterministicIssues
+        } : img
       ));
 
       // Extract specs
@@ -266,7 +282,13 @@ const App: React.FC = () => {
       });
 
       setImages(prev => prev.map(img =>
-        img.id === imageId ? { ...img, issues: diagResult.issues, description: diagResult.description } : img
+        img.id === imageId ? {
+          ...img,
+          issues: diagResult.issues,
+          description: diagResult.description,
+          ocrText: diagResult.ocrText,
+          deterministicIssues: diagResult.deterministicIssues
+        } : img
       ));
 
       const specs = await extractProductSpecs(image.base64, image.file.type);
@@ -435,7 +457,7 @@ const App: React.FC = () => {
             </div>
             <div>
               <div className="text-sm font-bold text-white">包装稿审核 Pro</div>
-              <div className="text-[10px] text-slate-500">v3.1 • 分屏对比</div>
+              <div className="text-[10px] text-slate-500">v3.2 • Gemini 驱动</div>
             </div>
           </div>
 
@@ -635,10 +657,10 @@ const App: React.FC = () => {
                     </div>
                     <div className="flex items-center gap-2 text-[10px]">
                       <div className={`w-6 h-6 rounded-full flex items-center justify-center text-white ${processingStep >= 1 ? 'bg-indigo-500' : 'bg-slate-700'}`}>1</div>
+                      <span className={`text-xs ${processingStep >= 1 ? 'text-indigo-400' : 'text-slate-500'}`}>AI分析</span>
                       <div className={`w-8 h-0.5 ${processingStep > 1 ? 'bg-indigo-500' : 'bg-slate-700'}`}></div>
                       <div className={`w-6 h-6 rounded-full flex items-center justify-center text-white ${processingStep >= 2 ? 'bg-indigo-500' : 'bg-slate-700'}`}>2</div>
-                      <div className={`w-8 h-0.5 ${processingStep > 2 ? 'bg-indigo-500' : 'bg-slate-700'}`}></div>
-                      <div className={`w-6 h-6 rounded-full flex items-center justify-center text-white ${processingStep >= 3 ? 'bg-indigo-500' : 'bg-slate-700'}`}>3</div>
+                      <span className={`text-xs ${processingStep >= 2 ? 'text-indigo-400' : 'text-slate-500'}`}>规则检查</span>
                     </div>
                   </div>
                 </div>
@@ -682,31 +704,43 @@ const App: React.FC = () => {
 
         {/* RIGHT: Issues Panel */}
         <div className="w-[380px] border-l border-slate-800 bg-slate-900 flex flex-col">
-          {/* Header */}
-          <div className="px-4 py-3 border-b border-slate-800 flex items-center justify-between">
-            <h3 className="font-bold text-sm flex items-center gap-2">
-              <AlertTriangle size={16} className="text-amber-400" />
+          {/* Tab Header */}
+          <div className="px-2 py-2 border-b border-slate-800 flex items-center gap-1 bg-slate-900">
+            <button
+              onClick={() => setRightPanelTab('issues')}
+              className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-all ${
+                rightPanelTab === 'issues'
+                  ? 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/50'
+                  : 'text-slate-500 hover:text-slate-300 hover:bg-slate-800'
+              }`}
+            >
+              <AlertTriangle size={14} />
               检测问题
-            </h3>
-            {currentImage && (
-              <div className="flex items-center gap-2">
-                {currentImage.issues.length > 0 ? (
-                  <span className="text-[10px] bg-red-500/20 text-red-400 px-2 py-0.5 rounded">{currentImage.issues.length} 个问题</span>
-                ) : !isCurrentProcessing && (
-                  <span className="text-[10px] bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded flex items-center gap-1">
-                    <CheckCircle size={10} /> 通过
-                  </span>
-                )}
-                <button
-                  onClick={() => currentImage && handleRetryAnalysis(currentImage.id)}
-                  disabled={isCurrentProcessing}
-                  className="p-1.5 text-slate-500 hover:text-indigo-400 hover:bg-slate-800 rounded transition-colors disabled:opacity-50"
-                  title="重新分析"
-                >
-                  <RefreshCw size={14} className={isCurrentProcessing ? 'animate-spin' : ''} />
-                </button>
-              </div>
-            )}
+              {currentImage && (currentImage.issues.length + (currentImage.deterministicIssues?.length || 0)) > 0 && (
+                <span className="bg-red-500 text-white text-[9px] px-1.5 rounded-full">
+                  {currentImage.issues.length + (currentImage.deterministicIssues?.length || 0)}
+                </span>
+              )}
+            </button>
+            <button
+              onClick={() => setRightPanelTab('ocr')}
+              className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-all ${
+                rightPanelTab === 'ocr'
+                  ? 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/50'
+                  : 'text-slate-500 hover:text-slate-300 hover:bg-slate-800'
+              }`}
+            >
+              <Type size={14} />
+              OCR 原文
+            </button>
+            <button
+              onClick={() => currentImage && handleRetryAnalysis(currentImage.id)}
+              disabled={isCurrentProcessing || !currentImage}
+              className="p-2 text-slate-500 hover:text-indigo-400 hover:bg-slate-800 rounded-lg transition-colors disabled:opacity-50"
+              title="重新分析"
+            >
+              <RefreshCw size={14} className={isCurrentProcessing ? 'animate-spin' : ''} />
+            </button>
           </div>
 
           {/* Description */}
@@ -719,8 +753,8 @@ const App: React.FC = () => {
             </div>
           )}
 
-          {/* Issues List */}
-          <div ref={issueListRef} className="flex-1 overflow-y-auto p-3 space-y-2">
+          {/* Tab Content */}
+          <div ref={issueListRef} className="flex-1 overflow-y-auto">
             {!currentImage ? (
               <div className="text-center py-12 text-slate-600">
                 <AlertCircle size={24} className="mx-auto mb-2 opacity-30" />
@@ -731,82 +765,146 @@ const App: React.FC = () => {
                 <Loader2 size={24} className="mx-auto mb-2 animate-spin" />
                 <p className="text-xs">正在分析...</p>
               </div>
-            ) : currentImage.issues.length === 0 ? (
-              <div className="text-center py-12 text-slate-600">
-                <CheckCircle size={24} className="mx-auto mb-2 text-emerald-500/50" />
-                <p className="text-xs">未检测到问题</p>
+            ) : rightPanelTab === 'ocr' ? (
+              /* OCR 原文展示 */
+              <div className="p-3">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">识别文字</span>
+                  <button
+                    onClick={() => currentImage.ocrText && handleCopy(currentImage.ocrText, 'ocr-text')}
+                    className="p-1 rounded hover:bg-slate-800 transition-colors"
+                    title="复制全部"
+                  >
+                    {copiedId === 'ocr-text' ? <CheckCheck size={12} className="text-emerald-400" /> : <Copy size={12} className="text-slate-500" />}
+                  </button>
+                </div>
+                {currentImage.ocrText ? (
+                  <pre className="text-xs text-slate-300 font-mono bg-slate-800/50 p-3 rounded-lg whitespace-pre-wrap leading-relaxed border border-slate-700/50 max-h-[500px] overflow-y-auto">
+                    {currentImage.ocrText}
+                  </pre>
+                ) : (
+                  <div className="text-center py-8 text-slate-600">
+                    <Type size={24} className="mx-auto mb-2 opacity-30" />
+                    <p className="text-xs">暂无 OCR 数据</p>
+                  </div>
+                )}
               </div>
             ) : (
-              currentImage.issues.map((issue) => {
-                const displayOriginal = issue.original || issue.text || '';
-                const displayProblem = issue.problem || '';
-                const copyText = `原文: ${displayOriginal}\n问题: ${displayProblem}\n建议: ${issue.suggestion}`;
-
-                // Parse **xxx** markers to highlight error words
-                const renderOriginal = (text: string) => {
-                  const parts = text.split(/(\*\*[^*]+\*\*)/g);
-                  return parts.map((part, i) => {
-                    if (part.startsWith('**') && part.endsWith('**')) {
-                      const word = part.slice(2, -2);
-                      return <span key={i} className="bg-red-500/30 text-red-300 px-0.5 rounded font-bold">{word}</span>;
-                    }
-                    return <span key={i}>{part}</span>;
-                  });
-                };
-
-                return (
-                  <div
-                    key={issue.id}
-                    data-issue-id={issue.id}
-                    onClick={() => setSelectedIssueId(issue.id)}
-                    className={`p-3 rounded-lg cursor-pointer transition-all group ${
-                      selectedIssueId === issue.id
-                        ? 'bg-indigo-500/20 border border-indigo-500/50 ring-2 ring-indigo-500/30'
-                        : 'bg-slate-800/50 border border-transparent hover:bg-slate-800 hover:border-slate-700'
-                    }`}
-                  >
-                    <div className="flex items-center gap-2 mb-2">
-                      <span className={`w-2 h-2 rounded-full shrink-0 ${
-                        issue.severity === 'high' ? 'bg-red-500' : issue.severity === 'medium' ? 'bg-amber-500' : 'bg-slate-500'
-                      }`}></span>
-                      <span className={`text-[9px] font-bold uppercase px-1.5 py-0.5 rounded ${
-                        issue.severity === 'high'
-                          ? 'bg-red-500/20 text-red-400'
-                          : issue.severity === 'medium'
-                            ? 'bg-amber-500/20 text-amber-400'
-                            : 'bg-slate-500/20 text-slate-400'
-                      }`}>
-                        {issue.severity === 'high' ? '紧急' : issue.severity === 'medium' ? '警告' : '提示'}
-                      </span>
-                      <button
-                        onClick={(e) => { e.stopPropagation(); handleCopy(copyText, issue.id); }}
-                        className="ml-auto p-1 rounded hover:bg-slate-700 transition-colors opacity-0 group-hover:opacity-100"
-                        title="复制"
-                      >
-                        {copiedId === issue.id ? <CheckCheck size={12} className="text-emerald-400" /> : <Copy size={12} className="text-slate-500" />}
-                      </button>
+              /* 检测问题展示 */
+              <div className="p-3 space-y-3">
+                {/* 确定性问题（100% 准确） */}
+                {currentImage.deterministicIssues && currentImage.deterministicIssues.length > 0 && (
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2 text-[10px] font-bold text-red-400 uppercase tracking-wider">
+                      <Brackets size={12} />
+                      确定性问题（100%准确）
                     </div>
-
-                    <div className="mb-2">
-                      <span className="text-[10px] text-slate-500">原文：</span>
-                      <div className="text-xs text-slate-300 font-mono bg-slate-800/50 px-2 py-1.5 rounded mt-1 leading-relaxed">
-                        {renderOriginal(displayOriginal)}
+                    {currentImage.deterministicIssues.map((issue) => (
+                      <div key={issue.id} className="p-3 rounded-lg bg-red-500/10 border border-red-500/30">
+                        <div className="flex items-center gap-2 mb-2">
+                          <span className="w-2 h-2 rounded-full bg-red-500 shrink-0"></span>
+                          <span className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-red-500/20 text-red-400">
+                            {issue.type === 'bracket_mismatch' ? '括号不配对' : issue.type === 'encoding_error' ? '编码错误' : '格式错误'}
+                          </span>
+                        </div>
+                        <p className="text-xs text-red-300 mb-1.5">{issue.description}</p>
+                        <div className="text-[10px] text-slate-400 font-mono bg-slate-900/50 px-2 py-1.5 rounded">
+                          {issue.location}
+                        </div>
                       </div>
-                    </div>
-
-                    {displayProblem && (
-                      <p className="text-xs text-slate-300 mb-1.5">{displayProblem}</p>
-                    )}
-
-                    {issue.suggestion && (
-                      <div className="flex items-start gap-1.5 text-[11px] text-emerald-400/90 bg-emerald-500/10 px-2 py-1.5 rounded">
-                        <span className="shrink-0">💡</span>
-                        <span>{issue.suggestion}</span>
-                      </div>
-                    )}
+                    ))}
                   </div>
-                );
-              })
+                )}
+
+                {/* AI 建议问题（需人工确认） */}
+                {currentImage.issues.length > 0 && (
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2 text-[10px] font-bold text-amber-400 uppercase tracking-wider">
+                      <ShieldAlert size={12} />
+                      AI 建议（需人工确认）
+                    </div>
+                    {currentImage.issues.map((issue) => {
+                      const displayOriginal = issue.original || issue.text || '';
+                      const displayProblem = issue.problem || '';
+                      const copyText = `原文: ${displayOriginal}\n问题: ${displayProblem}\n建议: ${issue.suggestion}`;
+
+                      const renderOriginal = (text: string) => {
+                        const parts = text.split(/(\*\*[^*]+\*\*)/g);
+                        return parts.map((part, i) => {
+                          if (part.startsWith('**') && part.endsWith('**')) {
+                            const word = part.slice(2, -2);
+                            return <span key={i} className="bg-red-500/30 text-red-300 px-0.5 rounded font-bold">{word}</span>;
+                          }
+                          return <span key={i}>{part}</span>;
+                        });
+                      };
+
+                      return (
+                        <div
+                          key={issue.id}
+                          data-issue-id={issue.id}
+                          onClick={() => setSelectedIssueId(issue.id)}
+                          className={`p-3 rounded-lg cursor-pointer transition-all group ${
+                            selectedIssueId === issue.id
+                              ? 'bg-indigo-500/20 border border-indigo-500/50 ring-2 ring-indigo-500/30'
+                              : 'bg-slate-800/50 border border-transparent hover:bg-slate-800 hover:border-slate-700'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2 mb-2">
+                            <span className={`w-2 h-2 rounded-full shrink-0 ${
+                              issue.severity === 'high' ? 'bg-red-500' : issue.severity === 'medium' ? 'bg-amber-500' : 'bg-slate-500'
+                            }`}></span>
+                            <span className={`text-[9px] font-bold uppercase px-1.5 py-0.5 rounded ${
+                              issue.severity === 'high'
+                                ? 'bg-red-500/20 text-red-400'
+                                : issue.severity === 'medium'
+                                  ? 'bg-amber-500/20 text-amber-400'
+                                  : 'bg-slate-500/20 text-slate-400'
+                            }`}>
+                              {issue.severity === 'high' ? '紧急' : issue.severity === 'medium' ? '警告' : '提示'}
+                            </span>
+                            <span className="text-[8px] text-slate-600 ml-auto">AI建议</span>
+                            <button
+                              onClick={(e) => { e.stopPropagation(); handleCopy(copyText, issue.id); }}
+                              className="p-1 rounded hover:bg-slate-700 transition-colors opacity-0 group-hover:opacity-100"
+                              title="复制"
+                            >
+                              {copiedId === issue.id ? <CheckCheck size={12} className="text-emerald-400" /> : <Copy size={12} className="text-slate-500" />}
+                            </button>
+                          </div>
+
+                          <div className="mb-2">
+                            <span className="text-[10px] text-slate-500">原文：</span>
+                            <div className="text-xs text-slate-300 font-mono bg-slate-800/50 px-2 py-1.5 rounded mt-1 leading-relaxed">
+                              {renderOriginal(displayOriginal)}
+                            </div>
+                          </div>
+
+                          {displayProblem && (
+                            <p className="text-xs text-slate-300 mb-1.5">{displayProblem}</p>
+                          )}
+
+                          {issue.suggestion && (
+                            <div className="flex items-start gap-1.5 text-[11px] text-emerald-400/90 bg-emerald-500/10 px-2 py-1.5 rounded">
+                              <span className="shrink-0">💡</span>
+                              <span>{issue.suggestion}</span>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* 无问题 */}
+                {currentImage.issues.length === 0 && (!currentImage.deterministicIssues || currentImage.deterministicIssues.length === 0) && (
+                  <div className="text-center py-12 text-slate-600">
+                    <CheckCircle size={24} className="mx-auto mb-2 text-emerald-500/50" />
+                    <p className="text-xs">未检测到问题</p>
+                    <p className="text-[10px] text-slate-700 mt-1">建议查看 OCR 原文自行核对</p>
+                  </div>
+                )}
+              </div>
             )}
           </div>
         </div>
