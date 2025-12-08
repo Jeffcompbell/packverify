@@ -1458,7 +1458,7 @@ const App: React.FC = () => {
               }
             }} />
           </label>
-          <div className="grid grid-cols-3 md:grid-cols-1 gap-2 flex-1">
+          <div className="grid grid-cols-3 md:grid-cols-1 gap-2 md:flex-1 overflow-y-auto">
             {images.map((img, idx) => (
               <div
                 key={img.id}
@@ -1466,11 +1466,11 @@ const App: React.FC = () => {
                   setCurrentImageIndex(idx);
                   setMobileTab('viewer');
                 }}
-                className={`relative group cursor-pointer rounded-lg overflow-hidden border-2 transition-all ${
+                className={`relative group cursor-pointer rounded-lg overflow-hidden border-2 transition-all aspect-square md:aspect-auto ${
                   currentImageIndex === idx ? 'border-indigo-500' : 'border-transparent hover:border-slate-600'
                 }`}
               >
-                <img src={img.src} alt="" className="w-full h-20 object-cover" />
+                <img src={img.src} alt="" className="w-full h-full md:h-20 object-cover" />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
                 <div className="absolute bottom-1 left-1 right-1 flex items-center justify-between">
                   <span className="text-[8px] text-white truncate max-w-[60px]">{img.file.name}</span>
