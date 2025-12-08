@@ -56,6 +56,7 @@ const App: React.FC = () => {
   const [images, setImages] = useState<ImageItem[]>([]);
   const [currentImageIndex, setCurrentImageIndex] = useState<number>(0);
   const [manualSourceFields, setManualSourceFields] = useState<SourceField[]>([]);
+  const [qilRawText, setQilRawText] = useState<string>(''); // QIL 原始文本
 
   // UI State
   const [selectedIssueId, setSelectedIssueId] = useState<string | null>(null);
@@ -475,8 +476,9 @@ const App: React.FC = () => {
     }
   }, [user, images, manualSourceFields, cloudSyncEnabled, sessionId]);
 
-  const handleUpdateQilFields = useCallback(async (fields: SourceField[]) => {
+  const handleUpdateQilFields = useCallback(async (fields: SourceField[], rawText: string) => {
     setManualSourceFields(fields);
+    setQilRawText(rawText); // 保存原文
 
     // 对当前图片执行 diff
     if (currentImage && currentImage.specs?.length) {
@@ -1323,31 +1325,40 @@ const App: React.FC = () => {
 
             <div className="flex-1 overflow-auto p-3">
               {specsTab === 'qil' ? (
-                manualSourceFields.length === 0 ? (
+                !qilRawText && manualSourceFields.length === 0 ? (
                   <div className="h-full flex flex-col items-center justify-center text-slate-700">
                     <Table size={24} className="mb-2 opacity-30" />
                     <span className="text-xs">暂无 QIL 数据</span>
                     <span className="text-[10px] text-slate-600 mt-1">左侧输入文本或上传图片后解析</span>
                   </div>
                 ) : (
-                  <table className="w-full text-[11px]">
-                    <thead className="bg-slate-800 sticky top-0">
-                      <tr>
-                        <th className="text-left px-3 py-2 text-slate-500 font-medium">分类</th>
-                        <th className="text-left px-3 py-2 text-slate-500 font-medium">项目</th>
-                        <th className="text-left px-3 py-2 text-slate-500 font-medium">值</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-800/50">
-                      {manualSourceFields.map((field, idx) => (
-                        <tr key={idx} className="hover:bg-slate-800/30">
-                          <td className="px-3 py-2 text-slate-500">{field.category}</td>
-                          <td className="px-3 py-2 text-slate-300 font-medium">{field.key}</td>
-                          <td className="px-3 py-2 text-slate-400 font-mono">{field.value}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                  <div className="h-full flex flex-col">
+                    <div className="flex items-center justify-between mb-2 px-1">
+                      <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                        QIL 源数据 {manualSourceFields.length > 0 && `(已解析 ${manualSourceFields.length} 个字段)`}
+                      </span>
+                      {qilRawText && (
+                        <button
+                          onClick={() => handleCopy(qilRawText, 'qil-raw-text')}
+                          className="p-1 rounded hover:bg-slate-800 transition-colors"
+                          title="复制全部"
+                        >
+                          {copiedId === 'qil-raw-text' ? <CheckCheck size={12} className="text-emerald-400" /> : <Copy size={12} className="text-slate-500" />}
+                        </button>
+                      )}
+                    </div>
+                    {qilRawText ? (
+                      <pre className="flex-1 text-xs text-slate-300 font-mono bg-slate-800/50 p-3 rounded-lg whitespace-pre-wrap leading-relaxed border border-slate-700/50 overflow-y-auto">
+                        {qilRawText}
+                      </pre>
+                    ) : (
+                      <div className="flex-1 text-center py-8 text-slate-600">
+                        <FileSpreadsheet size={24} className="mx-auto mb-2 opacity-30" />
+                        <p className="text-xs">已通过图片解析 {manualSourceFields.length} 个字段</p>
+                        <p className="text-[10px] text-slate-700 mt-1">使用文本输入可查看原文</p>
+                      </div>
+                    )}
+                  </div>
                 )
               ) : specsTab === 'diff' ? (
                 (() => {
@@ -1402,80 +1413,149 @@ const App: React.FC = () => {
                   const matchCount = allResults.length - errorCount - warningCount;
                   const allPass = errorCount === 0 && warningCount === 0;
 
+                  // 只显示差异项开关
+                  const [showOnlyDiff, setShowOnlyDiff] = useState(false);
+                  const displayResults = showOnlyDiff
+                    ? sortedResults.filter(r => r.hasError || r.hasWarning)
+                    : sortedResults;
+
                   return (
                     <div className="flex flex-col h-full">
-                      <div className={`px-3 py-2 mb-2 rounded flex items-center justify-between ${
-                        allPass ? 'bg-emerald-500/10' : errorCount > 0 ? 'bg-red-500/10' : 'bg-amber-500/10'
+                      {/* 汇总统计 */}
+                      <div className={`px-4 py-3 mb-3 rounded-lg flex items-center justify-between border-2 ${
+                        allPass
+                          ? 'bg-emerald-500/10 border-emerald-500/30'
+                          : errorCount > 0
+                            ? 'bg-red-500/10 border-red-500/30'
+                            : 'bg-amber-500/10 border-amber-500/30'
                       }`}>
-                        <span className={`text-xs font-bold ${
-                          allPass ? 'text-emerald-400' : errorCount > 0 ? 'text-red-400' : 'text-amber-400'
-                        }`}>
-                          {allPass ? '✓ 全部通过' : errorCount > 0 ? `✗ ${errorCount} 处差异` : `⚠ ${warningCount} 处警告`}
-                        </span>
-                        <span className="text-[10px] text-slate-500">
-                          {matchCount}匹配 / {warningCount}警告 / {errorCount}差异
-                        </span>
+                        <div className="flex items-center gap-3">
+                          <span className={`text-sm font-bold ${
+                            allPass ? 'text-emerald-400' : errorCount > 0 ? 'text-red-400' : 'text-amber-400'
+                          }`}>
+                            {allPass ? '✓ 全部通过' : errorCount > 0 ? `✗ 发现 ${errorCount} 处差异` : `⚠ ${warningCount} 处警告`}
+                          </span>
+                          <div className="flex items-center gap-2 text-[10px]">
+                            <span className="px-2 py-0.5 bg-emerald-500/20 text-emerald-400 rounded">{matchCount} 匹配</span>
+                            {warningCount > 0 && <span className="px-2 py-0.5 bg-amber-500/20 text-amber-400 rounded">{warningCount} 警告</span>}
+                            {errorCount > 0 && <span className="px-2 py-0.5 bg-red-500/20 text-red-400 rounded">{errorCount} 差异</span>}
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => setShowOnlyDiff(!showOnlyDiff)}
+                          className={`px-3 py-1.5 text-[10px] font-medium rounded-lg transition-all ${
+                            showOnlyDiff
+                              ? 'bg-indigo-600 text-white'
+                              : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
+                          }`}
+                        >
+                          {showOnlyDiff ? '显示全部' : '只看差异'}
+                        </button>
                       </div>
 
+                      {/* 对比表格 */}
                       <div className="flex-1 overflow-auto">
-                        <table className="w-full text-[11px]">
-                          <thead className="bg-slate-800 sticky top-0">
-                            <tr>
-                              <th className="text-left px-2 py-1.5 text-slate-500 w-24">字段</th>
-                              <th className="text-left px-2 py-1.5 text-indigo-400">QIL</th>
-                              <th className="text-left px-2 py-1.5 text-emerald-400">图片</th>
-                              <th className="w-8"></th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {sortedResults.map(({ field, imageResults, hasError, hasWarning }, idx) => (
-                              <tr key={idx} className={`border-b border-slate-800/50 ${
-                                hasError ? 'bg-red-500/5' : hasWarning ? 'bg-amber-500/5' : ''
-                              }`}>
-                                <td className="px-2 py-2 align-top">
-                                  <div className="flex items-center gap-1">
-                                    <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${
-                                      hasError ? 'bg-red-500' : hasWarning ? 'bg-amber-500' : 'bg-emerald-500'
-                                    }`}></span>
-                                    <span className="text-slate-300 truncate" title={field.key}>{field.key}</span>
+                        <div className="space-y-2">{displayResults.map(({ field, imageResults, hasError, hasWarning }, idx) => (
+                            <div
+                              key={idx}
+                              className={`rounded-lg border-2 transition-all ${
+                                hasError
+                                  ? 'bg-red-500/5 border-red-500/30 shadow-lg shadow-red-500/10'
+                                  : hasWarning
+                                    ? 'bg-amber-500/5 border-amber-500/30'
+                                    : 'bg-slate-800/30 border-slate-700/50'
+                              }`}
+                            >
+                              {/* 字段名 */}
+                              <div className="px-3 py-2 border-b border-slate-700/50 flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                  <span className={`w-2 h-2 rounded-full ${
+                                    hasError ? 'bg-red-500' : hasWarning ? 'bg-amber-500' : 'bg-emerald-500'
+                                  }`}></span>
+                                  <span className="text-xs font-medium text-slate-200">{field.key}</span>
+                                </div>
+                                {(hasError || hasWarning) && (
+                                  <span className={`text-[9px] font-bold uppercase px-2 py-0.5 rounded ${
+                                    hasError
+                                      ? 'bg-red-500/20 text-red-400'
+                                      : 'bg-amber-500/20 text-amber-400'
+                                  }`}>
+                                    {hasError ? '差异' : '警告'}
+                                  </span>
+                                )}
+                              </div>
+
+                              {/* 对比内容 */}
+                              <div className="p-3 grid grid-cols-2 gap-3">
+                                {/* QIL 值 */}
+                                <div>
+                                  <div className="text-[9px] text-slate-500 uppercase tracking-wider mb-1 flex items-center gap-1">
+                                    <FileSpreadsheet size={10} />
+                                    QIL 标准
                                   </div>
-                                </td>
-                                <td className="px-2 py-2 align-top">
                                   <div
-                                    className="text-indigo-300 font-mono text-[10px] cursor-pointer hover:bg-slate-800 px-1 py-0.5 rounded -mx-1"
                                     onClick={() => handleCopy(field.value, `qil-${idx}`)}
-                                    title="点击复制"
+                                    className="group relative text-xs font-mono bg-indigo-500/10 text-indigo-300 px-3 py-2 rounded-lg cursor-pointer hover:bg-indigo-500/20 transition-all border border-indigo-500/30"
                                   >
-                                    {field.value}
-                                    {copiedId === `qil-${idx}` && <CheckCheck size={10} className="inline ml-1 text-emerald-400" />}
+                                    <div className="pr-6">{field.value}</div>
+                                    <Copy
+                                      size={12}
+                                      className="absolute right-2 top-1/2 -translate-y-1/2 text-indigo-400 opacity-0 group-hover:opacity-100 transition-opacity"
+                                    />
+                                    {copiedId === `qil-${idx}` && (
+                                      <div className="absolute -top-6 right-0 bg-emerald-500 text-white text-[9px] px-2 py-0.5 rounded">
+                                        已复制
+                                      </div>
+                                    )}
                                   </div>
-                                </td>
-                                <td className="px-2 py-2 align-top">
-                                  {imageResults.map((result, imgIdx) => (
-                                    <div
-                                      key={imgIdx}
-                                      className={`font-mono text-[10px] cursor-pointer hover:bg-slate-800 px-1 py-0.5 rounded -mx-1 ${
-                                        result.status === 'match' ? 'text-emerald-300' :
-                                        result.status === 'warning' ? 'text-amber-300' :
-                                        result.status === 'error' ? 'text-red-300' : 'text-slate-500'
-                                      }`}
-                                      onClick={() => handleCopy(result.value, `img-${idx}-${imgIdx}`)}
-                                      title="点击复制"
-                                    >
-                                      {result.value}
-                                      {copiedId === `img-${idx}-${imgIdx}` && <CheckCheck size={10} className="inline ml-1 text-emerald-400" />}
-                                    </div>
-                                  ))}
-                                </td>
-                                <td className="px-2 py-2 align-top text-center">
-                                  {hasError ? <XCircle size={12} className="text-red-400" /> :
-                                   hasWarning ? <AlertTriangle size={12} className="text-amber-400" /> :
-                                   <CheckCircle size={12} className="text-emerald-400" />}
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
+                                </div>
+
+                                {/* 图片值 */}
+                                <div>
+                                  <div className="text-[9px] text-slate-500 uppercase tracking-wider mb-1 flex items-center gap-1">
+                                    <Image size={10} />
+                                    图片实际
+                                  </div>
+                                  <div className="space-y-1.5">
+                                    {imageResults.map((result, imgIdx) => (
+                                      <div
+                                        key={imgIdx}
+                                        onClick={() => handleCopy(result.value, `img-${idx}-${imgIdx}`)}
+                                        className={`group relative text-xs font-mono px-3 py-2 rounded-lg cursor-pointer transition-all border ${
+                                          result.status === 'match'
+                                            ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30 hover:bg-emerald-500/20'
+                                            : result.status === 'warning'
+                                              ? 'bg-amber-500/10 text-amber-300 border-amber-500/30 hover:bg-amber-500/20'
+                                              : result.status === 'error'
+                                                ? 'bg-red-500/10 text-red-300 border-red-500/30 hover:bg-red-500/20'
+                                                : 'bg-slate-800/50 text-slate-500 border-slate-700/50'
+                                        }`}
+                                      >
+                                        <div className="flex items-center gap-2 pr-6">
+                                          <span className="text-[8px] text-slate-600">#{imgIdx + 1}</span>
+                                          <span className="flex-1">{result.value}</span>
+                                        </div>
+                                        <Copy
+                                          size={12}
+                                          className={`absolute right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity ${
+                                            result.status === 'match' ? 'text-emerald-400' :
+                                            result.status === 'warning' ? 'text-amber-400' :
+                                            result.status === 'error' ? 'text-red-400' : 'text-slate-400'
+                                          }`}
+                                        />
+                                        {copiedId === `img-${idx}-${imgIdx}` && (
+                                          <div className="absolute -top-6 right-0 bg-emerald-500 text-white text-[9px] px-2 py-0.5 rounded">
+                                            已复制
+                                          </div>
+                                        )}
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
                       </div>
                     </div>
                   );

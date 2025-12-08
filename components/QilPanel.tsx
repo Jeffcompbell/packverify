@@ -8,7 +8,7 @@ import { SourceField } from '../types';
 
 interface QilPanelProps {
   manualSourceFields: SourceField[];
-  onFieldsUpdate: (fields: SourceField[]) => void;
+  onFieldsUpdate: (fields: SourceField[], rawText: string) => void;
   onError: (message: string) => void;
   isProcessing: boolean;
   onProcessingChange: (processing: boolean) => void;
@@ -84,7 +84,7 @@ export const QilPanel = forwardRef<QilPanelRef, QilPanelProps>(({
     onProcessingChange(true);
     try {
       const fields = await parseSourceText(qilInputText);
-      onFieldsUpdate(fields);
+      onFieldsUpdate(fields, qilInputText); // 传递原文
     } catch (err) {
       onError("Failed to parse source text.");
     } finally {
@@ -120,7 +120,7 @@ export const QilPanel = forwardRef<QilPanelRef, QilPanelProps>(({
         return acc;
       }, [] as SourceField[]);
 
-      onFieldsUpdate(uniqueFields);
+      onFieldsUpdate(uniqueFields, ''); // 图片解析时原文为空
     } catch (error: any) {
       onError(error.message || 'QIL 图片解析失败');
     } finally {
