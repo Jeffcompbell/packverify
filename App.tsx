@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { diagnoseImage, fileToGenerativePart, parseSourceText, performSmartDiff, extractProductSpecs, AVAILABLE_MODELS, getModelId, setModelId, parseQILImage, localDiffSpecs } from './services/openaiService';
+import { login, logout, getCurrentUser, canProcessImage, getRemainingQuota, useQuota, User } from './services/authService';
 import { DiagnosisIssue, SourceField, DiffResult, ViewLayers, ImageItem, ImageSpec, BoundingBox, DeterministicCheck } from './types';
 import {
   Table, Zap, AlertCircle, XCircle, ChevronDown, ChevronLeft, ChevronRight,
   ImagePlus, Trash2, RefreshCw, Copy, CheckCheck, Upload, Eye, EyeOff,
   ZoomIn, ZoomOut, RotateCcw, RotateCw, FileText, AlertTriangle, CheckCircle,
   ClipboardCheck, Image, Search, FileSpreadsheet, Loader2, Maximize2, ImageIcon,
-  Type, Brackets, ShieldAlert, GitCompare, List
+  Type, Brackets, ShieldAlert, GitCompare, List, LogOut, User as UserIcon
 } from 'lucide-react';
 
 // 存储接口 - 用于 localStorage 持久化
@@ -48,7 +49,95 @@ const createVirtualFile = (base64: string, mimeType: string, fileName: string): 
 
 const STORAGE_KEY = 'packverify_data';
 
+// 登录组件
+const LoginPage: React.FC<{ onLogin: (user: User) => void }> = ({ onLogin }) => {
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+    setError('');
+
+    setTimeout(() => {
+      const user = login(username.trim(), password);
+      if (user) {
+        onLogin(user);
+      } else {
+        setError('用户名或密码错误');
+      }
+      setIsLoading(false);
+    }, 300);
+  };
+
+  return (
+    <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4">
+      <div className="w-full max-w-sm">
+        <div className="text-center mb-8">
+          <div className="inline-flex items-center gap-2 mb-4">
+            <div className="bg-indigo-500/20 p-2 rounded-lg">
+              <Zap size={24} className="text-indigo-400" fill="currentColor" />
+            </div>
+            <span className="text-xl font-bold text-white">包装稿审核 Pro</span>
+          </div>
+          <p className="text-slate-500 text-sm">请登录后使用</p>
+        </div>
+
+        <form onSubmit={handleSubmit} className="bg-slate-900 rounded-xl p-6 border border-slate-800">
+          <div className="mb-4">
+            <label className="block text-xs text-slate-500 mb-1.5">用户名</label>
+            <input
+              type="text"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+              placeholder="输入用户名"
+              autoFocus
+            />
+          </div>
+
+          <div className="mb-6">
+            <label className="block text-xs text-slate-500 mb-1.5">密码</label>
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+              placeholder="输入密码"
+            />
+          </div>
+
+          {error && (
+            <div className="mb-4 px-3 py-2 bg-red-500/10 border border-red-500/30 rounded-lg text-red-400 text-xs">
+              {error}
+            </div>
+          )}
+
+          <button
+            type="submit"
+            disabled={!username || !password || isLoading}
+            className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white py-2.5 rounded-lg font-medium text-sm transition-colors flex items-center justify-center gap-2"
+          >
+            {isLoading ? <Loader2 size={16} className="animate-spin" /> : null}
+            {isLoading ? '登录中...' : '登录'}
+          </button>
+        </form>
+
+        <p className="text-center text-slate-600 text-xs mt-4">
+          v3.3 · 首次使用请联系管理员获取账号
+        </p>
+      </div>
+    </div>
+  );
+};
+
 const App: React.FC = () => {
+  // 用户认证状态
+  const [user, setUser] = useState<User | null>(null);
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
+
   const [isProcessing, setIsProcessing] = useState(false);
   const [processingImageId, setProcessingImageId] = useState<string | null>(null);
   const [processingStep, setProcessingStep] = useState<number>(1);
@@ -181,12 +270,46 @@ const App: React.FC = () => {
     }
   }, [selectedIssueId]);
 
+  // 检查登录状态
+  useEffect(() => {
+    const existingUser = getCurrentUser();
+    if (existingUser) {
+      setUser(existingUser);
+    }
+    setIsCheckingAuth(false);
+  }, []);
+
   // Check for API Key on mount
   useEffect(() => {
     if (!import.meta.env.VITE_OPENAI_API_KEY) {
       setErrorMessage("Missing VITE_OPENAI_API_KEY in .env.local");
     }
   }, []);
+
+  // 登录回调
+  const handleLogin = (loggedInUser: User) => {
+    setUser(loggedInUser);
+  };
+
+  // 登出回调
+  const handleLogout = () => {
+    logout();
+    setUser(null);
+  };
+
+  // 如果正在检查登录状态，显示加载
+  if (isCheckingAuth) {
+    return (
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
+        <Loader2 size={24} className="animate-spin text-indigo-400" />
+      </div>
+    );
+  }
+
+  // 如果未登录，显示登录页
+  if (!user) {
+    return <LoginPage onLogin={handleLogin} />;
+  }
 
   const handleCopy = async (text: string, id: string) => {
     try {
@@ -207,6 +330,12 @@ const App: React.FC = () => {
 
     if (images.length >= 8) {
       setErrorMessage("最多支持 8 张图片");
+      return;
+    }
+
+    // 检查配额
+    if (!canProcessImage()) {
+      setErrorMessage(`配额已用完（${user?.used}/${user?.quota}），请联系管理员`);
       return;
     }
 
@@ -268,6 +397,10 @@ const App: React.FC = () => {
           img.id === newImageId ? { ...img, diffs } : img
         ));
       }
+
+      // 消耗配额
+      useQuota(1);
+      setUser(getCurrentUser());
 
     } catch (error: any) {
       console.error("Processing failed:", error);
@@ -563,7 +696,32 @@ const App: React.FC = () => {
         </div>
 
         {/* Right controls */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
+          {/* 配额显示 */}
+          <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-800 rounded-lg">
+            <div className="text-[10px] text-slate-500">配额</div>
+            <div className={`text-xs font-bold ${
+              (user?.quota || 0) - (user?.used || 0) <= 5 ? 'text-red-400' : 'text-emerald-400'
+            }`}>
+              {(user?.quota || 0) - (user?.used || 0)} / {user?.quota || 0}
+            </div>
+          </div>
+
+          {/* 用户信息 */}
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5 px-2 py-1 bg-slate-800 rounded-lg">
+              <UserIcon size={12} className="text-slate-500" />
+              <span className="text-xs text-slate-300">{user?.username}</span>
+            </div>
+            <button
+              onClick={handleLogout}
+              className="p-1.5 text-slate-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
+              title="退出登录"
+            >
+              <LogOut size={14} />
+            </button>
+          </div>
+
           {images.length > 0 && (
             <button onClick={handleReset} className="px-3 py-1.5 text-xs text-red-400 hover:bg-red-500/10 rounded-lg transition-colors">
               清空全部
