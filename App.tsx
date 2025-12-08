@@ -1812,16 +1812,16 @@ const App: React.FC = () => {
       </div>
 
       {/* BOTTOM BAR */}
-      {/* BOTTOM PANEL - QIL (桌面端显示，移动端通过导航切换) */}
-      <div style={{ height: bottomHeight }} className={`${mobileTab === 'qil' ? 'flex' : 'hidden'} md:flex border-t border-slate-800 bg-slate-950 flex-col shrink-0 relative`}>
+      {/* BOTTOM PANEL - QIL (桌面端显示，移动端通过导航切换全屏) */}
+      <div style={{ height: mobileTab === 'qil' ? 'auto' : bottomHeight }} className={`${mobileTab === 'qil' ? 'flex absolute inset-0 top-12 bottom-14 z-30' : 'hidden'} md:flex md:static md:z-auto border-t border-slate-800 bg-slate-950 flex-col shrink-0 relative`}>
         <div
           onMouseDown={handleResizeStart}
           className={`absolute top-0 left-0 right-0 h-1.5 cursor-ns-resize hover:bg-indigo-500/50 transition-colors hidden md:block ${isResizing ? 'bg-indigo-500/50' : ''}`}
         />
 
-        <div className="flex-1 flex flex-col md:flex-row min-h-0 pt-1">
+        <div className="flex-1 flex flex-col md:flex-row min-h-0 pt-1 overflow-hidden">
           {/* QIL Input */}
-          <div className="w-full md:w-[320px] border-b md:border-b-0 md:border-r border-slate-800 p-3 flex flex-col">
+          <div className="w-full md:w-[320px] border-b md:border-b-0 md:border-r border-slate-800 p-3 flex flex-col shrink-0 max-h-[40%] md:max-h-none">
             <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-2">
               <Table size={12} className="text-indigo-400" />
               QIL 源数据
