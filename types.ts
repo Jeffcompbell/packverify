@@ -7,7 +7,7 @@ export interface BoundingBox {
 }
 
 // Updated to match the 8-point checklist
-export type IssueType = 
+export type IssueType =
   | 'file_setting'   // 1. File settings/Layout
   | 'font'           // 2. Fonts/Copyright
   | 'image_quality'  // 3. Image Quality/Embeds
@@ -56,4 +56,27 @@ export interface CanvasTransform {
   x: number;
   y: number;
   scale: number;
+}
+
+export interface ImageSpec {
+  key: string;
+  value: string;
+  category: string;
+}
+
+export interface ImageItem {
+  id: string;
+  src: string;
+  base64: string;
+  file: File;
+  description?: string; // 图片内容描述
+  specs: ImageSpec[];   // 图片提取的参数
+  issues: DiagnosisIssue[];
+  diffs: DiffResult[];
+}
+
+// 诊断结果包含描述
+export interface DiagnosisResult {
+  description: string;
+  issues: DiagnosisIssue[];
 }
