@@ -95,7 +95,8 @@ export interface ImageItem {
 // 诊断结果包含描述
 export interface DiagnosisResult {
   description: string;
-  ocrText: string;      // OCR 原文（新增）
+  ocrText: string;      // OCR 原文
   issues: DiagnosisIssue[];
-  deterministicIssues: DeterministicCheck[]; // 确定性问题（新增）
+  deterministicIssues: DeterministicCheck[]; // 确定性问题
+  specs: SourceField[]; // 产品规格（从单次 AI 调用中提取）
 }

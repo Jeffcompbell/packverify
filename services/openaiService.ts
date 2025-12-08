@@ -198,64 +198,32 @@ export const runDeterministicChecks = (text: string): DeterministicCheck[] => {
 };
 
 // ============================================
-// 单步分析：OCR + 问题检测（合并原来的三步）
+// 单步分析：OCR + 问题检测 + 规格提取（一次调用完成）
 // ============================================
 export const analyzeImageSinglePass = async (
     base64Image: string,
     mimeType: string
-): Promise<{ description: string; ocrText: string; issues: DiagnosisIssue[] }> => {
+): Promise<{ description: string; ocrText: string; issues: DiagnosisIssue[]; specs: SourceField[] }> => {
     try {
         const client = getClient();
         const modelId = getModelId();
         console.log("Single-pass analysis with model:", modelId);
+        const startTime = Date.now();
 
-        const prompt = `你是资深印前QC专员，请分析这张包装设计图片。
+        // 精简 prompt，一次调用完成所有任务
+        const prompt = `分析包装图片，返回JSON：
 
-## 任务（按顺序执行）
-
-### 1. OCR 提取（最重要）
-- 提取图片上**所有可见文字**
-- 按从上到下、从左到右顺序
-- 保持原样，**绝对不要修正任何内容**
-- 模糊/不清晰的部分用 [?] 标记
-- 包括：标题、正文、成分表、警告语、小字等
-
-### 2. 问题检测（极其谨慎）
-只报告你 **100% 确定** 的错误：
-- 明显的拼写错误（必须是确定的，不是猜测）
-- 括号/引号不配对
-- 明显的标点问题
-
-## ⚠️ 极其重要的原则
-
-### 必须遵守
-- **宁可漏报10个真错误，也不要误报1个正确内容**
-- 如果不确定，**不要报告**
-- 外语词汇（法语、西语、德语等）有特殊拼写，不要随意判断
-
-### 绝对不要报告
-- 品牌名、产品名（可能是故意的创意拼写）
-- 外语专有名词
-- 你不确定的任何内容
-- 设计风格、布局、颜色问题
-
-## 输出 JSON 格式
 {
-  "description": "一句话描述图片内容",
-  "ocrText": "提取的全部文字，每个文本块换行，保持原样",
-  "issues": [
-    {
-      "original": "包含错误的原文（20-50字），用 **双星号** 标记错误词",
-      "problem": "简述问题：xxx 应为 yyy",
-      "suggestion": "正确写法",
-      "severity": "high/medium/low",
-      "confidence": "certain/likely/possible",
-      "box_2d": [ymin, xmin, ymax, xmax]
-    }
-  ]
+  "description": "一句话描述",
+  "ocrText": "提取所有文字，换行分隔",
+  "issues": [{"original": "含错误的原文用**标记**", "problem": "问题", "suggestion": "建议", "severity": "high/medium/low", "box_2d": [y1,x1,y2,x2]}],
+  "specs": [{"key": "项目名", "value": "值", "category": "content/compliance/specs"}]
 }
 
-如果没有100%确定的错误，返回空 issues 数组。这是完全正常的。`;
+要求：
+1. OCR提取所有文字，保持原样
+2. issues只报告100%确定的错误，可以为空
+3. specs提取：品名、成分、警告、净含量、条码等`;
 
         const response = await client.chat.completions.create({
             model: modelId,
@@ -268,18 +236,19 @@ export const analyzeImageSinglePass = async (
                             type: "image_url",
                             image_url: {
                                 url: `data:${mimeType};base64,${base64Image}`,
-                                detail: "high"
+                                detail: "auto"
                             }
                         }
                     ]
                 }
             ],
-            // response_format 部分代理不支持，通过 prompt 要求返回 JSON
         });
+
+        console.log(`API response time: ${Date.now() - startTime}ms`);
 
         const text = response.choices[0].message.content;
         if (!text) {
-            return { description: '', ocrText: '', issues: [] };
+            return { description: '', ocrText: '', issues: [], specs: [] };
         }
 
         const parsed = parseJSON(text);
@@ -303,10 +272,20 @@ export const analyzeImageSinglePass = async (
             }))
             : [];
 
+        // 处理 specs
+        const specs: SourceField[] = Array.isArray(parsed.specs)
+            ? parsed.specs.map((item: any) => ({
+                key: item.key || '',
+                value: item.value || '',
+                category: item.category || 'content'
+            }))
+            : [];
+
         return {
             description: parsed.description || '',
             ocrText: parsed.ocrText || '',
-            issues
+            issues,
+            specs
         };
     } catch (error) {
         console.error("Single-pass analysis failed:", error);
@@ -314,7 +293,7 @@ export const analyzeImageSinglePass = async (
     }
 };
 
-// Main diagnosis function - 简化为两步：AI分析 + 本地规则检查
+// Main diagnosis function - 单次 AI 调用 + 本地规则检查
 export const diagnoseImage = async (
     base64Image: string,
     mimeType: string,
@@ -323,15 +302,16 @@ export const diagnoseImage = async (
     try {
         console.log("Starting analysis (AI → Rules)...");
 
-        // Step 1: AI 单步分析（OCR + 问题检测）
+        // Step 1: AI 单步分析（OCR + 问题检测 + 规格提取，一次 API 调用）
         onStepChange?.(1);
         const aiResult = await analyzeImageSinglePass(base64Image, mimeType);
         console.log("AI analysis complete. Description:", aiResult.description);
         console.log("OCR text length:", aiResult.ocrText.length);
         console.log("AI issues found:", aiResult.issues.length);
+        console.log("Specs extracted:", aiResult.specs.length);
         console.log("=== OCR提取的文字 ===\n", aiResult.ocrText, "\n=== END ===");
 
-        // Step 2: 本地确定性规则检查（100% 准确）
+        // Step 2: 本地确定性规则检查（100% 准确，不调用 API）
         onStepChange?.(2);
         const deterministicIssues = runDeterministicChecks(aiResult.ocrText);
         console.log("Deterministic checks found:", deterministicIssues.length, "issues");
@@ -340,7 +320,8 @@ export const diagnoseImage = async (
             description: aiResult.description,
             ocrText: aiResult.ocrText,
             issues: aiResult.issues,
-            deterministicIssues
+            deterministicIssues,
+            specs: aiResult.specs
         };
     } catch (error) {
         console.error("Diagnosis failed:", error);

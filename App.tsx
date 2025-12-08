@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { diagnoseImage, fileToGenerativePart, parseSourceText, performSmartDiff, extractProductSpecs, AVAILABLE_MODELS, getModelId, setModelId, parseQILImage, localDiffSpecs } from './services/openaiService';
+import { diagnoseImage, fileToGenerativePart, parseSourceText, AVAILABLE_MODELS, getModelId, setModelId, parseQILImage, localDiffSpecs } from './services/openaiService';
 import {
   signInWithGoogle, signOutUser, onAuthChange, getOrCreateUser, getUserData, useQuotaFirebase, UserData,
   getOrCreateSession, saveImageToCloud, updateImageInCloud, deleteImageFromCloud, saveQilToCloud,
@@ -625,10 +625,17 @@ const App: React.FC = () => {
       setProcessingImageId(newImageId);
       setErrorMessage(null);
 
-      // Analyze
+      // 单次 AI 调用完成：OCR + 问题检测 + 规格提取
       const diagResult = await diagnoseImage(base64, file.type, (step) => {
         setProcessingStep(step);
       });
+
+      // 转换 specs 格式
+      const imageSpecs: ImageSpec[] = diagResult.specs.map(s => ({
+        key: s.key,
+        value: s.value,
+        category: s.category
+      }));
 
       setImages(prev => prev.map(img =>
         img.id === newImageId ? {
@@ -636,25 +643,15 @@ const App: React.FC = () => {
           issues: diagResult.issues,
           description: diagResult.description,
           ocrText: diagResult.ocrText,
-          deterministicIssues: diagResult.deterministicIssues
+          deterministicIssues: diagResult.deterministicIssues,
+          specs: imageSpecs
         } : img
       ));
 
-      // Extract specs
-      const specs = await extractProductSpecs(base64, file.type);
-      const imageSpecs: ImageSpec[] = specs.map(s => ({
-        key: s.key,
-        value: s.value,
-        category: s.category
-      }));
-
-      setImages(prev => prev.map(img =>
-        img.id === newImageId ? { ...img, specs: imageSpecs } : img
-      ));
-
-      // Diff if manual fields exist
+      // Diff if manual fields exist (本地对比，不调用 API)
+      let diffs: DiffResult[] = [];
       if (manualSourceFields.length > 0) {
-        const diffs = await performSmartDiff(base64, manualSourceFields);
+        diffs = localDiffSpecs(manualSourceFields, imageSpecs);
         setImages(prev => prev.map(img =>
           img.id === newImageId ? { ...img, diffs } : img
         ));
@@ -680,7 +677,7 @@ const App: React.FC = () => {
             specs: imageSpecs,
             issues: diagResult.issues,
             deterministicIssues: diagResult.deterministicIssues,
-            diffs: manualSourceFields.length > 0 ? await performSmartDiff(base64, manualSourceFields) : []
+            diffs: diffs
           };
           await saveImageToCloud(user.uid, sessionId, finalImage);
           console.log('Image synced to cloud:', newImageId);
@@ -721,9 +718,23 @@ const App: React.FC = () => {
       setProcessingImageId(imageId);
       setErrorMessage(null);
 
+      // 单次 AI 调用完成：OCR + 问题检测 + 规格提取
       const diagResult = await diagnoseImage(image.base64, image.file.type, (step) => {
         setProcessingStep(step);
       });
+
+      // 转换 specs 格式
+      const imageSpecs: ImageSpec[] = diagResult.specs.map(s => ({
+        key: s.key,
+        value: s.value,
+        category: s.category
+      }));
+
+      // Diff if manual fields exist (本地对比，不调用 API)
+      let diffs: DiffResult[] = [];
+      if (manualSourceFields.length > 0) {
+        diffs = localDiffSpecs(manualSourceFields, imageSpecs);
+      }
 
       setImages(prev => prev.map(img =>
         img.id === imageId ? {
@@ -731,27 +742,11 @@ const App: React.FC = () => {
           issues: diagResult.issues,
           description: diagResult.description,
           ocrText: diagResult.ocrText,
-          deterministicIssues: diagResult.deterministicIssues
+          deterministicIssues: diagResult.deterministicIssues,
+          specs: imageSpecs,
+          diffs: diffs
         } : img
       ));
-
-      const specs = await extractProductSpecs(image.base64, image.file.type);
-      const imageSpecs: ImageSpec[] = specs.map(s => ({
-        key: s.key,
-        value: s.value,
-        category: s.category
-      }));
-
-      setImages(prev => prev.map(img =>
-        img.id === imageId ? { ...img, specs: imageSpecs } : img
-      ));
-
-      if (manualSourceFields.length > 0) {
-        const diffs = await performSmartDiff(image.base64, manualSourceFields);
-        setImages(prev => prev.map(img =>
-          img.id === imageId ? { ...img, diffs } : img
-        ));
-      }
 
       // 消耗配额
       await useQuotaFirebase(user.uid, 1, image.file.name, 'retry');
@@ -767,7 +762,7 @@ const App: React.FC = () => {
             specs: imageSpecs,
             issues: diagResult.issues,
             deterministicIssues: diagResult.deterministicIssues,
-            diffs: manualSourceFields.length > 0 ? await performSmartDiff(image.base64, manualSourceFields) : []
+            diffs: diffs
           });
           console.log('Image updated in cloud:', imageId);
         } catch (syncError) {
