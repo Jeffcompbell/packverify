@@ -1458,7 +1458,7 @@ const App: React.FC = () => {
               }
             }} />
           </label>
-          <div className="grid grid-cols-3 md:grid-cols-1 gap-2 md:flex-1 overflow-y-auto">
+          <div className="grid grid-cols-3 gap-2 md:flex md:flex-col md:space-y-2 md:gap-0 overflow-y-auto">
             {images.map((img, idx) => (
               <div
                 key={img.id}
@@ -1494,7 +1494,7 @@ const App: React.FC = () => {
               </div>
             ))}
             {images.length === 0 && (
-              <div className="col-span-3 md:col-span-1 p-4 border-2 border-dashed border-slate-800 rounded-lg text-center">
+              <div className="col-span-3 p-4 border-2 border-dashed border-slate-800 rounded-lg text-center">
                 <ImagePlus size={20} className="mx-auto text-slate-700 mb-1" />
                 <span className="text-[9px] text-slate-600 hidden md:block">点击顶部按钮添加</span>
                 <span className="text-[9px] text-slate-600 md:hidden">点击上方按钮添加图片</span>
@@ -1523,14 +1523,47 @@ const App: React.FC = () => {
                   transition: 'transform 0.2s'
                 }}
               >
-                <div className="relative inline-block">
+                <div className="relative inline-block overflow-hidden">
                   <img
                     src={currentImage.src}
                     alt="包装设计"
-                    className={`block max-h-[60vh] ${isCurrentProcessing ? 'opacity-60' : ''}`}
+                    className="block max-h-[60vh]"
                     draggable={false}
                     style={{ maxWidth: '100%', height: 'auto' }}
                   />
+
+                  {/* 扫描动画效果 */}
+                  {isCurrentProcessing && (
+                    <>
+                      {/* 扫描线 */}
+                      <div
+                        className="absolute left-0 right-0 h-0.5 pointer-events-none z-20"
+                        style={{
+                          animation: 'scanLine 2.5s ease-in-out infinite',
+                          background: 'linear-gradient(90deg, transparent, rgba(99, 102, 241, 0.8), rgba(129, 140, 248, 1), rgba(99, 102, 241, 0.8), transparent)',
+                          boxShadow: '0 0 15px 3px rgba(99, 102, 241, 0.6), 0 0 30px 6px rgba(99, 102, 241, 0.3)'
+                        }}
+                      />
+                      {/* 扫描线上的状态文字 */}
+                      <div
+                        className="absolute left-1/2 -translate-x-1/2 pointer-events-none z-30 flex items-center gap-2 px-3 py-1 bg-slate-900/90 backdrop-blur-sm rounded-full border border-indigo-500/50 text-[10px] text-indigo-300 whitespace-nowrap"
+                        style={{
+                          animation: 'scanLine 2.5s ease-in-out infinite',
+                        }}
+                      >
+                        <span className="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-pulse" />
+                        {processingStep === 1 ? 'AI 视觉分析' : '规则检测'}
+                      </div>
+                      {/* 顶部和底部边缘发光 */}
+                      <div className="absolute top-0 left-0 right-0 h-8 bg-gradient-to-b from-indigo-500/20 to-transparent pointer-events-none z-10" />
+                      <div className="absolute bottom-0 left-0 right-0 h-8 bg-gradient-to-t from-indigo-500/20 to-transparent pointer-events-none z-10" />
+                      {/* 四角标记 */}
+                      <div className="absolute top-2 left-2 w-4 h-4 border-l-2 border-t-2 border-indigo-400 pointer-events-none z-10" />
+                      <div className="absolute top-2 right-2 w-4 h-4 border-r-2 border-t-2 border-indigo-400 pointer-events-none z-10" />
+                      <div className="absolute bottom-2 left-2 w-4 h-4 border-l-2 border-b-2 border-indigo-400 pointer-events-none z-10" />
+                      <div className="absolute bottom-2 right-2 w-4 h-4 border-r-2 border-b-2 border-indigo-400 pointer-events-none z-10" />
+                    </>
+                  )}
 
                   {showOverlay && !isCurrentProcessing && currentImage.issues.map(issue => (
                     issue.box_2d && (
@@ -1555,23 +1588,7 @@ const App: React.FC = () => {
                 </div>
               </div>
 
-              {isCurrentProcessing && (
-                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                  <div className="bg-slate-900/90 backdrop-blur px-6 py-4 rounded-xl border border-indigo-500/50">
-                    <div className="flex items-center gap-3 mb-3">
-                      <Loader2 className="animate-spin text-indigo-400" size={20} />
-                      <span className="text-sm font-medium">AI 分析中...</span>
-                    </div>
-                    <div className="flex items-center gap-2 text-[10px]">
-                      <div className={`w-6 h-6 rounded-full flex items-center justify-center text-white ${processingStep >= 1 ? 'bg-indigo-500' : 'bg-slate-700'}`}>1</div>
-                      <span className={`text-xs ${processingStep >= 1 ? 'text-indigo-400' : 'text-slate-500'}`}>AI分析</span>
-                      <div className={`w-8 h-0.5 ${processingStep > 1 ? 'bg-indigo-500' : 'bg-slate-700'}`}></div>
-                      <div className={`w-6 h-6 rounded-full flex items-center justify-center text-white ${processingStep >= 2 ? 'bg-indigo-500' : 'bg-slate-700'}`}>2</div>
-                      <span className={`text-xs ${processingStep >= 2 ? 'text-indigo-400' : 'text-slate-500'}`}>规则检查</span>
-                    </div>
-                  </div>
-                </div>
-              )}
+              {/* 左右切换按钮 */}
             </>
           ) : (
             <div className="text-center">

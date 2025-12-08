@@ -22,27 +22,36 @@ interface ModelConfig {
     name: string;
     description: string;
     baseURL: string;
+    apiKeyEnv?: string; // 使用的 API Key 环境变量
 }
 
-// 可用的模型列表 - 统一使用 /api/v1 端点
+// 可用的模型列表
 export const AVAILABLE_MODELS: ModelConfig[] = [
-    // Gemini 系列（推荐）
+    // PackyAPI Gemini（默认，使用新代理）
+    {
+        id: "gemini-3-pro-preview",
+        name: "Gemini 3 Pro",
+        description: "PackyAPI 代理（默认）",
+        baseURL: "https://api-slb.packyapi.com/v1",
+        apiKeyEnv: "VITE_GEMINI_API_KEY"
+    },
+    // Zenmux Gemini 系列（备选）
     {
         id: "google/gemini-3-pro-preview",
-        name: "Gemini 3 Pro",
-        description: "最新预览版，多模态最强",
+        name: "Gemini 3 Pro (Zen)",
+        description: "Zenmux 代理",
         baseURL: "https://zenmux.ai/api/v1"
     },
     {
         id: "google/gemini-2.5-pro",
         name: "Gemini 2.5 Pro",
-        description: "稳定版（推荐）",
+        description: "稳定版",
         baseURL: "https://zenmux.ai/api/v1"
     },
     {
         id: "google/gemini-2.5-flash",
         name: "Gemini 2.5 Flash",
-        description: "快速版，性价比高",
+        description: "快速版",
         baseURL: "https://zenmux.ai/api/v1"
     },
     // OpenAI 系列（备选）
@@ -52,16 +61,10 @@ export const AVAILABLE_MODELS: ModelConfig[] = [
         description: "OpenAI 多模态",
         baseURL: "https://zenmux.ai/api/v1"
     },
-    {
-        id: "openai/gpt-4o-mini",
-        name: "GPT-4o Mini",
-        description: "快速轻量版",
-        baseURL: "https://zenmux.ai/api/v1"
-    },
 ];
 
-// 默认使用 Gemini 2.5 Pro
-let currentModelId = import.meta.env.VITE_OPENAI_MODEL || "google/gemini-2.5-pro";
+// 默认使用 PackyAPI Gemini 3 Pro
+let currentModelId = import.meta.env.VITE_OPENAI_MODEL || "gemini-3-pro-preview";
 
 export const getModelId = () => currentModelId;
 
@@ -72,13 +75,21 @@ export const setModelId = (modelId: string) => {
 
 // 根据模型 ID 获取对应的 client
 const getClient = () => {
-    const apiKey = import.meta.env.VITE_OPENAI_API_KEY;
-    if (!apiKey) {
-        console.error("API Key not found. Please set VITE_OPENAI_API_KEY");
+    const modelConfig = AVAILABLE_MODELS.find(m => m.id === currentModelId);
+    const baseURL = modelConfig?.baseURL || "https://api-slb.packyapi.com/v1";
+
+    // 根据模型配置选择 API Key
+    let apiKey: string;
+    if (modelConfig?.apiKeyEnv === "VITE_GEMINI_API_KEY") {
+        apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+    } else {
+        apiKey = import.meta.env.VITE_OPENAI_API_KEY;
     }
 
-    // 统一使用 /api/v1 端点
-    const baseURL = "https://zenmux.ai/api/v1";
+    if (!apiKey) {
+        console.error("API Key not found");
+    }
+
     console.log(`Using model: ${currentModelId}, baseURL: ${baseURL}`);
 
     return new OpenAI({
@@ -263,7 +274,7 @@ export const analyzeImageSinglePass = async (
                     ]
                 }
             ],
-            response_format: { type: "json_object" }
+            // response_format 部分代理不支持，通过 prompt 要求返回 JSON
         });
 
         const text = response.choices[0].message.content;
@@ -359,7 +370,7 @@ export const parseSourceText = async (sourceText: string): Promise<SourceField[]
             messages: [
                 { role: "user", content: prompt }
             ],
-            response_format: { type: "json_object" }
+            // response_format 部分代理不支持，通过 prompt 要求返回 JSON
         });
 
         const text = response.choices[0].message.content;
@@ -419,7 +430,7 @@ export const extractProductSpecs = async (base64Image: string, mimeType: string)
                     ]
                 }
             ],
-            response_format: { type: "json_object" }
+            // response_format 部分代理不支持，通过 prompt 要求返回 JSON
         });
 
         const text = response.choices[0].message.content;
@@ -484,7 +495,7 @@ export const performSmartDiff = async (
                     ]
                 }
             ],
-            response_format: { type: "json_object" }
+            // response_format 部分代理不支持，通过 prompt 要求返回 JSON
         });
 
         const text = response.choices[0].message.content;
@@ -562,7 +573,7 @@ export const parseQILImage = async (base64Image: string, mimeType: string): Prom
                     ]
                 }
             ],
-            response_format: { type: "json_object" }
+            // response_format 部分代理不支持，通过 prompt 要求返回 JSON
         });
 
         const text = response.choices[0].message.content;
