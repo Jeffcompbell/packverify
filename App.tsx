@@ -12,7 +12,8 @@ import {
   ImagePlus, Trash2, RefreshCw, Copy, CheckCheck, Upload, Eye, EyeOff,
   ZoomIn, ZoomOut, RotateCcw, RotateCw, FileText, AlertTriangle, CheckCircle,
   ClipboardCheck, Image, Search, FileSpreadsheet, Loader2, Maximize2,
-  Type, Brackets, ShieldAlert, GitCompare, LogOut, User as UserIcon, X, Cloud, CloudOff
+  Type, Brackets, ShieldAlert, GitCompare, LogOut, User as UserIcon, X, Cloud, CloudOff,
+  Menu, Home, List, Settings
 } from 'lucide-react';
 
 // 存储接口 - 用于 localStorage 持久化
@@ -362,6 +363,9 @@ const App: React.FC = () => {
 
   // Right panel tab
   const [rightPanelTab, setRightPanelTab] = useState<'issues' | 'ocr'>('issues');
+
+  // Mobile view tab
+  const [mobileTab, setMobileTab] = useState<'images' | 'viewer' | 'issues' | 'qil'>('viewer');
 
   // QIL Input
   const [qilInputMode, setQilInputMode] = useState<'text' | 'image'>('text');
@@ -1168,11 +1172,11 @@ const App: React.FC = () => {
       )}
 
       {/* TOP BAR */}
-      <div className="h-12 border-b border-slate-800 bg-slate-900 flex items-center justify-between px-4 shrink-0">
+      <div className="h-12 border-b border-slate-800 bg-slate-900 flex items-center justify-between px-2 md:px-4 shrink-0">
         {/* Left: Product Name */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 md:gap-3 min-w-0 flex-1">
           {/* 产品名称 - 可编辑 */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1 md:gap-2 min-w-0">
             {isEditingProductName ? (
               <input
                 type="text"
@@ -1188,17 +1192,17 @@ const App: React.FC = () => {
                     handleProductNameChange(productName);
                   }
                 }}
-                className="bg-slate-800 border border-slate-600 rounded px-2 py-1 text-sm text-white w-40 focus:outline-none focus:border-slate-500"
+                className="bg-slate-800 border border-slate-600 rounded px-2 py-1 text-sm text-white w-28 md:w-40 focus:outline-none focus:border-slate-500"
                 autoFocus
               />
             ) : (
               <button
                 onClick={() => user && setIsEditingProductName(true)}
-                className="text-sm font-medium text-white hover:text-slate-300 transition-colors flex items-center gap-1"
+                className="text-xs md:text-sm font-medium text-white hover:text-slate-300 transition-colors flex items-center gap-1 truncate max-w-[100px] md:max-w-none"
                 title="点击编辑产品名称"
               >
                 {productName}
-                {user && <span className="text-slate-600 text-xs">✎</span>}
+                {user && <span className="text-slate-600 text-xs hidden md:inline">✎</span>}
               </button>
             )}
 
@@ -1263,12 +1267,12 @@ const App: React.FC = () => {
             )}
           </div>
 
-          {/* 分隔线 */}
-          <div className="h-5 w-px bg-slate-700" />
+          {/* 分隔线 - 桌面端 */}
+          <div className="h-5 w-px bg-slate-700 hidden md:block" />
 
-          {/* 云同步状态 */}
+          {/* 云同步状态 - 桌面端 */}
           {user && (
-            <div className="flex items-center gap-1.5" title={cloudSyncEnabled ? '云同步已开启' : '云同步已关闭'}>
+            <div className="hidden md:flex items-center gap-1.5" title={cloudSyncEnabled ? '云同步已开启' : '云同步已关闭'}>
               {isSyncing || isLoadingFromCloud ? (
                 <Loader2 size={12} className="animate-spin text-slate-500" />
               ) : (
@@ -1281,8 +1285,8 @@ const App: React.FC = () => {
           )}
         </div>
 
-        {/* Center: Image Tools */}
-        <div className="flex items-center gap-2">
+        {/* Center: Image Tools - 桌面端显示 */}
+        <div className="hidden md:flex items-center gap-2">
           {/* 添加图片 */}
           <label className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium rounded border border-slate-700 cursor-pointer transition-colors">
             <ImagePlus size={14} />
@@ -1345,9 +1349,9 @@ const App: React.FC = () => {
         </div>
 
         {/* Right: User & Settings */}
-        <div className="flex items-center gap-3">
-          {/* Model Selector */}
-          <div className="relative">
+        <div className="flex items-center gap-1.5 md:gap-3">
+          {/* Model Selector - 桌面端 */}
+          <div className="relative hidden md:block">
             <button
               onClick={() => setShowModelSelector(!showModelSelector)}
               className="bg-slate-800 px-2.5 py-1 rounded border border-slate-700 text-[11px] flex items-center gap-1.5 hover:border-slate-600 transition-colors"
@@ -1386,16 +1390,16 @@ const App: React.FC = () => {
               {/* 配额 */}
               <button
                 onClick={handleOpenQuotaModal}
-                className="flex items-center gap-1.5 px-2 py-1 bg-slate-800 hover:bg-slate-700 rounded text-[10px] transition-colors"
+                className="flex items-center gap-1 md:gap-1.5 px-1.5 md:px-2 py-1 bg-slate-800 hover:bg-slate-700 rounded text-[10px] transition-colors"
                 title="点击查看配额详情"
               >
-                <span className="text-slate-500">额度</span>
+                <span className="text-slate-500 hidden md:inline">额度</span>
                 <span className="text-slate-300 font-medium tabular-nums">{user.quota - user.used}/{user.quota}</span>
               </button>
 
               {/* 用户头像 */}
               <div className="relative group">
-                <button className="flex items-center gap-1.5 p-1 rounded hover:bg-slate-800 transition-all">
+                <button className="flex items-center gap-1 md:gap-1.5 p-1 rounded hover:bg-slate-800 transition-all">
                   <div className="w-6 h-6 rounded-full bg-slate-700 overflow-hidden">
                     {user.photoURL ? (
                       <img src={user.photoURL} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
@@ -1405,7 +1409,7 @@ const App: React.FC = () => {
                       </div>
                     )}
                   </div>
-                  <ChevronDown size={12} className="text-slate-500" />
+                  <ChevronDown size={12} className="text-slate-500 hidden md:block" />
                 </button>
 
                 {/* 下拉菜单 */}
@@ -1437,17 +1441,31 @@ const App: React.FC = () => {
       </div>
 
       {/* MAIN CONTENT */}
-      <div className="flex-1 flex min-h-0">
-        {/* LEFT: Thumbnails */}
-        <div className="w-[140px] border-r border-slate-800 bg-slate-950 p-2 overflow-y-auto shrink-0 flex flex-col">
+      <div className="flex-1 flex min-h-0 pb-14 md:pb-0">
+        {/* LEFT: Thumbnails - 桌面端显示，移动端通过底部导航切换 */}
+        <div className={`${mobileTab === 'images' ? 'flex' : 'hidden'} md:flex w-full md:w-[140px] border-r border-slate-800 bg-slate-950 p-2 overflow-y-auto shrink-0 flex-col`}>
           <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">
             图片列表
           </div>
-          <div className="space-y-2 flex-1">
+          {/* 移动端添加图片按钮 */}
+          <label className="md:hidden flex items-center justify-center gap-1.5 px-3 py-2 mb-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium rounded cursor-pointer transition-colors">
+            <ImagePlus size={14} />
+            <span>添加图片</span>
+            <input type="file" accept="image/*" className="hidden" onChange={(e) => {
+              if (e.target.files?.[0]) {
+                processFile(e.target.files[0]);
+                setMobileTab('viewer');
+              }
+            }} />
+          </label>
+          <div className="grid grid-cols-3 md:grid-cols-1 gap-2 flex-1">
             {images.map((img, idx) => (
               <div
                 key={img.id}
-                onClick={() => setCurrentImageIndex(idx)}
+                onClick={() => {
+                  setCurrentImageIndex(idx);
+                  setMobileTab('viewer');
+                }}
                 className={`relative group cursor-pointer rounded-lg overflow-hidden border-2 transition-all ${
                   currentImageIndex === idx ? 'border-indigo-500' : 'border-transparent hover:border-slate-600'
                 }`}
@@ -1476,16 +1494,17 @@ const App: React.FC = () => {
               </div>
             ))}
             {images.length === 0 && (
-              <div className="p-4 border-2 border-dashed border-slate-800 rounded-lg text-center">
+              <div className="col-span-3 md:col-span-1 p-4 border-2 border-dashed border-slate-800 rounded-lg text-center">
                 <ImagePlus size={20} className="mx-auto text-slate-700 mb-1" />
-                <span className="text-[9px] text-slate-600">点击顶部按钮添加</span>
+                <span className="text-[9px] text-slate-600 hidden md:block">点击顶部按钮添加</span>
+                <span className="text-[9px] text-slate-600 md:hidden">点击上方按钮添加图片</span>
               </div>
             )}
           </div>
         </div>
 
         {/* CENTER: Image Viewer */}
-        <div className="flex-1 relative bg-slate-900 overflow-hidden flex items-center justify-center">
+        <div className={`${mobileTab === 'viewer' ? 'flex' : 'hidden'} md:flex flex-1 relative bg-slate-900 overflow-hidden items-center justify-center`}>
           {/* Grid Background */}
           <div
             className="absolute inset-0 opacity-10 pointer-events-none"
@@ -1593,7 +1612,7 @@ const App: React.FC = () => {
         </div>
 
         {/* RIGHT: Issues Panel */}
-        <div className="w-[380px] border-l border-slate-800 bg-slate-900 flex flex-col">
+        <div className={`${mobileTab === 'issues' ? 'flex' : 'hidden'} md:flex w-full md:w-[380px] border-l border-slate-800 bg-slate-900 flex-col`}>
           <div className="px-2 py-2 border-b border-slate-800 flex items-center gap-1 bg-slate-900">
             <button
               onClick={() => setRightPanelTab('issues')}
@@ -1793,15 +1812,16 @@ const App: React.FC = () => {
       </div>
 
       {/* BOTTOM BAR */}
-      <div style={{ height: bottomHeight }} className="border-t border-slate-800 bg-slate-950 flex flex-col shrink-0 relative">
+      {/* BOTTOM PANEL - QIL (桌面端显示，移动端通过导航切换) */}
+      <div style={{ height: bottomHeight }} className={`${mobileTab === 'qil' ? 'flex' : 'hidden'} md:flex border-t border-slate-800 bg-slate-950 flex-col shrink-0 relative`}>
         <div
           onMouseDown={handleResizeStart}
-          className={`absolute top-0 left-0 right-0 h-1.5 cursor-ns-resize hover:bg-indigo-500/50 transition-colors ${isResizing ? 'bg-indigo-500/50' : ''}`}
+          className={`absolute top-0 left-0 right-0 h-1.5 cursor-ns-resize hover:bg-indigo-500/50 transition-colors hidden md:block ${isResizing ? 'bg-indigo-500/50' : ''}`}
         />
 
-        <div className="flex-1 flex min-h-0 pt-1">
+        <div className="flex-1 flex flex-col md:flex-row min-h-0 pt-1">
           {/* QIL Input */}
-          <div className="w-[320px] border-r border-slate-800 p-3 flex flex-col">
+          <div className="w-full md:w-[320px] border-b md:border-b-0 md:border-r border-slate-800 p-3 flex flex-col">
             <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-2">
               <Table size={12} className="text-indigo-400" />
               QIL 源数据
@@ -2171,6 +2191,56 @@ const App: React.FC = () => {
             </div>
           </div>
         </div>
+      </div>
+
+      {/* Mobile Bottom Navigation */}
+      <div className="md:hidden fixed bottom-0 left-0 right-0 h-14 bg-slate-900 border-t border-slate-800 flex items-center justify-around px-2 z-40">
+        <button
+          onClick={() => setMobileTab('images')}
+          className={`flex flex-col items-center justify-center gap-0.5 py-1.5 px-3 rounded-lg transition-colors ${
+            mobileTab === 'images' ? 'text-indigo-400 bg-slate-800' : 'text-slate-500'
+          }`}
+        >
+          <List size={18} />
+          <span className="text-[9px]">图片</span>
+          {images.length > 0 && (
+            <span className="absolute top-1 right-1 w-4 h-4 bg-indigo-500 text-white text-[8px] rounded-full flex items-center justify-center">
+              {images.length}
+            </span>
+          )}
+        </button>
+        <button
+          onClick={() => setMobileTab('viewer')}
+          className={`flex flex-col items-center justify-center gap-0.5 py-1.5 px-3 rounded-lg transition-colors ${
+            mobileTab === 'viewer' ? 'text-indigo-400 bg-slate-800' : 'text-slate-500'
+          }`}
+        >
+          <Eye size={18} />
+          <span className="text-[9px]">预览</span>
+        </button>
+        <button
+          onClick={() => setMobileTab('issues')}
+          className={`flex flex-col items-center justify-center gap-0.5 py-1.5 px-3 rounded-lg transition-colors relative ${
+            mobileTab === 'issues' ? 'text-indigo-400 bg-slate-800' : 'text-slate-500'
+          }`}
+        >
+          <AlertTriangle size={18} />
+          <span className="text-[9px]">问题</span>
+          {currentImage && (currentImage.issues.length + (currentImage.deterministicIssues?.length || 0)) > 0 && (
+            <span className="absolute top-0.5 right-0.5 w-4 h-4 bg-red-500 text-white text-[8px] rounded-full flex items-center justify-center">
+              {currentImage.issues.length + (currentImage.deterministicIssues?.length || 0)}
+            </span>
+          )}
+        </button>
+        <button
+          onClick={() => setMobileTab('qil')}
+          className={`flex flex-col items-center justify-center gap-0.5 py-1.5 px-3 rounded-lg transition-colors ${
+            mobileTab === 'qil' ? 'text-indigo-400 bg-slate-800' : 'text-slate-500'
+          }`}
+        >
+          <Table size={18} />
+          <span className="text-[9px]">QIL</span>
+        </button>
       </div>
 
       {/* Error Toast */}
