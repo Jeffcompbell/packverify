@@ -79,6 +79,8 @@ export interface ImageSpec {
   category: string;
 }
 
+export type IndustryType = 'cosmetics' | 'food' | 'pharma' | 'general';
+
 export interface ImageItem {
   id: string;
   src: string;
@@ -90,6 +92,8 @@ export interface ImageItem {
   issues: DiagnosisIssue[];
   deterministicIssues?: DeterministicCheck[]; // 确定性问题（新增）
   diffs: DiffResult[];
+  industry?: IndustryType; // 行业类型
+  rotation?: number; // 旋转角度
 }
 
 // 诊断结果包含描述

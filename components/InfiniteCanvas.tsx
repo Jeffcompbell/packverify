@@ -234,7 +234,7 @@ export const InfiniteCanvas: React.FC<InfiniteCanvasProps> = ({
                 </div>
 
                 {/* 顶部：图片区域 */}
-                <div className="relative">
+                <div className="relative" style={{ transform: `rotate(${imgItem.rotation || 0}deg)`, transformOrigin: 'center' }}>
                   <img
                     src={imgItem.src}
                     alt="包装设计"

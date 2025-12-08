@@ -16,6 +16,81 @@ export const fileToGenerativePart = async (file: File): Promise<string> => {
     });
 };
 
+// 行业检查规则配置
+interface IndustryRules {
+    name: string;
+    checkItems: string[];
+    examples: string[];
+}
+
+export const INDUSTRY_RULES: Record<string, IndustryRules> = {
+    cosmetics: {
+        name: '化妆品',
+        checkItems: [
+            'INCI 成分名称拼写（如 Ceteareth-25, Glycerin）',
+            '功效宣称合规性（不得宣称医疗功效）',
+            '警示用语（如"请置于儿童接触不到的地方"）',
+            '生产许可证号格式',
+            '净含量单位（ml/g）',
+            '保质期/限期使用日期格式',
+            '过敏原标注'
+        ],
+        examples: [
+            'Cetareth-25 → Ceteareth-25',
+            '美白祛斑 → 需符合特殊化妆品要求',
+            '500ML → 500ml'
+        ]
+    },
+    food: {
+        name: '食品',
+        checkItems: [
+            '配料表顺序（按含量递减）',
+            '过敏原标注（如含麸质、花生）',
+            '营养成分表格式（能量、蛋白质等）',
+            'QS/SC 生产许可证号',
+            '贮存条件',
+            '生产日期/保质期格式',
+            '添加剂使用规范'
+        ],
+        examples: [
+            '配料未按含量排序',
+            '缺少"含麸质"警告',
+            '营养成分表缺少钠含量'
+        ]
+    },
+    pharma: {
+        name: '药品',
+        checkItems: [
+            '药品批准文号格式',
+            '通用名/商品名规范',
+            '适应症/功能主治表述',
+            '用法用量准确性',
+            '禁忌症/注意事项',
+            '不良反应说明',
+            '贮藏条件',
+            '有效期格式'
+        ],
+        examples: [
+            '国药准字格式错误',
+            '禁忌症缺失',
+            '用法用量模糊'
+        ]
+    },
+    general: {
+        name: '通用',
+        checkItems: [
+            '拼写错误',
+            '标点错误（中英文混用、多余空格）',
+            '语法错误（主谓不一致、缺字漏字）',
+            '格式错误（日期格式、单位错误）'
+        ],
+        examples: [
+            '中文后使用英文逗号',
+            '日期格式不统一'
+        ]
+    }
+};
+
 // 模型配置 - 支持不同的 baseURL
 interface ModelConfig {
     id: string;
@@ -202,28 +277,50 @@ export const runDeterministicChecks = (text: string): DeterministicCheck[] => {
 // ============================================
 export const analyzeImageSinglePass = async (
     base64Image: string,
-    mimeType: string
+    mimeType: string,
+    industry: string = 'general'
 ): Promise<{ description: string; ocrText: string; issues: DiagnosisIssue[]; specs: SourceField[] }> => {
     try {
         const client = getClient();
         const modelId = getModelId();
-        console.log("Single-pass analysis with model:", modelId);
+        console.log("Single-pass analysis with model:", modelId, "industry:", industry);
         const startTime = Date.now();
 
+        // 获取行业规则
+        const rules = INDUSTRY_RULES[industry] || INDUSTRY_RULES.general;
+        const checkItemsList = rules.checkItems.map((item, idx) => `   ${idx + 1}. ${item}`).join('\n');
+        const examplesList = rules.examples.map(ex => `   - ${ex}`).join('\n');
+
         // 精简 prompt，一次调用完成所有任务
-        const prompt = `分析包装图片，返回JSON：
+        const prompt = `分析${rules.name}包装图片，返回JSON：
 
 {
   "description": "一句话描述",
   "ocrText": "提取所有文字，换行分隔",
-  "issues": [{"original": "含错误的原文用**标记**", "problem": "问题", "suggestion": "建议", "severity": "high/medium/low", "box_2d": [y1,x1,y2,x2]}],
+  "issues": [{"original": "含错误的原文用**标记**", "problem": "问题", "suggestion": "建议", "severity": "high/medium/low", "box_2d": [ymin,xmin,ymax,xmax]}],
   "specs": [{"key": "项目名", "value": "值", "category": "content/compliance/specs"}]
 }
 
+**坐标系统说明（重要）：**
+- box_2d 格式：[ymin, xmin, ymax, xmax]
+- 坐标范围：0-1000（归一化坐标，1000 = 100%）
+- 原点：图片左上角 (0,0)
+- x 轴：从左到右（0=最左，1000=最右）
+- y 轴：从上到下（0=最顶，1000=最底）
+- 示例：图片中心的文字 → [400, 400, 600, 600]
+- 示例：左上角的文字 → [50, 50, 150, 300]
+
 要求：
 1. OCR提取所有文字，保持原样
-2. issues只报告100%确定的错误，可以为空
-3. specs提取：品名、成分、警告、净含量、条码等`;
+2. **issues必须检查以下${rules.name}行业错误（100%确定才报告）：**
+${checkItemsList}
+
+   常见错误示例：
+${examplesList}
+
+   **如无错误，返回空数组[]，但必须认真检查**
+3. specs提取：品名、成分、警告、净含量、条码等
+4. **box_2d 必须准确标注错误文字的位置，使用 0-1000 归一化坐标**`;
 
         const response = await client.chat.completions.create({
             model: modelId,
@@ -297,14 +394,15 @@ export const analyzeImageSinglePass = async (
 export const diagnoseImage = async (
     base64Image: string,
     mimeType: string,
-    onStepChange?: (step: number) => void
+    onStepChange?: (step: number) => void,
+    industry: string = 'general'
 ): Promise<DiagnosisResult> => {
     try {
         console.log("Starting analysis (AI → Rules)...");
 
         // Step 1: AI 单步分析（OCR + 问题检测 + 规格提取，一次 API 调用）
         onStepChange?.(1);
-        const aiResult = await analyzeImageSinglePass(base64Image, mimeType);
+        const aiResult = await analyzeImageSinglePass(base64Image, mimeType, industry);
         console.log("AI analysis complete. Description:", aiResult.description);
         console.log("OCR text length:", aiResult.ocrText.length);
         console.log("AI issues found:", aiResult.issues.length);
@@ -447,16 +545,22 @@ export const performSmartDiff = async (
 
       对于源数据中的每个字段，判断它是否存在于图片上以及是否匹配。
       如果是'error'状态，用中文解释原因。
-      估算文本在图片上的位置box_2d [ymin, xmin, ymax, xmax]（0-1000）。
+
+      **坐标系统（重要）：**
+      - box_2d 格式：[ymin, xmin, ymax, xmax]
+      - 坐标范围：0-1000（归一化坐标）
+      - 原点：图片左上角 (0,0)
+      - x 轴：从左到右，y 轴：从上到下
+      - 示例：图片中心 → [400, 400, 600, 600]
 
       输出JSON格式：
       {
         "diffs": [
-          { "field": "产品名称", "sourceValue": "...", "imageValue": "...", "status": "match", "matchType": "strict", "box_2d": [...], "reason": "（如有差异，用中文说明原因）" }
+          { "field": "产品名称", "sourceValue": "...", "imageValue": "...", "status": "match", "matchType": "strict", "box_2d": [ymin,xmin,ymax,xmax], "reason": "（如有差异，用中文说明原因）" }
         ]
       }
 
-      **重要：field和reason字段必须使用中文！**
+      **重要：field和reason字段必须使用中文！box_2d 必须准确标注文字位置！**
     `;
 
         const response = await client.chat.completions.create({

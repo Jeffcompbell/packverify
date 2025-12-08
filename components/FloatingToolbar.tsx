@@ -1,6 +1,6 @@
 import React from 'react';
-import { ViewLayers } from '../types';
-import { ScanEye, FileDiff, ZoomIn, ZoomOut, Maximize, ImagePlus, RotateCcw } from 'lucide-react';
+import { ViewLayers, IndustryType } from '../types';
+import { ScanEye, FileDiff, ZoomIn, ZoomOut, Maximize, ImagePlus, RotateCcw, Package } from 'lucide-react';
 
 interface FloatingToolbarProps {
   layers: ViewLayers;
@@ -13,6 +13,8 @@ interface FloatingToolbarProps {
   onNext: () => void;
   canProceed: boolean;
   nextLabel: string;
+  industry: IndustryType;
+  onIndustryChange: (industry: IndustryType) => void;
 }
 
 export const FloatingToolbar: React.FC<FloatingToolbarProps> = ({
@@ -21,14 +23,24 @@ export const FloatingToolbar: React.FC<FloatingToolbarProps> = ({
   onZoom,
   onFit,
   onUpload,
-  onReset
+  onReset,
+  industry,
+  onIndustryChange
 }) => {
   const fileInputRef = React.useRef<HTMLInputElement>(null);
+  const [showIndustryMenu, setShowIndustryMenu] = React.useState(false);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       onUpload(e.target.files[0]);
     }
+  };
+
+  const industryLabels: Record<IndustryType, string> = {
+    cosmetics: '化妆品',
+    food: '食品',
+    pharma: '药品',
+    general: '通用'
   };
 
   return (
@@ -40,6 +52,38 @@ export const FloatingToolbar: React.FC<FloatingToolbarProps> = ({
         className="hidden"
         accept="image/*"
       />
+
+      {/* Industry Selector */}
+      <div className="relative pointer-events-auto">
+        <button
+          onClick={() => setShowIndustryMenu(!showIndustryMenu)}
+          className="bg-slate-900/80 backdrop-blur-md border border-slate-700/50 rounded-full px-4 py-2 shadow-2xl flex items-center gap-2 text-slate-300 hover:text-white transition-colors"
+          title="选择行业"
+        >
+          <Package size={16} />
+          <span className="text-xs font-medium">{industryLabels[industry]}</span>
+        </button>
+        {showIndustryMenu && (
+          <div className="absolute bottom-full mb-2 left-0 bg-slate-900/95 backdrop-blur-md border border-slate-700/50 rounded-lg shadow-2xl overflow-hidden">
+            {(Object.keys(industryLabels) as IndustryType[]).map((ind) => (
+              <button
+                key={ind}
+                onClick={() => {
+                  onIndustryChange(ind);
+                  setShowIndustryMenu(false);
+                }}
+                className={`w-full px-4 py-2 text-left text-xs transition-colors ${
+                  industry === ind
+                    ? 'bg-indigo-600 text-white'
+                    : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+                }`}
+              >
+                {industryLabels[ind]}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
 
       {/* Action Controls */}
       <div className="bg-slate-900/80 backdrop-blur-md border border-slate-700/50 rounded-full p-1.5 shadow-2xl flex items-center gap-1 pointer-events-auto mr-2">

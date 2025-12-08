@@ -13,303 +13,14 @@ import {
   ZoomIn, ZoomOut, RotateCcw, RotateCw, FileText, AlertTriangle, CheckCircle,
   ClipboardCheck, Image, Search, FileSpreadsheet, Loader2, Maximize2,
   Type, Brackets, ShieldAlert, GitCompare, LogOut, User as UserIcon, X, Cloud, CloudOff,
-  Menu, Home, List, Settings
+  Menu, Home, List, Settings, Package
 } from 'lucide-react';
-
-// 存储接口 - 用于 localStorage 持久化
-interface StoredImageItem {
-  id: string;
-  base64: string;
-  mimeType: string;
-  fileName: string;
-  description?: string;
-  ocrText?: string;
-  specs: ImageSpec[];
-  issues: DiagnosisIssue[];
-  deterministicIssues?: DeterministicCheck[];
-  diffs: DiffResult[];
-}
-
-// base64 转 blob URL
-const base64ToBlobUrl = (base64: string, mimeType: string): string => {
-  const byteString = atob(base64);
-  const ab = new ArrayBuffer(byteString.length);
-  const ia = new Uint8Array(ab);
-  for (let i = 0; i < byteString.length; i++) {
-    ia[i] = byteString.charCodeAt(i);
-  }
-  const blob = new Blob([ab], { type: mimeType });
-  return URL.createObjectURL(blob);
-};
-
-// 创建虚拟 File 对象
-const createVirtualFile = (base64: string, mimeType: string, fileName: string): File => {
-  const byteString = atob(base64);
-  const ab = new ArrayBuffer(byteString.length);
-  const ia = new Uint8Array(ab);
-  for (let i = 0; i < byteString.length; i++) {
-    ia[i] = byteString.charCodeAt(i);
-  }
-  return new File([ab], fileName, { type: mimeType });
-};
-
-const STORAGE_KEY = 'packverify_data';
-
-// Google 图标组件
-const GoogleIcon = () => (
-  <svg className="w-5 h-5" viewBox="0 0 24 24">
-    <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-    <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-    <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
-    <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
-  </svg>
-);
-
-// 登录弹窗组件 - 简洁专业设计
-const LoginModal: React.FC<{
-  isOpen: boolean;
-  onClose: () => void;
-  onLogin: (user: UserData) => void;
-}> = ({ isOpen, onClose, onLogin }) => {
-  const [error, setError] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-
-  if (!isOpen) return null;
-
-  const handleGoogleLogin = async () => {
-    setIsLoading(true);
-    setError('');
-    try {
-      const userData = await signInWithGoogle();
-      if (userData) {
-        onLogin(userData);
-        onClose();
-      }
-    } catch (err: any) {
-      console.error('Login error:', err);
-      if (err.code === 'auth/popup-closed-by-user') {
-        setError('登录已取消');
-      } else {
-        setError(err.message || '登录失败，请重试');
-      }
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      {/* Backdrop */}
-      <div
-        className="absolute inset-0 bg-black/70"
-        onClick={onClose}
-      />
-
-      {/* Modal */}
-      <div className="relative w-full max-w-sm bg-slate-900 rounded-2xl shadow-2xl border border-slate-800">
-        {/* Close button */}
-        <button
-          onClick={onClose}
-          className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-lg text-slate-500 hover:text-slate-300 hover:bg-slate-800 transition-all"
-        >
-          <X size={18} />
-        </button>
-
-        {/* Content */}
-        <div className="p-8">
-          {/* Logo */}
-          <div className="text-center mb-8">
-            <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-slate-800 mb-4">
-              <Zap size={24} className="text-slate-300" fill="currentColor" />
-            </div>
-            <h1 className="text-xl font-semibold text-white mb-1">登录</h1>
-            <p className="text-sm text-slate-500">登录后使用图片分析功能</p>
-          </div>
-
-          {/* Error */}
-          {error && (
-            <div className="mb-4 px-3 py-2 bg-red-500/10 border border-red-500/20 rounded-lg text-red-400 text-sm">
-              {error}
-            </div>
-          )}
-
-          {/* Login button */}
-          <button
-            onClick={handleGoogleLogin}
-            disabled={isLoading}
-            className="w-full bg-white hover:bg-slate-100 disabled:opacity-50 text-slate-900 py-3 rounded-xl font-medium text-sm transition-all flex items-center justify-center gap-3"
-          >
-            {isLoading ? (
-              <Loader2 size={18} className="animate-spin" />
-            ) : (
-              <GoogleIcon />
-            )}
-            {isLoading ? '登录中...' : '使用 Google 继续'}
-          </button>
-
-          {/* Footer */}
-          <p className="mt-4 text-center text-xs text-slate-600">
-            首次登录赠送 50 次分析额度
-          </p>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-// 配额使用记录弹窗
-const QuotaModal: React.FC<{
-  isOpen: boolean;
-  onClose: () => void;
-  user: UserData;
-  usageHistory: QuotaUsageRecord[];
-  isLoading: boolean;
-  onLoadMore: () => void;
-  hasMore: boolean;
-  isLoadingMore: boolean;
-}> = ({ isOpen, onClose, user, usageHistory, isLoading, onLoadMore, hasMore, isLoadingMore }) => {
-  if (!isOpen) return null;
-
-  const formatTime = (timestamp: any) => {
-    if (!timestamp?.toDate) return '未知时间';
-    const date = timestamp.toDate();
-    const now = new Date();
-    const diff = now.getTime() - date.getTime();
-    const minutes = Math.floor(diff / 60000);
-    const hours = Math.floor(diff / 3600000);
-    const days = Math.floor(diff / 86400000);
-
-    if (minutes < 1) return '刚刚';
-    if (minutes < 60) return `${minutes} 分钟前`;
-    if (hours < 24) return `${hours} 小时前`;
-    if (days < 7) return `${days} 天前`;
-    return date.toLocaleDateString('zh-CN', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
-  };
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/70" onClick={onClose} />
-      <div className="relative w-full max-w-md bg-slate-900 rounded-2xl shadow-2xl border border-slate-800">
-        <button
-          onClick={onClose}
-          className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-lg text-slate-500 hover:text-slate-300 hover:bg-slate-800 transition-all"
-        >
-          <X size={18} />
-        </button>
-
-        <div className="p-6">
-          <h2 className="text-lg font-semibold text-white mb-4">配额使用情况</h2>
-
-          {/* 配额概览 */}
-          <div className="bg-slate-800 rounded-xl p-4 mb-4">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-slate-400 text-sm">剩余额度</span>
-              <span className="text-2xl font-bold text-white">{user.quota - user.used}</span>
-            </div>
-            <div className="w-full bg-slate-700 rounded-full h-2 mb-2">
-              <div
-                className="bg-indigo-500 h-2 rounded-full transition-all"
-                style={{ width: `${((user.quota - user.used) / user.quota) * 100}%` }}
-              />
-            </div>
-            <div className="flex justify-between text-[10px] text-slate-500">
-              <span>已用 {user.used} 次</span>
-              <span>总额 {user.quota} 次</span>
-            </div>
-          </div>
-
-          {/* 说明 */}
-          <div className="bg-slate-800/50 rounded-lg px-3 py-2 mb-3 text-[10px] text-slate-500">
-            每张图片的新建分析或重新分析都会消耗 1 次额度
-          </div>
-
-          {/* 使用记录 */}
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-medium text-slate-400">使用记录</span>
-            <span className="text-[10px] text-slate-600">{usageHistory.length} 条</span>
-          </div>
-          <div className="max-h-72 overflow-y-auto">
-            {isLoading ? (
-              <div className="text-center py-4 text-slate-500">
-                <Loader2 size={20} className="animate-spin mx-auto mb-2" />
-                <span className="text-xs">加载中...</span>
-              </div>
-            ) : usageHistory.length === 0 ? (
-              <div className="text-center py-4 text-slate-600 text-xs">
-                暂无使用记录
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {usageHistory.map((record) => (
-                  <div key={record.id} className="flex items-center justify-between px-3 py-2 bg-slate-800/50 rounded-lg">
-                    <div className="flex items-center gap-2">
-                      <div className={`w-6 h-6 rounded flex items-center justify-center ${
-                        record.type === 'retry' ? 'bg-amber-500/20' : 'bg-indigo-500/20'
-                      }`}>
-                        {record.type === 'retry' ? (
-                          <RefreshCw size={12} className="text-amber-400" />
-                        ) : (
-                          <Zap size={12} className="text-indigo-400" />
-                        )}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-1.5">
-                          <span className="text-xs text-slate-300 truncate max-w-[140px]">{record.imageName}</span>
-                          <span className={`text-[9px] px-1 py-0.5 rounded ${
-                            record.type === 'retry'
-                              ? 'bg-amber-500/20 text-amber-400'
-                              : 'bg-indigo-500/20 text-indigo-400'
-                          }`}>
-                            {record.type === 'retry' ? '重试' : '新建'}
-                          </span>
-                        </div>
-                        <div className="text-[10px] text-slate-500">
-                          {formatTime(record.timestamp)}
-                        </div>
-                      </div>
-                    </div>
-                    <span className="text-xs text-red-400 font-medium">-{record.count || 1}</span>
-                  </div>
-                ))}
-
-                {/* 加载更多 */}
-                {hasMore && (
-                  <button
-                    onClick={onLoadMore}
-                    disabled={isLoadingMore}
-                    className="w-full py-2 text-[10px] text-slate-500 hover:text-slate-300 hover:bg-slate-800 rounded transition-colors flex items-center justify-center gap-1"
-                  >
-                    {isLoadingMore ? (
-                      <>
-                        <Loader2 size={10} className="animate-spin" />
-                        加载中...
-                      </>
-                    ) : (
-                      <>
-                        <ChevronDown size={10} />
-                        加载更多
-                      </>
-                    )}
-                  </button>
-                )}
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-// 生成默认产品名称
-const generateProductName = () => {
-  const now = new Date();
-  const month = (now.getMonth() + 1).toString().padStart(2, '0');
-  const day = now.getDate().toString().padStart(2, '0');
-  const hour = now.getHours().toString().padStart(2, '0');
-  const minute = now.getMinutes().toString().padStart(2, '0');
-  return `产品-${month}${day}-${hour}${minute}`;
-};
+import { LoginModal } from './components/LoginModal';
+import { QuotaModal } from './components/QuotaModal';
+import { AllProductsPage } from './components/AllProductsPage';
+import { IssuesPanel } from './components/IssuesPanel';
+import { base64ToBlobUrl, createVirtualFile, generateProductName, STORAGE_KEY } from './utils/helpers';
+import { StoredImageItem } from './types/storage';
 
 const App: React.FC = () => {
   // 用户认证状态
@@ -350,7 +61,6 @@ const App: React.FC = () => {
   const [currentModel, setCurrentModel] = useState(getModelId());
   const [showModelSelector, setShowModelSelector] = useState(false);
   const [imageScale, setImageScale] = useState(1);
-  const [imageRotation, setImageRotation] = useState(0);
   const [showOverlay, setShowOverlay] = useState(true);
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
@@ -1316,13 +1026,16 @@ const App: React.FC = () => {
                 <ZoomOut size={14} />
               </button>
               <span className="text-[10px] text-slate-500 px-1 min-w-[36px] text-center">{Math.round(imageScale * 100)}%</span>
-              <button onClick={() => { setImageScale(1); setImageRotation(0); }} className="p-1.5 text-slate-500 hover:bg-slate-800 hover:text-white rounded transition-colors" title="重置">
+              <button onClick={() => {
+                setImageScale(1);
+                setImages(imgs => imgs.map((img, i) => i === currentImageIndex ? { ...img, rotation: 0 } : img));
+              }} className="p-1.5 text-slate-500 hover:bg-slate-800 hover:text-white rounded transition-colors" title="重置">
                 <Maximize2 size={14} />
               </button>
-              <button onClick={() => setImageRotation(r => r - 90)} className="p-1.5 text-slate-500 hover:bg-slate-800 hover:text-white rounded transition-colors" title="逆时针旋转">
+              <button onClick={() => setImages(imgs => imgs.map((img, i) => i === currentImageIndex ? { ...img, rotation: (img.rotation || 0) - 90 } : img))} className="p-1.5 text-slate-500 hover:bg-slate-800 hover:text-white rounded transition-colors" title="逆时针旋转">
                 <RotateCcw size={14} />
               </button>
-              <button onClick={() => setImageRotation(r => r + 90)} className="p-1.5 text-slate-500 hover:bg-slate-800 hover:text-white rounded transition-colors" title="顺时针旋转">
+              <button onClick={() => setImages(imgs => imgs.map((img, i) => i === currentImageIndex ? { ...img, rotation: (img.rotation || 0) + 90 } : img))} className="p-1.5 text-slate-500 hover:bg-slate-800 hover:text-white rounded transition-colors" title="顺时针旋转">
                 <RotateCw size={14} />
               </button>
             </>
@@ -1514,7 +1227,7 @@ const App: React.FC = () => {
               <div
                 className="relative"
                 style={{
-                  transform: `scale(${imageScale}) rotate(${imageRotation}deg)`,
+                  transform: `scale(${imageScale}) rotate(${currentImage.rotation || 0}deg)`,
                   transition: 'transform 0.2s'
                 }}
               >
@@ -1624,203 +1337,19 @@ const App: React.FC = () => {
         </div>
 
         {/* RIGHT: Issues Panel */}
-        <div className={`${mobileTab === 'issues' ? 'flex' : 'hidden'} md:flex w-full md:w-[380px] border-l border-slate-800 bg-slate-900 flex-col`}>
-          <div className="px-2 py-2 border-b border-slate-800 flex items-center gap-1 bg-slate-900">
-            <button
-              onClick={() => setRightPanelTab('issues')}
-              className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-all ${
-                rightPanelTab === 'issues'
-                  ? 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/50'
-                  : 'text-slate-500 hover:text-slate-300 hover:bg-slate-800'
-              }`}
-            >
-              <AlertTriangle size={14} />
-              检测问题
-              {currentImage && (currentImage.issues.length + (currentImage.deterministicIssues?.length || 0)) > 0 && (
-                <span className="bg-red-500 text-white text-[9px] px-1.5 rounded-full">
-                  {currentImage.issues.length + (currentImage.deterministicIssues?.length || 0)}
-                </span>
-              )}
-            </button>
-            <button
-              onClick={() => setRightPanelTab('ocr')}
-              className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-all ${
-                rightPanelTab === 'ocr'
-                  ? 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/50'
-                  : 'text-slate-500 hover:text-slate-300 hover:bg-slate-800'
-              }`}
-            >
-              <Type size={14} />
-              OCR 原文
-            </button>
-            <button
-              onClick={() => currentImage && handleRetryAnalysis(currentImage.id)}
-              disabled={isCurrentProcessing || !currentImage}
-              className="p-2 text-slate-500 hover:text-indigo-400 hover:bg-slate-800 rounded-lg transition-colors disabled:opacity-50"
-              title="重新分析"
-            >
-              <RefreshCw size={14} className={isCurrentProcessing ? 'animate-spin' : ''} />
-            </button>
-          </div>
-
-          {currentImage?.description && (
-            <div className="px-4 py-2 border-b border-slate-800/50 bg-slate-800/30">
-              <div className="flex items-center gap-1.5 text-[10px] text-slate-500 mb-1">
-                <FileText size={10} /> 图片描述
-              </div>
-              <p className="text-xs text-slate-300">{currentImage.description}</p>
-            </div>
-          )}
-
-          <div ref={issueListRef} className="flex-1 overflow-y-auto">
-            {!currentImage ? (
-              <div className="text-center py-12 text-slate-600">
-                <AlertCircle size={24} className="mx-auto mb-2 opacity-30" />
-                <p className="text-xs">上传图片后显示检测结果</p>
-              </div>
-            ) : isCurrentProcessing ? (
-              <div className="text-center py-12 text-slate-500">
-                <Loader2 size={24} className="mx-auto mb-2 animate-spin" />
-                <p className="text-xs">正在分析...</p>
-              </div>
-            ) : rightPanelTab === 'ocr' ? (
-              <div className="p-3">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">识别文字</span>
-                  <button
-                    onClick={() => currentImage.ocrText && handleCopy(currentImage.ocrText, 'ocr-text')}
-                    className="p-1 rounded hover:bg-slate-800 transition-colors"
-                    title="复制全部"
-                  >
-                    {copiedId === 'ocr-text' ? <CheckCheck size={12} className="text-emerald-400" /> : <Copy size={12} className="text-slate-500" />}
-                  </button>
-                </div>
-                {currentImage.ocrText ? (
-                  <pre className="text-xs text-slate-300 font-mono bg-slate-800/50 p-3 rounded-lg whitespace-pre-wrap leading-relaxed border border-slate-700/50 max-h-[500px] overflow-y-auto">
-                    {currentImage.ocrText}
-                  </pre>
-                ) : (
-                  <div className="text-center py-8 text-slate-600">
-                    <Type size={24} className="mx-auto mb-2 opacity-30" />
-                    <p className="text-xs">暂无 OCR 数据</p>
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div className="p-3 space-y-3">
-                {currentImage.deterministicIssues && currentImage.deterministicIssues.length > 0 && (
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-2 text-[10px] font-bold text-red-400 uppercase tracking-wider">
-                      <Brackets size={12} />
-                      确定性问题（100%准确）
-                    </div>
-                    {currentImage.deterministicIssues.map((issue) => (
-                      <div key={issue.id} className="p-3 rounded-lg bg-red-500/10 border border-red-500/30">
-                        <div className="flex items-center gap-2 mb-2">
-                          <span className="w-2 h-2 rounded-full bg-red-500 shrink-0"></span>
-                          <span className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-red-500/20 text-red-400">
-                            {issue.type === 'bracket_mismatch' ? '括号不配对' : issue.type === 'encoding_error' ? '编码错误' : '格式错误'}
-                          </span>
-                        </div>
-                        <p className="text-xs text-red-300 mb-1.5">{issue.description}</p>
-                        <div className="text-[10px] text-slate-400 font-mono bg-slate-900/50 px-2 py-1.5 rounded">
-                          {issue.location}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {currentImage.issues.length > 0 && (
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-2 text-[10px] font-bold text-amber-400 uppercase tracking-wider">
-                      <ShieldAlert size={12} />
-                      AI 建议（需人工确认）
-                    </div>
-                    {currentImage.issues.map((issue) => {
-                      const displayOriginal = issue.original || issue.text || '';
-                      const displayProblem = issue.problem || '';
-                      const copyText = `原文: ${displayOriginal}\n问题: ${displayProblem}\n建议: ${issue.suggestion}`;
-
-                      const renderOriginal = (text: string) => {
-                        const parts = text.split(/(\*\*[^*]+\*\*)/g);
-                        return parts.map((part, i) => {
-                          if (part.startsWith('**') && part.endsWith('**')) {
-                            const word = part.slice(2, -2);
-                            return <span key={i} className="bg-red-500/30 text-red-300 px-0.5 rounded font-bold">{word}</span>;
-                          }
-                          return <span key={i}>{part}</span>;
-                        });
-                      };
-
-                      return (
-                        <div
-                          key={issue.id}
-                          data-issue-id={issue.id}
-                          onClick={() => setSelectedIssueId(issue.id)}
-                          className={`p-3 rounded-lg cursor-pointer transition-all group ${
-                            selectedIssueId === issue.id
-                              ? 'bg-indigo-500/20 border border-indigo-500/50 ring-2 ring-indigo-500/30'
-                              : 'bg-slate-800/50 border border-transparent hover:bg-slate-800 hover:border-slate-700'
-                          }`}
-                        >
-                          <div className="flex items-center gap-2 mb-2">
-                            <span className={`w-2 h-2 rounded-full shrink-0 ${
-                              issue.severity === 'high' ? 'bg-red-500' : issue.severity === 'medium' ? 'bg-amber-500' : 'bg-slate-500'
-                            }`}></span>
-                            <span className={`text-[9px] font-bold uppercase px-1.5 py-0.5 rounded ${
-                              issue.severity === 'high'
-                                ? 'bg-red-500/20 text-red-400'
-                                : issue.severity === 'medium'
-                                  ? 'bg-amber-500/20 text-amber-400'
-                                  : 'bg-slate-500/20 text-slate-400'
-                            }`}>
-                              {issue.severity === 'high' ? '紧急' : issue.severity === 'medium' ? '警告' : '提示'}
-                            </span>
-                            <span className="text-[8px] text-slate-600 ml-auto">AI建议</span>
-                            <button
-                              onClick={(e) => { e.stopPropagation(); handleCopy(copyText, issue.id); }}
-                              className="p-1 rounded hover:bg-slate-700 transition-colors opacity-0 group-hover:opacity-100"
-                              title="复制"
-                            >
-                              {copiedId === issue.id ? <CheckCheck size={12} className="text-emerald-400" /> : <Copy size={12} className="text-slate-500" />}
-                            </button>
-                          </div>
-
-                          <div className="mb-2">
-                            <span className="text-[10px] text-slate-500">原文：</span>
-                            <div className="text-xs text-slate-300 font-mono bg-slate-800/50 px-2 py-1.5 rounded mt-1 leading-relaxed">
-                              {renderOriginal(displayOriginal)}
-                            </div>
-                          </div>
-
-                          {displayProblem && (
-                            <p className="text-xs text-slate-300 mb-1.5">{displayProblem}</p>
-                          )}
-
-                          {issue.suggestion && (
-                            <div className="flex items-start gap-1.5 text-[11px] text-emerald-400/90 bg-emerald-500/10 px-2 py-1.5 rounded">
-                              <span className="shrink-0">💡</span>
-                              <span>{issue.suggestion}</span>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-
-                {currentImage.issues.length === 0 && (!currentImage.deterministicIssues || currentImage.deterministicIssues.length === 0) && (
-                  <div className="text-center py-12 text-slate-600">
-                    <CheckCircle size={24} className="mx-auto mb-2 text-emerald-500/50" />
-                    <p className="text-xs">未检测到问题</p>
-                    <p className="text-[10px] text-slate-700 mt-1">建议查看 OCR 原文自行核对</p>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        </div>
+        <IssuesPanel
+          currentImage={currentImage}
+          isCurrentProcessing={isCurrentProcessing}
+          rightPanelTab={rightPanelTab}
+          onTabChange={setRightPanelTab}
+          onRetryAnalysis={() => currentImage && handleRetryAnalysis(currentImage.id)}
+          selectedIssueId={selectedIssueId}
+          onSelectIssue={setSelectedIssueId}
+          copiedId={copiedId}
+          onCopy={handleCopy}
+          mobileTab={mobileTab}
+          issueListRef={issueListRef}
+        />
       </div>
 
       {/* BOTTOM BAR */}
