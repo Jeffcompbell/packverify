@@ -3,7 +3,8 @@ import { diagnoseImage, fileToGenerativePart, parseSourceText, performSmartDiff,
 import {
   signInWithGoogle, signOutUser, onAuthChange, getOrCreateUser, getUserData, useQuotaFirebase, UserData,
   getOrCreateSession, saveImageToCloud, updateImageInCloud, deleteImageFromCloud, saveQilToCloud,
-  loadSessionFromCloud, clearSessionInCloud, CloudImageData
+  loadSessionFromCloud, clearSessionInCloud, CloudImageData, CloudSession,
+  getUserSessions, createNewSession, updateSessionProductName, getQuotaUsageHistory, QuotaUsageRecord
 } from './services/firebase';
 import { DiagnosisIssue, SourceField, DiffResult, ImageItem, ImageSpec, BoundingBox, DeterministicCheck } from './types';
 import {
@@ -155,17 +156,178 @@ const LoginModal: React.FC<{
   );
 };
 
+// 配额使用记录弹窗
+const QuotaModal: React.FC<{
+  isOpen: boolean;
+  onClose: () => void;
+  user: UserData;
+  usageHistory: QuotaUsageRecord[];
+  isLoading: boolean;
+  onLoadMore: () => void;
+  hasMore: boolean;
+  isLoadingMore: boolean;
+}> = ({ isOpen, onClose, user, usageHistory, isLoading, onLoadMore, hasMore, isLoadingMore }) => {
+  if (!isOpen) return null;
+
+  const formatTime = (timestamp: any) => {
+    if (!timestamp?.toDate) return '未知时间';
+    const date = timestamp.toDate();
+    const now = new Date();
+    const diff = now.getTime() - date.getTime();
+    const minutes = Math.floor(diff / 60000);
+    const hours = Math.floor(diff / 3600000);
+    const days = Math.floor(diff / 86400000);
+
+    if (minutes < 1) return '刚刚';
+    if (minutes < 60) return `${minutes} 分钟前`;
+    if (hours < 24) return `${hours} 小时前`;
+    if (days < 7) return `${days} 天前`;
+    return date.toLocaleDateString('zh-CN', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/70" onClick={onClose} />
+      <div className="relative w-full max-w-md bg-slate-900 rounded-2xl shadow-2xl border border-slate-800">
+        <button
+          onClick={onClose}
+          className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-lg text-slate-500 hover:text-slate-300 hover:bg-slate-800 transition-all"
+        >
+          <X size={18} />
+        </button>
+
+        <div className="p-6">
+          <h2 className="text-lg font-semibold text-white mb-4">配额使用情况</h2>
+
+          {/* 配额概览 */}
+          <div className="bg-slate-800 rounded-xl p-4 mb-4">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-slate-400 text-sm">剩余额度</span>
+              <span className="text-2xl font-bold text-white">{user.quota - user.used}</span>
+            </div>
+            <div className="w-full bg-slate-700 rounded-full h-2 mb-2">
+              <div
+                className="bg-indigo-500 h-2 rounded-full transition-all"
+                style={{ width: `${((user.quota - user.used) / user.quota) * 100}%` }}
+              />
+            </div>
+            <div className="flex justify-between text-[10px] text-slate-500">
+              <span>已用 {user.used} 次</span>
+              <span>总额 {user.quota} 次</span>
+            </div>
+          </div>
+
+          {/* 说明 */}
+          <div className="bg-slate-800/50 rounded-lg px-3 py-2 mb-3 text-[10px] text-slate-500">
+            每张图片的新建分析或重新分析都会消耗 1 次额度
+          </div>
+
+          {/* 使用记录 */}
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs font-medium text-slate-400">使用记录</span>
+            <span className="text-[10px] text-slate-600">{usageHistory.length} 条</span>
+          </div>
+          <div className="max-h-72 overflow-y-auto">
+            {isLoading ? (
+              <div className="text-center py-4 text-slate-500">
+                <Loader2 size={20} className="animate-spin mx-auto mb-2" />
+                <span className="text-xs">加载中...</span>
+              </div>
+            ) : usageHistory.length === 0 ? (
+              <div className="text-center py-4 text-slate-600 text-xs">
+                暂无使用记录
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {usageHistory.map((record) => (
+                  <div key={record.id} className="flex items-center justify-between px-3 py-2 bg-slate-800/50 rounded-lg">
+                    <div className="flex items-center gap-2">
+                      <div className={`w-6 h-6 rounded flex items-center justify-center ${
+                        record.type === 'retry' ? 'bg-amber-500/20' : 'bg-indigo-500/20'
+                      }`}>
+                        {record.type === 'retry' ? (
+                          <RefreshCw size={12} className="text-amber-400" />
+                        ) : (
+                          <Zap size={12} className="text-indigo-400" />
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-xs text-slate-300 truncate max-w-[140px]">{record.imageName}</span>
+                          <span className={`text-[9px] px-1 py-0.5 rounded ${
+                            record.type === 'retry'
+                              ? 'bg-amber-500/20 text-amber-400'
+                              : 'bg-indigo-500/20 text-indigo-400'
+                          }`}>
+                            {record.type === 'retry' ? '重试' : '新建'}
+                          </span>
+                        </div>
+                        <div className="text-[10px] text-slate-500">
+                          {formatTime(record.timestamp)}
+                        </div>
+                      </div>
+                    </div>
+                    <span className="text-xs text-red-400 font-medium">-{record.count || 1}</span>
+                  </div>
+                ))}
+
+                {/* 加载更多 */}
+                {hasMore && (
+                  <button
+                    onClick={onLoadMore}
+                    disabled={isLoadingMore}
+                    className="w-full py-2 text-[10px] text-slate-500 hover:text-slate-300 hover:bg-slate-800 rounded transition-colors flex items-center justify-center gap-1"
+                  >
+                    {isLoadingMore ? (
+                      <>
+                        <Loader2 size={10} className="animate-spin" />
+                        加载中...
+                      </>
+                    ) : (
+                      <>
+                        <ChevronDown size={10} />
+                        加载更多
+                      </>
+                    )}
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// 生成默认产品名称
+const generateProductName = () => {
+  const now = new Date();
+  const month = (now.getMonth() + 1).toString().padStart(2, '0');
+  const day = now.getDate().toString().padStart(2, '0');
+  const hour = now.getHours().toString().padStart(2, '0');
+  const minute = now.getMinutes().toString().padStart(2, '0');
+  return `产品-${month}${day}-${hour}${minute}`;
+};
+
 const App: React.FC = () => {
   // 用户认证状态
   const [user, setUser] = useState<UserData | null>(null);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
   const [showLoginModal, setShowLoginModal] = useState(false);
+  const [showQuotaModal, setShowQuotaModal] = useState(false);
+  const [quotaUsageHistory, setQuotaUsageHistory] = useState<QuotaUsageRecord[]>([]);
+  const [isLoadingQuotaHistory, setIsLoadingQuotaHistory] = useState(false);
+  const [hasMoreQuotaHistory, setHasMoreQuotaHistory] = useState(false);
+  const [isLoadingMoreQuotaHistory, setIsLoadingMoreQuotaHistory] = useState(false);
 
   // 产品/会话状态
   const [sessionId, setSessionId] = useState<string | null>(null);
-  const [productName, setProductName] = useState<string>('未命名产品');
+  const [productName, setProductName] = useState<string>(generateProductName());
   const [isEditingProductName, setIsEditingProductName] = useState(false);
   const [showProductList, setShowProductList] = useState(false);
+  const [historySessions, setHistorySessions] = useState<CloudSession[]>([]);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
 
   // 云同步状态
   const [isSyncing, setIsSyncing] = useState(false);
@@ -329,50 +491,61 @@ const App: React.FC = () => {
         setIsLoadingFromCloud(true);
 
         // 获取或创建会话
-        const sid = await getOrCreateSession(user.uid);
+        const sid = await getOrCreateSession(user.uid, productName);
         setSessionId(sid);
 
         // 从云端加载数据
         const { session, images: cloudImages } = await loadSessionFromCloud(user.uid, sid);
 
-        if (session && cloudImages.length > 0) {
-          // 将云端数据转换为本地格式
-          const loadedImages: ImageItem[] = await Promise.all(
-            cloudImages.map(async (cloudImg: CloudImageData) => {
-              // 从 Storage URL 获取图片并转为 base64
-              const response = await fetch(cloudImg.storageUrl);
-              const blob = await response.blob();
-              const base64 = await new Promise<string>((resolve) => {
-                const reader = new FileReader();
-                reader.onloadend = () => {
-                  const result = reader.result as string;
-                  // 移除 data:image/xxx;base64, 前缀
-                  const base64Data = result.split(',')[1] || result;
-                  resolve(base64Data);
+        if (session) {
+          // 设置产品名称
+          if (session.productName) {
+            setProductName(session.productName);
+          }
+
+          if (cloudImages.length > 0) {
+            // 将云端数据转换为本地格式
+            const loadedImages: ImageItem[] = await Promise.all(
+              cloudImages.map(async (cloudImg: CloudImageData) => {
+                // 从 Storage URL 获取图片并转为 base64
+                const response = await fetch(cloudImg.storageUrl);
+                const blob = await response.blob();
+                const base64 = await new Promise<string>((resolve) => {
+                  const reader = new FileReader();
+                  reader.onloadend = () => {
+                    const result = reader.result as string;
+                    // 移除 data:image/xxx;base64, 前缀
+                    const base64Data = result.split(',')[1] || result;
+                    resolve(base64Data);
+                  };
+                  reader.readAsDataURL(blob);
+                });
+
+                return {
+                  id: cloudImg.id,
+                  src: cloudImg.storageUrl,
+                  base64,
+                  file: new File([blob], cloudImg.fileName, { type: cloudImg.mimeType }),
+                  description: cloudImg.description,
+                  ocrText: cloudImg.ocrText,
+                  specs: cloudImg.specs || [],
+                  issues: cloudImg.issues || [],
+                  deterministicIssues: cloudImg.deterministicIssues || [],
+                  diffs: cloudImg.diffs || []
                 };
-                reader.readAsDataURL(blob);
-              });
+              })
+            );
 
-              return {
-                id: cloudImg.id,
-                src: cloudImg.storageUrl,
-                base64,
-                file: new File([blob], cloudImg.fileName, { type: cloudImg.mimeType }),
-                description: cloudImg.description,
-                ocrText: cloudImg.ocrText,
-                specs: cloudImg.specs || [],
-                issues: cloudImg.issues || [],
-                deterministicIssues: cloudImg.deterministicIssues || [],
-                diffs: cloudImg.diffs || []
-              };
-            })
-          );
-
-          setImages(loadedImages);
+            setImages(loadedImages);
+          }
           setManualSourceFields(session.qilFields || []);
           setQilInputText(session.qilInputText || '');
-          console.log(`Loaded ${loadedImages.length} images from cloud`);
+          console.log(`Loaded ${cloudImages.length} images from cloud`);
         }
+
+        // 加载历史会话列表
+        const sessions = await getUserSessions(user.uid, 10);
+        setHistorySessions(sessions);
       } catch (error) {
         console.error('Failed to load cloud data:', error);
       } finally {
@@ -484,7 +657,7 @@ const App: React.FC = () => {
       }
 
       // 消耗配额
-      await useQuotaFirebase(user.uid, 1);
+      await useQuotaFirebase(user.uid, 1, file.name);
       const updatedUser = await getUserData(user.uid);
       if (updatedUser) setUser(updatedUser);
 
@@ -577,7 +750,7 @@ const App: React.FC = () => {
       }
 
       // 消耗配额
-      await useQuotaFirebase(user.uid, 1);
+      await useQuotaFirebase(user.uid, 1, image.file.name, 'retry');
       const updatedUser = await getUserData(user.uid);
       if (updatedUser) setUser(updatedUser);
 
@@ -679,6 +852,143 @@ const App: React.FC = () => {
       }
     }
   }, [cloudSyncEnabled, sessionId, user]);
+
+  // 切换到指定的历史产品
+  const handleSwitchSession = useCallback(async (targetSession: CloudSession) => {
+    if (!user) return;
+
+    try {
+      setIsLoadingFromCloud(true);
+      setShowProductList(false);
+
+      // 加载目标会话数据
+      const { session, images: cloudImages } = await loadSessionFromCloud(user.uid, targetSession.id);
+
+      if (session) {
+        setSessionId(targetSession.id);
+        setProductName(session.productName || '未命名产品');
+
+        if (cloudImages.length > 0) {
+          const loadedImages: ImageItem[] = await Promise.all(
+            cloudImages.map(async (cloudImg: CloudImageData) => {
+              const response = await fetch(cloudImg.storageUrl);
+              const blob = await response.blob();
+              const base64 = await new Promise<string>((resolve) => {
+                const reader = new FileReader();
+                reader.onloadend = () => {
+                  const result = reader.result as string;
+                  const base64Data = result.split(',')[1] || result;
+                  resolve(base64Data);
+                };
+                reader.readAsDataURL(blob);
+              });
+
+              return {
+                id: cloudImg.id,
+                src: cloudImg.storageUrl,
+                base64,
+                file: new File([blob], cloudImg.fileName, { type: cloudImg.mimeType }),
+                description: cloudImg.description,
+                ocrText: cloudImg.ocrText,
+                specs: cloudImg.specs || [],
+                issues: cloudImg.issues || [],
+                deterministicIssues: cloudImg.deterministicIssues || [],
+                diffs: cloudImg.diffs || []
+              };
+            })
+          );
+          setImages(loadedImages);
+        } else {
+          setImages([]);
+        }
+
+        setManualSourceFields(session.qilFields || []);
+        setQilInputText(session.qilInputText || '');
+        setCurrentImageIndex(0);
+        setQilImages([]);
+      }
+    } catch (error) {
+      console.error('Failed to switch session:', error);
+      setErrorMessage('切换产品失败');
+    } finally {
+      setIsLoadingFromCloud(false);
+    }
+  }, [user]);
+
+  // 创建新产品
+  const handleCreateNewProduct = useCallback(async () => {
+    if (!user) return;
+
+    try {
+      const newName = generateProductName();
+      const newSid = await createNewSession(user.uid, newName);
+
+      setSessionId(newSid);
+      setProductName(newName);
+      setImages([]);
+      setManualSourceFields([]);
+      setQilInputText('');
+      setQilImages([]);
+      setCurrentImageIndex(0);
+      setShowProductList(false);
+
+      // 刷新历史列表
+      const sessions = await getUserSessions(user.uid, 10);
+      setHistorySessions(sessions);
+    } catch (error) {
+      console.error('Failed to create new product:', error);
+      setErrorMessage('创建新产品失败');
+    }
+  }, [user]);
+
+  // 产品名称变更时保存到云端
+  const handleProductNameChange = useCallback(async (newName: string) => {
+    setProductName(newName);
+    if (user && sessionId && cloudSyncEnabled) {
+      try {
+        await updateSessionProductName(user.uid, sessionId, newName);
+        // 更新历史列表中的名称
+        setHistorySessions(prev => prev.map(s =>
+          s.id === sessionId ? { ...s, productName: newName } : s
+        ));
+      } catch (error) {
+        console.error('Failed to update product name:', error);
+      }
+    }
+  }, [user, sessionId, cloudSyncEnabled]);
+
+  // 打开配额弹窗
+  const handleOpenQuotaModal = useCallback(async () => {
+    if (!user) return;
+    setShowQuotaModal(true);
+    setIsLoadingQuotaHistory(true);
+    setQuotaUsageHistory([]);
+    try {
+      const { records, hasMore } = await getQuotaUsageHistory(user.uid, 20);
+      setQuotaUsageHistory(records);
+      setHasMoreQuotaHistory(hasMore);
+    } catch (error) {
+      console.error('Failed to load quota history:', error);
+    } finally {
+      setIsLoadingQuotaHistory(false);
+    }
+  }, [user]);
+
+  // 加载更多配额记录
+  const handleLoadMoreQuotaHistory = useCallback(async () => {
+    if (!user || isLoadingMoreQuotaHistory || quotaUsageHistory.length === 0) return;
+    setIsLoadingMoreQuotaHistory(true);
+    try {
+      const lastRecord = quotaUsageHistory[quotaUsageHistory.length - 1];
+      const { records, hasMore } = await getQuotaUsageHistory(user.uid, 20, lastRecord.timestamp);
+      setQuotaUsageHistory(prev => [...prev, ...records]);
+      setHasMoreQuotaHistory(hasMore);
+    } catch (error) {
+      console.error('Failed to load more quota history:', error);
+    } finally {
+      setIsLoadingMoreQuotaHistory(false);
+    }
+  }, [user, quotaUsageHistory, isLoadingMoreQuotaHistory]);
 
   // QIL 图片处理 - 支持多张
   const handleQilImageFile = useCallback(async (file: File) => {
@@ -843,6 +1153,20 @@ const App: React.FC = () => {
         onLogin={handleLogin}
       />
 
+      {/* 配额弹窗 */}
+      {user && (
+        <QuotaModal
+          isOpen={showQuotaModal}
+          onClose={() => setShowQuotaModal(false)}
+          user={user}
+          usageHistory={quotaUsageHistory}
+          isLoading={isLoadingQuotaHistory}
+          onLoadMore={handleLoadMoreQuotaHistory}
+          hasMore={hasMoreQuotaHistory}
+          isLoadingMore={isLoadingMoreQuotaHistory}
+        />
+      )}
+
       {/* TOP BAR */}
       <div className="h-12 border-b border-slate-800 bg-slate-900 flex items-center justify-between px-4 shrink-0">
         {/* Left: Product Name */}
@@ -854,8 +1178,16 @@ const App: React.FC = () => {
                 type="text"
                 value={productName}
                 onChange={(e) => setProductName(e.target.value)}
-                onBlur={() => setIsEditingProductName(false)}
-                onKeyDown={(e) => e.key === 'Enter' && setIsEditingProductName(false)}
+                onBlur={() => {
+                  setIsEditingProductName(false);
+                  handleProductNameChange(productName);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    setIsEditingProductName(false);
+                    handleProductNameChange(productName);
+                  }
+                }}
                 className="bg-slate-800 border border-slate-600 rounded px-2 py-1 text-sm text-white w-40 focus:outline-none focus:border-slate-500"
                 autoFocus
               />
@@ -882,24 +1214,48 @@ const App: React.FC = () => {
                 </button>
 
                 {showProductList && (
-                  <div className="absolute top-full left-0 mt-1 w-48 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-50">
+                  <div className="absolute top-full left-0 mt-1 w-64 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-50 max-h-80 overflow-hidden">
+                    {/* 新建产品 */}
                     <div className="p-2 border-b border-slate-700">
                       <button
-                        onClick={() => {
-                          setProductName('未命名产品');
-                          setImages([]);
-                          setManualSourceFields([]);
-                          setQilInputText('');
-                          setShowProductList(false);
-                        }}
+                        onClick={handleCreateNewProduct}
                         className="w-full px-3 py-2 text-xs text-slate-300 hover:bg-slate-700 rounded flex items-center gap-2"
                       >
                         <ImagePlus size={12} />
                         新建产品
                       </button>
                     </div>
-                    <div className="p-1 text-[10px] text-slate-500 text-center">
-                      历史产品（开发中）
+
+                    {/* 历史产品列表 */}
+                    <div className="max-h-60 overflow-y-auto">
+                      {historySessions.length === 0 ? (
+                        <div className="p-3 text-[10px] text-slate-500 text-center">
+                          暂无历史产品
+                        </div>
+                      ) : (
+                        historySessions.map((s) => (
+                          <button
+                            key={s.id}
+                            onClick={() => handleSwitchSession(s)}
+                            className={`w-full px-3 py-2 text-left hover:bg-slate-700 transition-colors flex items-center justify-between ${
+                              s.id === sessionId ? 'bg-slate-700/50' : ''
+                            }`}
+                          >
+                            <div className="flex-1 min-w-0">
+                              <div className={`text-xs font-medium truncate ${s.id === sessionId ? 'text-white' : 'text-slate-300'}`}>
+                                {s.productName}
+                              </div>
+                              <div className="text-[10px] text-slate-500 flex items-center gap-2">
+                                <span>{s.imageCount} 张图片</span>
+                                {s.updatedAt?.toDate && (
+                                  <span>{s.updatedAt.toDate().toLocaleDateString()}</span>
+                                )}
+                              </div>
+                            </div>
+                            {s.id === sessionId && <div className="w-1.5 h-1.5 bg-emerald-400 rounded-full shrink-0 ml-2"></div>}
+                          </button>
+                        ))
+                      )}
                     </div>
                   </div>
                 )}
@@ -928,7 +1284,7 @@ const App: React.FC = () => {
         {/* Center: Image Tools */}
         <div className="flex items-center gap-2">
           {/* 添加图片 */}
-          <label className="flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-slate-100 text-slate-900 text-xs font-medium rounded cursor-pointer transition-colors">
+          <label className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium rounded border border-slate-700 cursor-pointer transition-colors">
             <ImagePlus size={14} />
             <span>添加图片</span>
             <input type="file" accept="image/*" className="hidden" onChange={(e) => e.target.files?.[0] && processFile(e.target.files[0])} />
@@ -1028,10 +1384,14 @@ const App: React.FC = () => {
           {user ? (
             <>
               {/* 配额 */}
-              <div className="flex items-center gap-1.5 px-2 py-1 bg-slate-800 rounded text-[10px]">
+              <button
+                onClick={handleOpenQuotaModal}
+                className="flex items-center gap-1.5 px-2 py-1 bg-slate-800 hover:bg-slate-700 rounded text-[10px] transition-colors"
+                title="点击查看配额详情"
+              >
                 <span className="text-slate-500">额度</span>
                 <span className="text-slate-300 font-medium tabular-nums">{user.quota - user.used}/{user.quota}</span>
-              </div>
+              </button>
 
               {/* 用户头像 */}
               <div className="relative group">

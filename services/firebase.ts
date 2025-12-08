@@ -1,6 +1,6 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
-import { getFirestore, doc, getDoc, setDoc, updateDoc, increment, serverTimestamp, collection, query, orderBy, getDocs, deleteDoc, writeBatch, limit } from 'firebase/firestore';
+import { getFirestore, doc, getDoc, setDoc, updateDoc, increment, serverTimestamp, collection, query, orderBy, getDocs, deleteDoc, writeBatch, limit, startAfter } from 'firebase/firestore';
 import { getStorage, ref, uploadString, getDownloadURL, deleteObject } from 'firebase/storage';
 import { ImageItem, DiagnosisIssue, DiffResult, ImageSpec, DeterministicCheck, SourceField } from '../types';
 
@@ -139,8 +139,21 @@ export const getUserData = async (uid: string): Promise<UserData | null> => {
   return null;
 };
 
-// 使用配额
-export const useQuotaFirebase = async (uid: string, count: number = 1): Promise<boolean> => {
+// 使用配额（带记录）
+export interface QuotaUsageRecord {
+  id: string;
+  type: 'analyze' | 'retry';
+  imageName: string;
+  count: number;
+  timestamp: any;
+}
+
+export const useQuotaFirebase = async (
+  uid: string,
+  count: number = 1,
+  imageName: string = '图片',
+  type: 'analyze' | 'retry' = 'analyze'
+): Promise<boolean> => {
   const userData = await getUserData(uid);
   if (!userData) return false;
 
@@ -153,7 +166,55 @@ export const useQuotaFirebase = async (uid: string, count: number = 1): Promise<
     used: increment(count)
   });
 
+  // 记录消耗历史
+  const usageRef = doc(collection(db, 'users', uid, 'usage'));
+  await setDoc(usageRef, {
+    type,
+    imageName,
+    count,
+    timestamp: serverTimestamp()
+  });
+
   return true;
+};
+
+// 获取配额使用记录（支持分页）
+export const getQuotaUsageHistory = async (
+  uid: string,
+  maxResults: number = 20,
+  lastTimestamp?: any
+): Promise<{ records: QuotaUsageRecord[]; hasMore: boolean }> => {
+  try {
+    const usageRef = collection(db, 'users', uid, 'usage');
+    let q;
+
+    if (lastTimestamp) {
+      q = query(
+        usageRef,
+        orderBy('timestamp', 'desc'),
+        startAfter(lastTimestamp),
+        limit(maxResults + 1)
+      );
+    } else {
+      q = query(usageRef, orderBy('timestamp', 'desc'), limit(maxResults + 1));
+    }
+
+    const snapshot = await getDocs(q);
+    const docs = snapshot.docs;
+    const hasMore = docs.length > maxResults;
+    const records = docs.slice(0, maxResults).map(doc => ({
+      id: doc.id,
+      type: doc.data().type || 'analyze',
+      imageName: doc.data().imageName || '图片',
+      count: doc.data().count || 1,
+      timestamp: doc.data().timestamp
+    }));
+
+    return { records, hasMore };
+  } catch (error) {
+    console.error('Get usage history error:', error);
+    return { records: [], hasMore: false };
+  }
 };
 
 // 检查是否有配额
@@ -200,6 +261,7 @@ export const resetUserUsage = async (targetUid: string): Promise<boolean> => {
 export interface CloudSession {
   id: string;
   userId: string;
+  productName: string;
   createdAt: any;
   updatedAt: any;
   imageCount: number;
@@ -253,7 +315,7 @@ export const deleteImageFromStorage = async (uid: string, imageId: string): Prom
 };
 
 // 获取或创建当前会话
-export const getOrCreateSession = async (uid: string): Promise<string> => {
+export const getOrCreateSession = async (uid: string, productName?: string): Promise<string> => {
   const sessionsRef = collection(db, 'users', uid, 'sessions');
   const q = query(sessionsRef, orderBy('updatedAt', 'desc'), limit(1));
   const snapshot = await getDocs(q);
@@ -273,6 +335,7 @@ export const getOrCreateSession = async (uid: string): Promise<string> => {
   const newSessionRef = doc(collection(db, 'users', uid, 'sessions'));
   await setDoc(newSessionRef, {
     userId: uid,
+    productName: productName || '未命名产品',
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
     imageCount: 0,
@@ -281,6 +344,30 @@ export const getOrCreateSession = async (uid: string): Promise<string> => {
   });
 
   return newSessionRef.id;
+};
+
+// 创建新会话（强制创建）
+export const createNewSession = async (uid: string, productName: string): Promise<string> => {
+  const newSessionRef = doc(collection(db, 'users', uid, 'sessions'));
+  await setDoc(newSessionRef, {
+    userId: uid,
+    productName,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+    imageCount: 0,
+    qilFields: [],
+    qilInputText: ''
+  });
+  return newSessionRef.id;
+};
+
+// 更新会话产品名称
+export const updateSessionProductName = async (uid: string, sessionId: string, productName: string): Promise<void> => {
+  const sessionRef = doc(db, 'users', uid, 'sessions', sessionId);
+  await updateDoc(sessionRef, {
+    productName,
+    updatedAt: serverTimestamp()
+  });
 };
 
 // 保存图片数据到云端
@@ -404,6 +491,7 @@ export const loadSessionFromCloud = async (
     const session: CloudSession = {
       id: sessionSnap.id,
       userId: sessionData.userId,
+      productName: sessionData.productName || '未命名产品',
       createdAt: sessionData.createdAt,
       updatedAt: sessionData.updatedAt,
       imageCount: sessionData.imageCount || 0,
@@ -487,6 +575,7 @@ export const getUserSessions = async (uid: string, maxResults: number = 10): Pro
       return {
         id: doc.id,
         userId: data.userId,
+        productName: data.productName || '未命名产品',
         createdAt: data.createdAt,
         updatedAt: data.updatedAt,
         imageCount: data.imageCount || 0,
