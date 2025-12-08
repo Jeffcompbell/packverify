@@ -2197,14 +2197,14 @@ const App: React.FC = () => {
       <div className="md:hidden fixed bottom-0 left-0 right-0 h-14 bg-slate-900 border-t border-slate-800 flex items-center justify-around px-2 z-40">
         <button
           onClick={() => setMobileTab('images')}
-          className={`flex flex-col items-center justify-center gap-0.5 py-1.5 px-3 rounded-lg transition-colors ${
+          className={`relative flex flex-col items-center justify-center gap-0.5 py-1.5 px-3 rounded-lg transition-colors ${
             mobileTab === 'images' ? 'text-indigo-400 bg-slate-800' : 'text-slate-500'
           }`}
         >
           <List size={18} />
           <span className="text-[9px]">图片</span>
           {images.length > 0 && (
-            <span className="absolute top-1 right-1 w-4 h-4 bg-indigo-500 text-white text-[8px] rounded-full flex items-center justify-center">
+            <span className="absolute -top-0.5 -right-0.5 min-w-4 h-4 px-1 bg-indigo-500 text-white text-[8px] rounded-full flex items-center justify-center">
               {images.length}
             </span>
           )}
@@ -2220,26 +2220,31 @@ const App: React.FC = () => {
         </button>
         <button
           onClick={() => setMobileTab('issues')}
-          className={`flex flex-col items-center justify-center gap-0.5 py-1.5 px-3 rounded-lg transition-colors relative ${
+          className={`relative flex flex-col items-center justify-center gap-0.5 py-1.5 px-3 rounded-lg transition-colors ${
             mobileTab === 'issues' ? 'text-indigo-400 bg-slate-800' : 'text-slate-500'
           }`}
         >
           <AlertTriangle size={18} />
           <span className="text-[9px]">问题</span>
           {currentImage && (currentImage.issues.length + (currentImage.deterministicIssues?.length || 0)) > 0 && (
-            <span className="absolute top-0.5 right-0.5 w-4 h-4 bg-red-500 text-white text-[8px] rounded-full flex items-center justify-center">
+            <span className="absolute -top-0.5 -right-0.5 min-w-4 h-4 px-1 bg-red-500 text-white text-[8px] rounded-full flex items-center justify-center">
               {currentImage.issues.length + (currentImage.deterministicIssues?.length || 0)}
             </span>
           )}
         </button>
         <button
           onClick={() => setMobileTab('qil')}
-          className={`flex flex-col items-center justify-center gap-0.5 py-1.5 px-3 rounded-lg transition-colors ${
+          className={`relative flex flex-col items-center justify-center gap-0.5 py-1.5 px-3 rounded-lg transition-colors ${
             mobileTab === 'qil' ? 'text-indigo-400 bg-slate-800' : 'text-slate-500'
           }`}
         >
           <Table size={18} />
           <span className="text-[9px]">QIL</span>
+          {manualSourceFields.length > 0 && (
+            <span className="absolute -top-0.5 -right-0.5 min-w-4 h-4 px-1 bg-emerald-500 text-white text-[8px] rounded-full flex items-center justify-center">
+              {manualSourceFields.length}
+            </span>
+          )}
         </button>
       </div>
 
