@@ -1,6 +1,6 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { CanvasTransform, DiagnosisIssue, DiffResult, ViewLayers, BoundingBox, ImageItem } from '../types';
-import { AlertCircle, CheckCircle, Info, XCircle, ImagePlus, Loader2, Trash2, FileText, AlertTriangle, RefreshCw, Copy, CheckCheck, Upload } from 'lucide-react';
+import { AlertCircle, CheckCircle, Info, XCircle, ImagePlus, Loader2, Trash2, FileText, AlertTriangle, RefreshCw, Copy, CheckCheck, Upload, GripVertical, Eye, FileSearch, CheckSquare } from 'lucide-react';
 
 interface InfiniteCanvasProps {
   images: ImageItem[];
@@ -14,6 +14,7 @@ interface InfiniteCanvasProps {
   onUpload: (file: File) => void;
   isProcessing: boolean;
   processingImageId: string | null;
+  processingStep?: number; // 1=视觉分析, 2=OCR提取, 3=终审验证
   onRemoveImage: (id: string) => void;
   onRetryAnalysis?: (imageId: string) => void;
 }
@@ -30,6 +31,7 @@ export const InfiniteCanvas: React.FC<InfiniteCanvasProps> = ({
   onUpload,
   isProcessing,
   processingImageId,
+  processingStep = 1,
   onRemoveImage,
   onRetryAnalysis
 }) => {
@@ -39,6 +41,7 @@ export const InfiniteCanvas: React.FC<InfiniteCanvasProps> = ({
   const [lastMouse, setLastMouse] = useState({ x: 0, y: 0 });
   const [isDragOver, setIsDragOver] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [dragHandleActive, setDragHandleActive] = useState<string | null>(null);
 
   const handleCopy = async (text: string, id: string) => {
     try {
@@ -57,7 +60,6 @@ export const InfiniteCanvas: React.FC<InfiniteCanvasProps> = ({
   };
 
   const handleWheel = (e: React.WheelEvent) => {
-    // Enable zoom even if no image, for effect
     e.preventDefault();
     if (e.ctrlKey || e.metaKey) {
       const scaleFactor = 0.1;
@@ -72,7 +74,17 @@ export const InfiniteCanvas: React.FC<InfiniteCanvasProps> = ({
     }
   };
 
+  // 只有在拖动手柄激活时才允许拖动画布
   const handleMouseDown = (e: React.MouseEvent) => {
+    // 检查是否点击在卡片内部（非拖动手柄）
+    const target = e.target as HTMLElement;
+    const isInsideCard = target.closest('.image-card-content');
+
+    if (isInsideCard && !dragHandleActive) {
+      // 点击在卡片内容区域，不拖动画布
+      return;
+    }
+
     if (e.button === 0 || e.button === 1) {
       setIsDragging(true);
       setLastMouse({ x: e.clientX, y: e.clientY });
@@ -91,9 +103,11 @@ export const InfiniteCanvas: React.FC<InfiniteCanvasProps> = ({
     setLastMouse({ x: e.clientX, y: e.clientY });
   };
 
-  const handleMouseUp = () => setIsDragging(false);
+  const handleMouseUp = () => {
+    setIsDragging(false);
+    setDragHandleActive(null);
+  };
 
-  // Native wheel handler to support non-passive prevention
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
@@ -118,10 +132,45 @@ export const InfiniteCanvas: React.FC<InfiniteCanvasProps> = ({
     width: `${(box.xmax - box.xmin) / 10}%`,
   });
 
+  // 三步分析进度组件
+  const AnalysisProgress = ({ step }: { step: number }) => (
+    <div className="absolute bottom-6 left-1/2 -translate-x-1/2 bg-slate-900/95 backdrop-blur border border-indigo-500/50 text-white px-4 py-3 rounded-xl shadow-xl z-50">
+      <div className="flex items-center gap-4">
+        {/* Step 1 */}
+        <div className={`flex items-center gap-2 ${step >= 1 ? 'text-indigo-400' : 'text-slate-600'}`}>
+          <div className={`w-7 h-7 rounded-full flex items-center justify-center ${step === 1 ? 'bg-indigo-500 animate-pulse' : step > 1 ? 'bg-emerald-500' : 'bg-slate-700'}`}>
+            {step > 1 ? <CheckCircle size={14} /> : <Eye size={14} />}
+          </div>
+          <span className="text-[10px] font-medium">视觉分析</span>
+        </div>
+
+        <div className={`w-8 h-0.5 ${step > 1 ? 'bg-emerald-500' : 'bg-slate-700'}`}></div>
+
+        {/* Step 2 */}
+        <div className={`flex items-center gap-2 ${step >= 2 ? 'text-indigo-400' : 'text-slate-600'}`}>
+          <div className={`w-7 h-7 rounded-full flex items-center justify-center ${step === 2 ? 'bg-indigo-500 animate-pulse' : step > 2 ? 'bg-emerald-500' : 'bg-slate-700'}`}>
+            {step > 2 ? <CheckCircle size={14} /> : <FileSearch size={14} />}
+          </div>
+          <span className="text-[10px] font-medium">OCR提取</span>
+        </div>
+
+        <div className={`w-8 h-0.5 ${step > 2 ? 'bg-emerald-500' : 'bg-slate-700'}`}></div>
+
+        {/* Step 3 */}
+        <div className={`flex items-center gap-2 ${step >= 3 ? 'text-indigo-400' : 'text-slate-600'}`}>
+          <div className={`w-7 h-7 rounded-full flex items-center justify-center ${step === 3 ? 'bg-indigo-500 animate-pulse' : 'bg-slate-700'}`}>
+            <CheckSquare size={14} />
+          </div>
+          <span className="text-[10px] font-medium">终审验证</span>
+        </div>
+      </div>
+    </div>
+  );
+
   return (
     <div
       ref={containerRef}
-      className={`absolute inset-0 overflow-hidden bg-slate-900 cursor-${isDragging ? 'grabbing' : 'grab'}`}
+      className={`absolute inset-0 overflow-hidden bg-slate-900 ${isDragging ? 'cursor-grabbing' : 'cursor-default'}`}
       onMouseDown={handleMouseDown}
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
@@ -169,6 +218,21 @@ export const InfiniteCanvas: React.FC<InfiniteCanvasProps> = ({
             return (
               <div key={imgItem.id} className="relative group shrink-0 flex flex-col bg-slate-800/30 rounded-xl overflow-hidden border border-slate-700/50 shadow-2xl" style={{ width: '420px' }}>
 
+                {/* 左上角拖动手柄 */}
+                <div
+                  className="absolute top-0 left-0 z-30 p-2 cursor-grab active:cursor-grabbing opacity-0 group-hover:opacity-100 transition-opacity"
+                  onMouseDown={(e) => {
+                    e.stopPropagation();
+                    setDragHandleActive(imgItem.id);
+                    setIsDragging(true);
+                    setLastMouse({ x: e.clientX, y: e.clientY });
+                  }}
+                >
+                  <div className="bg-slate-800/90 backdrop-blur p-1.5 rounded-lg border border-slate-600/50 hover:bg-slate-700 transition-colors">
+                    <GripVertical size={16} className="text-slate-400" />
+                  </div>
+                </div>
+
                 {/* 顶部：图片区域 */}
                 <div className="relative">
                   <img
@@ -179,29 +243,27 @@ export const InfiniteCanvas: React.FC<InfiniteCanvasProps> = ({
                   />
 
                   {/* 悬停时显示文件名、重试和删除按钮 */}
-                  <div className="absolute top-2 left-2 right-2 flex items-center justify-between opacity-0 group-hover:opacity-100 transition-opacity">
-                    <span className="text-[11px] text-white bg-black/70 backdrop-blur px-2.5 py-1.5 rounded truncate max-w-[220px]">{imgItem.file.name}</span>
-                    <div className="flex items-center gap-1.5">
-                      {onRetryAnalysis && !isThisProcessing && (
-                        <button
-                          onClick={(e) => { e.stopPropagation(); onRetryAnalysis(imgItem.id); }}
-                          className="p-1.5 bg-indigo-500/80 hover:bg-indigo-500 text-white rounded-full transition-colors"
-                          title="重新分析 (切换模型后可重试)"
-                        >
-                          <RefreshCw size={12} />
-                        </button>
-                      )}
+                  <div className="absolute top-2 right-2 flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <span className="text-[11px] text-white bg-black/70 backdrop-blur px-2.5 py-1.5 rounded truncate max-w-[200px]">{imgItem.file.name}</span>
+                    {onRetryAnalysis && !isThisProcessing && (
                       <button
-                        onClick={(e) => { e.stopPropagation(); onRemoveImage(imgItem.id); }}
-                        className="p-1.5 bg-red-500/80 hover:bg-red-500 text-white rounded-full transition-colors"
-                        title="删除"
+                        onClick={(e) => { e.stopPropagation(); onRetryAnalysis(imgItem.id); }}
+                        className="p-1.5 bg-indigo-500/80 hover:bg-indigo-500 text-white rounded-full transition-colors"
+                        title="重新分析 (切换模型后可重试)"
                       >
-                        <Trash2 size={12} />
+                        <RefreshCw size={12} />
                       </button>
-                    </div>
+                    )}
+                    <button
+                      onClick={(e) => { e.stopPropagation(); onRemoveImage(imgItem.id); }}
+                      className="p-1.5 bg-red-500/80 hover:bg-red-500 text-white rounded-full transition-colors"
+                      title="删除"
+                    >
+                      <Trash2 size={12} />
+                    </button>
                   </div>
 
-                  {/* 扫描动画 */}
+                  {/* 扫描动画 + 三步进度 */}
                   {isThisProcessing && (
                     <div className="absolute inset-0 z-50 overflow-hidden pointer-events-none">
                       <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-indigo-400 via-purple-500 to-indigo-400 shadow-[0_0_30px_rgba(99,102,241,0.8)]"
@@ -216,10 +278,7 @@ export const InfiniteCanvas: React.FC<InfiniteCanvasProps> = ({
                         }
                       `}</style>
                       <div className="absolute inset-0 bg-indigo-500/5 backdrop-blur-[1px]" />
-                      <div className="absolute bottom-6 left-1/2 -translate-x-1/2 bg-slate-900/95 backdrop-blur border border-indigo-500/50 text-white px-5 py-2.5 rounded-full shadow-xl flex items-center gap-2">
-                        <Loader2 className="w-5 h-5 text-indigo-400 animate-spin" />
-                        <span className="text-sm font-bold tracking-wide">AI 分析中...</span>
-                      </div>
+                      <AnalysisProgress step={processingStep} />
                     </div>
                   )}
 
@@ -240,7 +299,7 @@ export const InfiniteCanvas: React.FC<InfiniteCanvasProps> = ({
                         <div className={`absolute -top-10 left-1/2 -translate-x-1/2 bg-slate-900 text-white text-[10px] font-medium px-2 py-1 rounded shadow-xl whitespace-nowrap opacity-0 group-hover/issue:opacity-100 transition-all pointer-events-none flex items-center gap-1 border border-slate-700 z-50 ${selectedId === issue.id ? 'opacity-100' : ''}`}>
                           {issue.type === 'content' && <AlertCircle size={10} className="text-red-400" />}
                           {issue.type === 'compliance' && <Info size={10} className="text-amber-400" />}
-                          {issue.text}
+                          {issue.original || issue.text}
                         </div>
                       </div>
                     )
@@ -272,8 +331,12 @@ export const InfiniteCanvas: React.FC<InfiniteCanvasProps> = ({
                   ))}
                 </div>
 
-                {/* 下部：分析结果区域 - 可滚动 */}
-                <div className="flex-1 flex flex-col bg-slate-900/50 overflow-y-auto" style={{ maxHeight: '400px' }}>
+                {/* 下部：分析结果区域 - 可滚动，阻止事件冒泡 */}
+                <div
+                  className="image-card-content flex-1 flex flex-col bg-slate-900/50 overflow-y-auto cursor-default"
+                  style={{ maxHeight: '400px' }}
+                  onMouseDown={(e) => e.stopPropagation()}
+                >
 
                   {/* 图片描述 */}
                   {imgItem.description && (
@@ -312,51 +375,72 @@ export const InfiniteCanvas: React.FC<InfiniteCanvasProps> = ({
                       </div>
                     ) : (
                       <div className="p-3 space-y-2">
-                        {imgItem.issues.map((issue) => (
-                          <div
-                            key={issue.id}
-                            onClick={() => onSelect(issue.id)}
-                            className={`p-3 rounded-lg cursor-pointer transition-all group/issue ${
-                              selectedId === issue.id
-                                ? 'bg-indigo-500/20 border border-indigo-500/50'
-                                : 'bg-slate-800/50 border border-transparent hover:bg-slate-800 hover:border-slate-700'
-                            }`}
-                          >
-                            <div className="flex items-center gap-2 mb-1.5">
-                              <span className={`w-2 h-2 rounded-full shrink-0 ${
-                                issue.severity === 'high' ? 'bg-red-500' : issue.severity === 'medium' ? 'bg-amber-500' : 'bg-slate-500'
-                              }`}></span>
-                              <span className={`text-[9px] font-bold uppercase px-1.5 py-0.5 rounded ${
-                                issue.severity === 'high'
-                                  ? 'bg-red-500/20 text-red-400'
-                                  : issue.severity === 'medium'
-                                    ? 'bg-amber-500/20 text-amber-400'
-                                    : 'bg-slate-500/20 text-slate-400'
-                              }`}>
-                                {issue.severity === 'high' ? '紧急' : issue.severity === 'medium' ? '警告' : '提示'}
-                              </span>
-                              <span className="text-[9px] text-slate-500 font-mono">{issue.type}</span>
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleCopy(`[${issue.severity === 'high' ? '紧急' : issue.severity === 'medium' ? '警告' : '提示'}] ${issue.text}${issue.suggestion ? `\n建议: ${issue.suggestion}` : ''}`, issue.id);
-                                }}
-                                className="ml-auto p-1 rounded hover:bg-slate-700 transition-colors opacity-0 group-hover/issue:opacity-100"
-                                title="复制问题"
-                              >
-                                {copiedId === issue.id ? (
-                                  <CheckCheck size={12} className="text-emerald-400" />
-                                ) : (
-                                  <Copy size={12} className="text-slate-500" />
-                                )}
-                              </button>
+                        {imgItem.issues.map((issue) => {
+                          // 兼容新旧格式
+                          const displayOriginal = issue.original || issue.text || '';
+                          const displayProblem = issue.problem || '';
+                          const copyText = `原文: ${displayOriginal}\n问题: ${displayProblem}\n建议: ${issue.suggestion}`;
+
+                          return (
+                            <div
+                              key={issue.id}
+                              onClick={() => onSelect(issue.id)}
+                              className={`p-3 rounded-lg cursor-pointer transition-all group/issue ${
+                                selectedId === issue.id
+                                  ? 'bg-indigo-500/20 border border-indigo-500/50'
+                                  : 'bg-slate-800/50 border border-transparent hover:bg-slate-800 hover:border-slate-700'
+                              }`}
+                            >
+                              <div className="flex items-center gap-2 mb-2">
+                                <span className={`w-2 h-2 rounded-full shrink-0 ${
+                                  issue.severity === 'high' ? 'bg-red-500' : issue.severity === 'medium' ? 'bg-amber-500' : 'bg-slate-500'
+                                }`}></span>
+                                <span className={`text-[9px] font-bold uppercase px-1.5 py-0.5 rounded ${
+                                  issue.severity === 'high'
+                                    ? 'bg-red-500/20 text-red-400'
+                                    : issue.severity === 'medium'
+                                      ? 'bg-amber-500/20 text-amber-400'
+                                      : 'bg-slate-500/20 text-slate-400'
+                                }`}>
+                                  {issue.severity === 'high' ? '紧急' : issue.severity === 'medium' ? '警告' : '提示'}
+                                </span>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleCopy(copyText, issue.id);
+                                  }}
+                                  className="ml-auto p-1 rounded hover:bg-slate-700 transition-colors opacity-0 group-hover/issue:opacity-100"
+                                  title="复制问题"
+                                >
+                                  {copiedId === issue.id ? (
+                                    <CheckCheck size={12} className="text-emerald-400" />
+                                  ) : (
+                                    <Copy size={12} className="text-slate-500" />
+                                  )}
+                                </button>
+                              </div>
+
+                              {/* 原文（简短） */}
+                              <div className="mb-1.5">
+                                <span className="text-[10px] text-slate-500">原文：</span>
+                                <span className="text-xs text-red-300 font-mono bg-red-500/10 px-1.5 py-0.5 rounded ml-1">{displayOriginal}</span>
+                              </div>
+
+                              {/* 问题描述 */}
+                              {displayProblem && (
+                                <p className="text-xs text-slate-300 mb-1.5">{displayProblem}</p>
+                              )}
+
+                              {/* 修改建议 */}
+                              {issue.suggestion && (
+                                <div className="flex items-start gap-1.5 text-[11px] text-emerald-400/90 bg-emerald-500/10 px-2 py-1.5 rounded">
+                                  <span className="shrink-0">💡</span>
+                                  <span>{issue.suggestion}</span>
+                                </div>
+                              )}
                             </div>
-                            <p className="text-xs text-slate-200 leading-relaxed mb-1">{issue.text}</p>
-                            {issue.suggestion && (
-                              <p className="text-[11px] text-slate-500 leading-relaxed">💡 {issue.suggestion}</p>
-                            )}
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     )}
                   </div>

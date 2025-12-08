@@ -59,34 +59,42 @@ export const initialImageAnalysis = async (base64Image: string, mimeType: string
         const modelId = getModelId();
         console.log("Step 1: Initial vision analysis with model:", modelId);
 
-        const prompt = `你是资深印前QC专员，专门检查包装印刷品。请仔细分析这张包装设计图片。
+        const prompt = `你是资深印前QC专员，专门检查包装印刷品的文字错误。请仔细分析这张包装设计图片。
 
 ## 任务
 1. 描述图片内容
-2. 列出你看到的所有文字内容（包括产品名、品牌、成分、日期、条码等）
-3. 初步标记可能存在的问题
+2. 逐字逐句列出你看到的所有文字（保留原始格式）
+3. 检查并标记文字错误
 
-## 重点检查
-- 英文单词是否缺少空格（如"HelloWorld"应为"Hello World"）
-- 中文是否有错别字
-- 标点符号是否正确
-- 排版是否有问题
+## 必须检查的印刷错误
+- **错别字**：中文错字、漏字、多字
+- **拼写错误**：英文单词拼写错误
+- **空格问题**：英文单词间缺少空格（如"HelloWorld"应为"Hello World"）
+- **标点错误**：标点缺失、多余、中英文标点混用
+- **括号不配对**：左右括号数量不一致
+- **数字错误**：日期、重量等数字明显错误
+
+## 不要报告
+- 设计风格、布局
+- 颜色、字体选择
+- 图片质量
 
 ## 输出JSON
 {
-  "description": "一句话描述图片（产品类型、品牌）",
-  "observedText": "按位置顺序列出图片中所有可见文字，用换行分隔",
+  "description": "一句话描述图片",
+  "observedText": "完整列出图片中所有可见文字，用换行分隔",
   "initialIssues": [
     {
       "type": "content",
-      "text": "可能的问题描述",
-      "location": "问题在图片中的大致位置",
+      "text": "具体的文字错误",
+      "original": "原文",
+      "location": "位置",
       "confidence": "high/medium/low"
     }
   ]
 }
 
-注意：这是第一轮分析，后续会用OCR复核。请尽可能准确识别文字和标记疑点。`;
+只关注文字错误，不评论设计。请返回json格式。`;
 
         const response = await client.chat.completions.create({
             model: modelId,
@@ -130,16 +138,26 @@ export const ocrExtractText = async (base64Image: string, mimeType: string): Pro
         const modelId = getModelId();
         console.log("Step 2: OCR text extraction with model:", modelId);
 
-        const prompt = `请作为OCR系统，精确提取这张图片中的所有文字。
+        const prompt = `你是专业OCR系统，请精确提取图片中的【所有】文字，包括最小的字。
 
-要求：
-1. 逐字逐词提取，保持原始格式
-2. 包括所有可见文字：标题、正文、小字、条形码数字
-3. 保留空格和标点符号的原始状态
-4. 如果看到"HelloWorld"没有空格，就输出"HelloWorld"（不要自动加空格）
-5. 按从上到下、从左到右的顺序输出
+## 核心要求
+1. **必须提取所有文字**：
+   - 大标题、正文、小字、成分表、警告语、条码数字
+   - 特别注意：侧边、角落、旋转的文字也要提取
 
-只输出提取的文字，不要任何解释或标注。`;
+2. **保留原始状态**：
+   - 不要自动修正任何错误
+   - 不要添加缺失的空格或标点
+   - 如实呈现图片上的内容
+
+3. **特别注意符号**：
+   - 括号：() （）[] 【】{} 必须准确
+   - 标点：，。、；：要准确
+
+## 输出
+按从上到下、从左到右顺序输出所有文字。
+每个文本块换行。
+不要任何解释，只输出原文。`;
 
         const response = await client.chat.completions.create({
             model: modelId,
@@ -179,37 +197,48 @@ export const finalVerification = async (
         const modelId = getModelId();
         console.log("Step 3: Final verification with model:", modelId);
 
-        const prompt = `你是资深印前QC终审专员。请基于两轮分析结果，给出最终结论。
+        const prompt = `你是资深印前QC终审专员，专门检查印刷品的文字错误。
 
-## 第一轮：视觉分析结果
+## 第一轮分析（视觉）
 描述：${initialAnalysis.description}
 观察到的文字：
 ${initialAnalysis.observedText}
 
-初步发现的问题：
+初步问题：
 ${JSON.stringify(initialAnalysis.initialIssues, null, 2)}
 
-## 第二轮：OCR精确提取的文字
+## 第二轮分析（OCR精确提取）
 ${ocrText}
 
-## 你的任务
-1. 对比两轮结果，确认哪些问题是真实存在的
-2. 检查OCR文字中是否有第一轮遗漏的问题
-3. 重点关注：
-   - 英文单词间缺少空格（如"HelloWorld"应为"Hello World"）
-   - 中文错别字
-   - 中英文标点混用
-   - 排版对齐问题
+## 终审任务
+**仔细检查上面OCR提取的文字**，找出所有印刷错误：
 
-## 输出最终确认的问题
-返回JSON格式：
+### 检查清单（逐项检查）
+1. **括号配对**：数一数左括号和右括号的数量是否相等
+   - 检查 ( 和 ) 的数量
+   - 检查成分表中的括号是否都闭合
+
+2. **错别字**：中文有没有错字、漏字、多字
+
+3. **拼写错误**：英文单词有没有拼错
+
+4. **空格缺失**：英文单词是否连在一起
+
+5. **标点问题**：标点是否缺失或多余
+
+### 不要报告
+- 设计布局
+- 颜色字体
+
+## 输出json格式
 {
   "description": "图片描述",
   "issues": [
     {
       "type": "content",
-      "text": "确认的问题，引用原文",
-      "suggestion": "修改建议",
+      "original": "问题原文（2-10个字）",
+      "problem": "问题描述",
+      "suggestion": "建议修改为：xxx",
       "severity": "high/medium/low",
       "box_2d": [ymin, xmin, ymax, xmax]
     }
@@ -217,10 +246,8 @@ ${ocrText}
 }
 
 规则：
-- 只报告两轮分析都确认的问题，减少误报
-- text必须引用OCR提取的原文
-- 没有确认问题就返回空数组
-- severity: high=严重影响印刷质量, medium=建议修改, low=轻微问题`;
+- 只报告文字错误
+- 没有错误就返回空issues数组`;
 
         const response = await client.chat.completions.create({
             model: modelId,
@@ -268,20 +295,28 @@ ${ocrText}
 };
 
 // Main diagnosis function - three-step process for maximum accuracy
-export const diagnoseImage = async (base64Image: string, mimeType: string): Promise<DiagnosisResult> => {
+export const diagnoseImage = async (
+    base64Image: string,
+    mimeType: string,
+    onStepChange?: (step: number) => void
+): Promise<DiagnosisResult> => {
     try {
         console.log("Starting three-step analysis (Vision → OCR → Verification)...");
 
         // Step 1: Initial vision analysis
+        onStepChange?.(1);
         const initialAnalysis = await initialImageAnalysis(base64Image, mimeType);
         console.log("Step 1 complete. Description:", initialAnalysis.description);
         console.log("Initial issues found:", initialAnalysis.initialIssues.length);
 
         // Step 2: OCR text extraction
+        onStepChange?.(2);
         const ocrText = await ocrExtractText(base64Image, mimeType);
         console.log("Step 2 complete. OCR text length:", ocrText.length);
+        console.log("=== OCR提取的文字 ===\n", ocrText, "\n=== END ===");
 
         // Step 3: Final verification combining both results
+        onStepChange?.(3);
         const result = await finalVerification(initialAnalysis, ocrText, base64Image, mimeType);
         console.log("Step 3 complete. Final issues:", result.issues.length);
 

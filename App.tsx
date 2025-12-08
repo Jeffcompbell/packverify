@@ -10,6 +10,7 @@ import { Table, Zap, LayoutGrid, AlertCircle, XCircle, ChevronDown } from 'lucid
 const App: React.FC = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [processingImageId, setProcessingImageId] = useState<string | null>(null);
+  const [processingStep, setProcessingStep] = useState<number>(1);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   // Data
@@ -92,7 +93,9 @@ const App: React.FC = () => {
 
       // Analyze
       console.log("Starting diagnosis...");
-      const diagResult = await diagnoseImage(base64, file.type);
+      const diagResult = await diagnoseImage(base64, file.type, (step) => {
+        setProcessingStep(step);
+      });
       console.log("Diagnosis complete:", diagResult);
 
       setImages(prev => prev.map(img =>
@@ -203,8 +206,10 @@ const App: React.FC = () => {
 
       console.log("Retrying analysis for image:", imageId, "with model:", currentModel);
 
-      // Re-run diagnosis
-      const diagResult = await diagnoseImage(image.base64, image.file.type);
+      // Re-run diagnosis with step callback
+      const diagResult = await diagnoseImage(image.base64, image.file.type, (step) => {
+        setProcessingStep(step);
+      });
       console.log("Retry diagnosis complete:", diagResult);
 
       // Update image with new results
@@ -344,6 +349,7 @@ const App: React.FC = () => {
             onUpload={handleFileUpload}
             isProcessing={isProcessing}
             processingImageId={processingImageId}
+            processingStep={processingStep}
             onRemoveImage={(id) => setImages(prev => prev.filter(i => i.id !== id))}
             onRetryAnalysis={handleRetryAnalysis}
           />

@@ -21,7 +21,9 @@ export type IssueType =
 export interface DiagnosisIssue {
   id: string;
   type: IssueType;
-  text: string;
+  text?: string;  // 旧格式兼容
+  original?: string;  // 新格式：问题原文（简短）
+  problem?: string;   // 新格式：具体问题描述
   suggestion: string;
   location_desc?: string;
   severity: 'high' | 'medium' | 'low';
