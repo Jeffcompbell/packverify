@@ -511,3 +511,138 @@ export const performSmartDiff = async (
         throw error;
     }
 };
+
+// 从 QIL 图片中提取规格数据
+export const parseQILImage = async (base64Image: string, mimeType: string): Promise<SourceField[]> => {
+    try {
+        const client = getClient();
+        const modelId = getModelId();
+        console.log("Parsing QIL image with model:", modelId);
+
+        const prompt = `你是专业的包装规格数据提取专家。请从这张 QIL（质量检验清单）截图中提取所有产品规格信息。
+
+## 任务
+分析图片，提取表格或列表中的所有产品规格字段。
+
+## 常见 QIL 字段类型
+- **content（内容）**：产品名称、品牌、描述、卖点、使用说明等
+- **compliance（合规）**：成分表、配料、警告语、保质期、生产日期、批号、条形码、生产商、产地等
+- **specs（规格）**：净含量、重量、尺寸、规格型号、包装规格等
+
+## 输出要求
+提取所有可见的键值对信息，返回 JSON 格式：
+{
+  "fields": [
+    { "key": "产品名称", "value": "XXX护肤霜", "category": "content" },
+    { "key": "净含量", "value": "50ml", "category": "specs" },
+    { "key": "成分", "value": "水、甘油、...", "category": "compliance" }
+  ]
+}
+
+## 重要
+1. key 使用中文描述
+2. value 保持原文，不要修改
+3. 尽可能提取完整信息
+4. 如果是表格，按行提取每个字段`;
+
+        const response = await client.chat.completions.create({
+            model: modelId,
+            messages: [
+                {
+                    role: "user",
+                    content: [
+                        { type: "text", text: prompt },
+                        {
+                            type: "image_url",
+                            image_url: {
+                                url: `data:${mimeType};base64,${base64Image}`,
+                                detail: "high"
+                            }
+                        }
+                    ]
+                }
+            ],
+            response_format: { type: "json_object" }
+        });
+
+        const text = response.choices[0].message.content;
+        if (!text) return [];
+
+        const parsed = parseJSON(text);
+        return parsed.fields || [];
+
+    } catch (error) {
+        console.error("Parse QIL image failed:", error);
+        throw error;
+    }
+};
+
+// 本地对比 QIL 和图片规格（不调用 API）
+export const localDiffSpecs = (
+    qilFields: SourceField[],
+    imageSpecs: { key: string; value: string; category?: string }[]
+): DiffResult[] => {
+    const results: DiffResult[] = [];
+
+    for (const qilField of qilFields) {
+        // 在图片规格中查找匹配的 key
+        const matchingSpec = imageSpecs.find(spec =>
+            spec.key === qilField.key ||
+            spec.key.includes(qilField.key) ||
+            qilField.key.includes(spec.key)
+        );
+
+        if (!matchingSpec) {
+            // 图片中未找到该字段
+            results.push({
+                id: `diff-${results.length}-${Date.now()}`,
+                field: qilField.key,
+                sourceValue: qilField.value,
+                imageValue: null,
+                status: 'error',
+                matchType: 'strict',
+                reason: '图片中未找到该字段'
+            });
+        } else {
+            // 比较值
+            const qilValue = qilField.value.trim().toLowerCase();
+            const imgValue = matchingSpec.value.trim().toLowerCase();
+
+            if (qilValue === imgValue) {
+                // 完全匹配
+                results.push({
+                    id: `diff-${results.length}-${Date.now()}`,
+                    field: qilField.key,
+                    sourceValue: qilField.value,
+                    imageValue: matchingSpec.value,
+                    status: 'match',
+                    matchType: 'strict'
+                });
+            } else if (imgValue.includes(qilValue) || qilValue.includes(imgValue)) {
+                // 部分匹配
+                results.push({
+                    id: `diff-${results.length}-${Date.now()}`,
+                    field: qilField.key,
+                    sourceValue: qilField.value,
+                    imageValue: matchingSpec.value,
+                    status: 'warning',
+                    matchType: 'semantic',
+                    reason: '部分匹配，请人工确认'
+                });
+            } else {
+                // 不匹配
+                results.push({
+                    id: `diff-${results.length}-${Date.now()}`,
+                    field: qilField.key,
+                    sourceValue: qilField.value,
+                    imageValue: matchingSpec.value,
+                    status: 'error',
+                    matchType: 'strict',
+                    reason: `值不匹配：QIL="${qilField.value}" vs 图片="${matchingSpec.value}"`
+                });
+            }
+        }
+    }
+
+    return results;
+};

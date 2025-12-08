@@ -1,12 +1,12 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { diagnoseImage, fileToGenerativePart, parseSourceText, performSmartDiff, extractProductSpecs, AVAILABLE_MODELS, getModelId, setModelId } from './services/openaiService';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { diagnoseImage, fileToGenerativePart, parseSourceText, performSmartDiff, extractProductSpecs, AVAILABLE_MODELS, getModelId, setModelId, parseQILImage, localDiffSpecs } from './services/openaiService';
 import { DiagnosisIssue, SourceField, DiffResult, ViewLayers, ImageItem, ImageSpec, BoundingBox, DeterministicCheck } from './types';
 import {
   Table, Zap, AlertCircle, XCircle, ChevronDown, ChevronLeft, ChevronRight,
   ImagePlus, Trash2, RefreshCw, Copy, CheckCheck, Upload, Eye, EyeOff,
   ZoomIn, ZoomOut, RotateCcw, RotateCw, FileText, AlertTriangle, CheckCircle,
   ClipboardCheck, Image, Search, FileSpreadsheet, Loader2, Maximize2, ImageIcon,
-  Type, Brackets, ShieldAlert
+  Type, Brackets, ShieldAlert, GitCompare, List
 } from 'lucide-react';
 
 // 存储接口 - 用于 localStorage 持久化
@@ -73,7 +73,7 @@ const App: React.FC = () => {
   const [isResizing, setIsResizing] = useState(false);
 
   // Specs tab
-  const [specsTab, setSpecsTab] = useState<string>('all');
+  const [specsTab, setSpecsTab] = useState<string>('qil');
 
   // Right panel tab
   const [rightPanelTab, setRightPanelTab] = useState<'issues' | 'ocr'>('issues');
@@ -81,12 +81,22 @@ const App: React.FC = () => {
   // QIL Input
   const [qilInputMode, setQilInputMode] = useState<'text' | 'image'>('text');
   const [qilInputText, setQilInputText] = useState('');
-  const [qilImage, setQilImage] = useState<{ src: string; base64: string } | null>(null);
+  const [qilImages, setQilImages] = useState<{ id: string; src: string; base64: string; mimeType: string; parsed: boolean }[]>([]);
+  const [isParsingQil, setIsParsingQil] = useState(false);
+  const [parsingQilId, setParsingQilId] = useState<string | null>(null);
   const qilDropRef = useRef<HTMLDivElement>(null);
   const issueListRef = useRef<HTMLDivElement>(null);
 
   // Current image
   const currentImage = images[currentImageIndex] || null;
+
+  // 计算当前图片与 QIL 的对比结果
+  const currentDiffResults = useMemo(() => {
+    if (!currentImage || !manualSourceFields.length || !currentImage.specs?.length) {
+      return [];
+    }
+    return localDiffSpecs(manualSourceFields, currentImage.specs);
+  }, [currentImage, manualSourceFields]);
 
   // 从 localStorage 恢复数据
   useEffect(() => {
@@ -356,19 +366,74 @@ const App: React.FC = () => {
     setErrorMessage(null);
     setSelectedIssueId(null);
     setImageScale(1);
-    setQilImage(null);
+    setQilImages([]);
     setQilInputText('');
     // 清除 localStorage
     localStorage.removeItem(STORAGE_KEY);
   };
 
-  // QIL 图片处理
+  // QIL 图片处理 - 支持多张
   const handleQilImageFile = async (file: File) => {
     if (!file.type.startsWith('image/')) return;
+    if (qilImages.length >= 4) {
+      setErrorMessage('QIL 最多支持 4 张图片');
+      return;
+    }
     const url = URL.createObjectURL(file);
     const base64 = await fileToGenerativePart(file);
-    setQilImage({ src: url, base64 });
+    const newQilImage = {
+      id: `qil-${Date.now()}`,
+      src: url,
+      base64,
+      mimeType: file.type,
+      parsed: false
+    };
+    setQilImages(prev => [...prev, newQilImage]);
     setQilInputMode('image');
+  };
+
+  // QIL 图片删除
+  const handleRemoveQilImage = (id: string) => {
+    setQilImages(prev => prev.filter(img => img.id !== id));
+  };
+
+  // QIL 解析所有图片
+  const handleParseAllQilImages = async () => {
+    const unparsedImages = qilImages.filter(img => !img.parsed);
+    if (unparsedImages.length === 0) return;
+
+    setIsParsingQil(true);
+    setErrorMessage(null);
+
+    try {
+      let allFields: SourceField[] = [...manualSourceFields];
+
+      for (const qilImg of unparsedImages) {
+        setParsingQilId(qilImg.id);
+        const fields = await parseQILImage(qilImg.base64, qilImg.mimeType);
+        allFields = [...allFields, ...fields];
+        // 标记为已解析
+        setQilImages(prev => prev.map(img =>
+          img.id === qilImg.id ? { ...img, parsed: true } : img
+        ));
+      }
+
+      // 去重（按 key）
+      const uniqueFields = allFields.reduce((acc, field) => {
+        if (!acc.find(f => f.key === field.key)) {
+          acc.push(field);
+        }
+        return acc;
+      }, [] as SourceField[]);
+
+      setManualSourceFields(uniqueFields);
+      console.log('All QIL images parsed, total fields:', uniqueFields.length);
+    } catch (error: any) {
+      setErrorMessage(error.message || 'QIL 图片解析失败');
+    } finally {
+      setIsParsingQil(false);
+      setParsingQilId(null);
+    }
   };
 
   // Global Paste Handler - 智能判断粘贴目标
@@ -457,7 +522,7 @@ const App: React.FC = () => {
             </div>
             <div>
               <div className="text-sm font-bold text-white">包装稿审核 Pro</div>
-              <div className="text-[10px] text-slate-500">v3.2 • Gemini 驱动</div>
+              <div className="text-[10px] text-slate-500">v3.3 • QIL 对比</div>
             </div>
           </div>
 
@@ -965,10 +1030,10 @@ const App: React.FC = () => {
             ) : (
               <div
                 ref={qilDropRef}
-                className="qil-input-area flex-1 bg-slate-900 border-2 border-dashed border-slate-700 rounded flex flex-col items-center justify-center cursor-pointer hover:border-indigo-500/50 transition-colors relative overflow-hidden"
+                className="qil-input-area flex-1 bg-slate-900 border-2 border-dashed border-slate-700 rounded flex flex-col cursor-pointer hover:border-indigo-500/50 transition-colors relative overflow-hidden"
                 tabIndex={0}
                 onClick={() => {
-                  if (!qilImage) {
+                  if (qilImages.length < 4) {
                     const input = document.createElement('input');
                     input.type = 'file';
                     input.accept = 'image/*';
@@ -987,37 +1052,65 @@ const App: React.FC = () => {
                   if (file) handleQilImageFile(file);
                 }}
               >
-                {qilImage ? (
-                  <>
-                    <img src={qilImage.src} alt="QIL" className="max-w-full max-h-full object-contain" />
-                    <div className="absolute top-1 right-1 flex gap-1">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          // TODO: 解析 QIL 图片
-                          setErrorMessage('QIL 图片解析功能开发中...');
-                        }}
-                        className="p-1 bg-indigo-600 hover:bg-indigo-500 text-white rounded text-[10px] flex items-center gap-1"
-                      >
-                        <Search size={10} /> 解析
-                      </button>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setQilImage(null);
-                        }}
-                        className="p-1 bg-red-500/80 hover:bg-red-500 text-white rounded"
-                      >
-                        <XCircle size={12} />
-                      </button>
+                {qilImages.length > 0 ? (
+                  <div className="flex-1 p-2 overflow-auto">
+                    <div className="grid grid-cols-2 gap-2">
+                      {qilImages.map((qilImg) => (
+                        <div key={qilImg.id} className="relative group">
+                          <img src={qilImg.src} alt="QIL" className="w-full h-24 object-cover rounded border border-slate-700" />
+                          {/* 已解析标记 */}
+                          {qilImg.parsed && (
+                            <div className="absolute top-1 left-1 bg-emerald-500/80 text-white text-[8px] px-1 rounded">
+                              已解析
+                            </div>
+                          )}
+                          {/* 解析中 */}
+                          {parsingQilId === qilImg.id && (
+                            <div className="absolute inset-0 bg-slate-900/80 flex items-center justify-center rounded">
+                              <Loader2 size={16} className="animate-spin text-indigo-400" />
+                            </div>
+                          )}
+                          {/* 删除按钮 */}
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleRemoveQilImage(qilImg.id);
+                            }}
+                            className="absolute top-1 right-1 p-0.5 bg-red-500/80 rounded opacity-0 group-hover:opacity-100 transition-opacity"
+                          >
+                            <XCircle size={10} className="text-white" />
+                          </button>
+                        </div>
+                      ))}
+                      {/* 添加更多按钮 */}
+                      {qilImages.length < 4 && (
+                        <div className="h-24 border-2 border-dashed border-slate-700 rounded flex flex-col items-center justify-center text-slate-600 hover:border-indigo-500/50 hover:text-slate-500 transition-colors">
+                          <ImagePlus size={16} />
+                          <span className="text-[9px] mt-1">添加</span>
+                        </div>
+                      )}
                     </div>
-                  </>
+                    {/* 解析按钮 */}
+                    {qilImages.some(img => !img.parsed) && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleParseAllQilImages();
+                        }}
+                        disabled={isParsingQil}
+                        className="mt-2 w-full py-1.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white rounded text-[10px] flex items-center justify-center gap-1"
+                      >
+                        {isParsingQil ? <Loader2 size={10} className="animate-spin" /> : <Search size={10} />}
+                        {isParsingQil ? '解析中...' : `解析 ${qilImages.filter(img => !img.parsed).length} 张图片`}
+                      </button>
+                    )}
+                  </div>
                 ) : (
-                  <>
+                  <div className="flex-1 flex flex-col items-center justify-center">
                     <Upload size={20} className="text-slate-600 mb-1" />
                     <span className="text-[10px] text-slate-600">Ctrl+V 粘贴 QIL 截图</span>
-                    <span className="text-[9px] text-slate-700 mt-1">或点击/拖拽上传</span>
-                  </>
+                    <span className="text-[9px] text-slate-700 mt-1">或点击/拖拽上传（最多4张）</span>
+                  </div>
                 )}
               </div>
             )}
@@ -1036,29 +1129,39 @@ const App: React.FC = () => {
             <div className="px-3 py-2 bg-slate-900 border-b border-slate-800 flex items-center gap-1 overflow-x-auto shrink-0">
               <FileSpreadsheet size={12} className="text-emerald-400 shrink-0 mr-1" />
               <button
-                onClick={() => setSpecsTab('all')}
+                onClick={() => setSpecsTab('qil')}
                 className={`px-3 py-1 text-[10px] font-bold uppercase tracking-wider rounded transition-all shrink-0 ${
-                  specsTab === 'all'
+                  specsTab === 'qil'
                     ? 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/50'
                     : 'text-slate-500 hover:text-slate-300 hover:bg-slate-800'
                 }`}
               >
-                全部
+                QIL ({manualSourceFields.length})
               </button>
               {images.map((img, idx) => (
                 <button
                   key={img.id}
                   onClick={() => setSpecsTab(img.id)}
-                  className={`px-3 py-1 text-[10px] font-medium rounded transition-all shrink-0 truncate max-w-[100px] ${
+                  className={`px-3 py-1 text-[10px] font-medium rounded transition-all shrink-0 truncate max-w-[120px] ${
                     specsTab === img.id
                       ? 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/50'
                       : 'text-slate-500 hover:text-slate-300 hover:bg-slate-800'
                   }`}
                   title={img.file.name}
                 >
-                  图片{idx + 1}
+                  图片{idx + 1} ({img.specs?.length || 0})
                 </button>
               ))}
+              <button
+                onClick={() => setSpecsTab('diff')}
+                className={`px-3 py-1 text-[10px] font-bold uppercase tracking-wider rounded transition-all shrink-0 ${
+                  specsTab === 'diff'
+                    ? 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/50'
+                    : 'text-slate-500 hover:text-slate-300 hover:bg-slate-800'
+                }`}
+              >
+                对比汇总
+              </button>
               <span className="ml-auto text-[10px] text-slate-600 shrink-0">
                 {specsTab === 'all'
                   ? `共 ${images.reduce((sum, img) => sum + (img.specs?.length || 0), 0)} 个字段`
@@ -1069,48 +1172,208 @@ const App: React.FC = () => {
 
             {/* Table Content */}
             <div className="flex-1 overflow-auto p-3">
-              {(() => {
-                const currentSpecs = specsTab === 'all'
-                  ? images.flatMap(img => (img.specs || []).map(spec => ({ ...spec, imageName: img.file.name })))
-                  : (images.find(img => img.id === specsTab)?.specs || []);
-
-                if (currentSpecs.length === 0) {
-                  return (
-                    <div className="h-full flex flex-col items-center justify-center text-slate-700">
-                      <Table size={24} className="mb-2 opacity-30" />
-                      <span className="text-xs">暂无规格数据</span>
-                      <span className="text-[10px] text-slate-600 mt-1">上传图片后自动提取</span>
-                    </div>
-                  );
-                }
-
-                return (
+              {specsTab === 'qil' ? (
+                /* QIL 源数据表格 */
+                manualSourceFields.length === 0 ? (
+                  <div className="h-full flex flex-col items-center justify-center text-slate-700">
+                    <Table size={24} className="mb-2 opacity-30" />
+                    <span className="text-xs">暂无 QIL 数据</span>
+                    <span className="text-[10px] text-slate-600 mt-1">左侧输入文本或上传图片后解析</span>
+                  </div>
+                ) : (
                   <table className="w-full text-[11px]">
                     <thead className="bg-slate-800 sticky top-0">
                       <tr>
-                        {specsTab === 'all' && <th className="text-left px-3 py-2 text-slate-500 font-medium">来源</th>}
                         <th className="text-left px-3 py-2 text-slate-500 font-medium">分类</th>
                         <th className="text-left px-3 py-2 text-slate-500 font-medium">项目</th>
                         <th className="text-left px-3 py-2 text-slate-500 font-medium">值</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-800/50">
-                      {currentSpecs.map((spec: any, idx: number) => (
+                      {manualSourceFields.map((field, idx) => (
                         <tr key={idx} className="hover:bg-slate-800/30">
-                          {specsTab === 'all' && (
-                            <td className="px-3 py-2 text-slate-600 truncate max-w-[100px]" title={spec.imageName}>
-                              {spec.imageName}
-                            </td>
-                          )}
-                          <td className="px-3 py-2 text-slate-500">{spec.category}</td>
-                          <td className="px-3 py-2 text-slate-300 font-medium">{spec.key}</td>
-                          <td className="px-3 py-2 text-slate-400 font-mono">{spec.value}</td>
+                          <td className="px-3 py-2 text-slate-500">{field.category}</td>
+                          <td className="px-3 py-2 text-slate-300 font-medium">{field.key}</td>
+                          <td className="px-3 py-2 text-slate-400 font-mono">{field.value}</td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
-                );
-              })()}
+                )
+              ) : specsTab === 'diff' ? (
+                /* 对比汇总 - 简洁表格，差异优先 */
+                (() => {
+                  if (images.length === 0 || manualSourceFields.length === 0) {
+                    return (
+                      <div className="h-full flex flex-col items-center justify-center text-slate-700">
+                        <GitCompare size={24} className="mb-2 opacity-30" />
+                        <span className="text-xs">暂无对比数据</span>
+                        <span className="text-[10px] text-slate-600 mt-1">
+                          {images.length === 0 ? '请上传包装图片' : '请输入 QIL 数据'}
+                        </span>
+                      </div>
+                    );
+                  }
+
+                  // 计算所有对比结果
+                  const allResults = manualSourceFields.map(field => {
+                    const imageResults = images.map(img => {
+                      if (!img.specs?.length) return { value: '-', status: 'pending' };
+                      const matchingSpec = img.specs.find(spec =>
+                        spec.key === field.key ||
+                        spec.key.includes(field.key) ||
+                        field.key.includes(spec.key)
+                      );
+                      if (!matchingSpec) return { value: '(未找到)', status: 'error' };
+
+                      const qilValue = field.value.trim().toLowerCase();
+                      const imgValue = matchingSpec.value.trim().toLowerCase();
+
+                      if (qilValue === imgValue) {
+                        return { value: matchingSpec.value, status: 'match' };
+                      } else if (imgValue.includes(qilValue) || qilValue.includes(imgValue)) {
+                        return { value: matchingSpec.value, status: 'warning' };
+                      } else {
+                        return { value: matchingSpec.value, status: 'error' };
+                      }
+                    });
+                    const hasError = imageResults.some(r => r.status === 'error');
+                    const hasWarning = imageResults.some(r => r.status === 'warning');
+                    return { field, imageResults, hasError, hasWarning };
+                  });
+
+                  // 排序：差异 > 警告 > 匹配
+                  const sortedResults = [...allResults].sort((a, b) => {
+                    if (a.hasError && !b.hasError) return -1;
+                    if (!a.hasError && b.hasError) return 1;
+                    if (a.hasWarning && !b.hasWarning) return -1;
+                    if (!a.hasWarning && b.hasWarning) return 1;
+                    return 0;
+                  });
+
+                  // 统计
+                  const errorCount = allResults.filter(r => r.hasError).length;
+                  const warningCount = allResults.filter(r => r.hasWarning && !r.hasError).length;
+                  const matchCount = allResults.length - errorCount - warningCount;
+                  const allPass = errorCount === 0 && warningCount === 0;
+
+                  return (
+                    <div className="flex flex-col h-full">
+                      {/* 结论 */}
+                      <div className={`px-3 py-2 mb-2 rounded flex items-center justify-between ${
+                        allPass ? 'bg-emerald-500/10' : errorCount > 0 ? 'bg-red-500/10' : 'bg-amber-500/10'
+                      }`}>
+                        <span className={`text-xs font-bold ${
+                          allPass ? 'text-emerald-400' : errorCount > 0 ? 'text-red-400' : 'text-amber-400'
+                        }`}>
+                          {allPass ? '✓ 全部通过' : errorCount > 0 ? `✗ ${errorCount} 处差异` : `⚠ ${warningCount} 处警告`}
+                        </span>
+                        <span className="text-[10px] text-slate-500">
+                          {matchCount}匹配 / {warningCount}警告 / {errorCount}差异
+                        </span>
+                      </div>
+
+                      {/* 表格 */}
+                      <div className="flex-1 overflow-auto">
+                        <table className="w-full text-[11px]">
+                          <thead className="bg-slate-800 sticky top-0">
+                            <tr>
+                              <th className="text-left px-2 py-1.5 text-slate-500 w-24">字段</th>
+                              <th className="text-left px-2 py-1.5 text-indigo-400">QIL</th>
+                              <th className="text-left px-2 py-1.5 text-emerald-400">图片</th>
+                              <th className="w-8"></th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {sortedResults.map(({ field, imageResults, hasError, hasWarning }, idx) => (
+                              <tr key={idx} className={`border-b border-slate-800/50 ${
+                                hasError ? 'bg-red-500/5' : hasWarning ? 'bg-amber-500/5' : ''
+                              }`}>
+                                <td className="px-2 py-2 align-top">
+                                  <div className="flex items-center gap-1">
+                                    <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+                                      hasError ? 'bg-red-500' : hasWarning ? 'bg-amber-500' : 'bg-emerald-500'
+                                    }`}></span>
+                                    <span className="text-slate-300 truncate" title={field.key}>{field.key}</span>
+                                  </div>
+                                </td>
+                                <td className="px-2 py-2 align-top">
+                                  <div
+                                    className="text-indigo-300 font-mono text-[10px] cursor-pointer hover:bg-slate-800 px-1 py-0.5 rounded -mx-1"
+                                    onClick={() => handleCopy(field.value, `qil-${idx}`)}
+                                    title="点击复制"
+                                  >
+                                    {field.value}
+                                    {copiedId === `qil-${idx}` && <CheckCheck size={10} className="inline ml-1 text-emerald-400" />}
+                                  </div>
+                                </td>
+                                <td className="px-2 py-2 align-top">
+                                  {imageResults.map((result, imgIdx) => (
+                                    <div
+                                      key={imgIdx}
+                                      className={`font-mono text-[10px] cursor-pointer hover:bg-slate-800 px-1 py-0.5 rounded -mx-1 ${
+                                        result.status === 'match' ? 'text-emerald-300' :
+                                        result.status === 'warning' ? 'text-amber-300' :
+                                        result.status === 'error' ? 'text-red-300' : 'text-slate-500'
+                                      }`}
+                                      onClick={() => handleCopy(result.value, `img-${idx}-${imgIdx}`)}
+                                      title="点击复制"
+                                    >
+                                      {result.value}
+                                      {copiedId === `img-${idx}-${imgIdx}` && <CheckCheck size={10} className="inline ml-1 text-emerald-400" />}
+                                    </div>
+                                  ))}
+                                </td>
+                                <td className="px-2 py-2 align-top text-center">
+                                  {hasError ? <XCircle size={12} className="text-red-400" /> :
+                                   hasWarning ? <AlertTriangle size={12} className="text-amber-400" /> :
+                                   <CheckCircle size={12} className="text-emerald-400" />}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  );
+                })()
+              ) : (
+                /* 单张图片规格 */
+                (() => {
+                  const currentSpecs = images.find(img => img.id === specsTab)?.specs || [];
+
+                  if (currentSpecs.length === 0) {
+                    return (
+                      <div className="h-full flex flex-col items-center justify-center text-slate-700">
+                        <Table size={24} className="mb-2 opacity-30" />
+                        <span className="text-xs">暂无规格数据</span>
+                        <span className="text-[10px] text-slate-600 mt-1">图片分析后自动提取</span>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <table className="w-full text-[11px]">
+                      <thead className="bg-slate-800 sticky top-0">
+                        <tr>
+                          <th className="text-left px-3 py-2 text-slate-500 font-medium">分类</th>
+                          <th className="text-left px-3 py-2 text-slate-500 font-medium">项目</th>
+                          <th className="text-left px-3 py-2 text-slate-500 font-medium">值</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-800/50">
+                        {currentSpecs.map((spec: any, idx: number) => (
+                          <tr key={idx} className="hover:bg-slate-800/30">
+                            <td className="px-3 py-2 text-slate-500">{spec.category}</td>
+                            <td className="px-3 py-2 text-slate-300 font-medium">{spec.key}</td>
+                            <td className="px-3 py-2 text-slate-400 font-mono">{spec.value}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  );
+                })()
+              )}
             </div>
           </div>
         </div>
