@@ -1226,7 +1226,7 @@ const App: React.FC = () => {
         </div>
 
         {/* CENTER: Image Viewer */}
-        <div className={`${mobileTab === 'viewer' ? 'flex' : 'hidden'} md:flex flex-1 relative bg-white overflow-hidden items-center justify-center`}>
+        <div className={`${mobileTab === 'viewer' ? 'flex' : 'hidden'} md:flex flex-1 relative bg-white overflow-hidden items-center justify-center group/canvas`}>
           {/* Grid Background */}
           <div
             className="absolute inset-0 opacity-10 pointer-events-none"
@@ -1314,18 +1314,18 @@ const App: React.FC = () => {
             </>
           ) : (
             <div className="text-center">
-              <div className="p-6 bg-surface-100/30 rounded-full mb-4 inline-block">
-                <ImagePlus className="text-text-muted" size={48} />
+              <div className="p-5 bg-surface-50 rounded-2xl mb-4 inline-block">
+                <ImagePlus className="text-text-muted" size={40} />
               </div>
-              <p className="text-text-muted font-medium mb-2">Ctrl+V 粘贴图片</p>
-              <p className="text-slate-600 text-sm mb-4">或拖拽图片到此处</p>
-              <label className="inline-flex items-center gap-2 px-4 py-2 bg-primary-600 hover:bg-primary-500 text-text-primary text-sm font-medium rounded-lg cursor-pointer transition-colors">
+              <p className="text-text-secondary font-medium mb-1">Ctrl+V 粘贴图片</p>
+              <p className="text-text-muted text-sm mb-4">或拖拽图片到此处</p>
+              <label className="inline-flex items-center gap-2 px-4 py-2 bg-surface-100 hover:bg-surface-200 text-text-primary text-sm font-medium rounded-lg cursor-pointer transition-colors border border-border">
                 <Upload size={16} />
                 选择文件
                 <input type="file" accept="image/*" className="hidden" onChange={(e) => e.target.files?.[0] && processFile(e.target.files[0])} />
               </label>
               {!user && (
-                <p className="text-slate-600 text-xs mt-4">上传图片需要先登录</p>
+                <p className="text-text-muted text-xs mt-4">上传图片需要先登录</p>
               )}
             </div>
           )}
@@ -1335,16 +1335,16 @@ const App: React.FC = () => {
               <button
                 onClick={() => setCurrentImageIndex(i => Math.max(0, i - 1))}
                 disabled={currentImageIndex === 0}
-                className="absolute left-4 top-1/2 -translate-y-1/2 p-2 bg-surface-100/80 rounded-full disabled:opacity-30 hover:bg-surface-200 transition-colors"
+                className="absolute left-4 top-1/2 -translate-y-1/2 p-2 bg-white/80 rounded-full disabled:opacity-30 hover:bg-surface-100 transition-all opacity-0 group-hover/canvas:opacity-100 shadow-sm border border-border"
               >
-                <ChevronLeft size={20} />
+                <ChevronLeft size={20} className="text-text-secondary" />
               </button>
               <button
                 onClick={() => setCurrentImageIndex(i => Math.min(images.length - 1, i + 1))}
                 disabled={currentImageIndex === images.length - 1}
-                className="absolute right-4 top-1/2 -translate-y-1/2 p-2 bg-surface-100/80 rounded-full disabled:opacity-30 hover:bg-surface-200 transition-colors"
+                className="absolute right-4 top-1/2 -translate-y-1/2 p-2 bg-white/80 rounded-full disabled:opacity-30 hover:bg-surface-100 transition-all opacity-0 group-hover/canvas:opacity-100 shadow-sm border border-border"
               >
-                <ChevronRight size={20} />
+                <ChevronRight size={20} className="text-text-secondary" />
               </button>
             </>
           )}

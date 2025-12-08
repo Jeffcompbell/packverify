@@ -59,27 +59,27 @@ export const QuotaModal: React.FC<QuotaModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
-      <div className="absolute inset-0 bg-gradient-to-br from-slate-900/95 via-slate-800/90 to-slate-900/95 backdrop-blur-xl" onClick={onClose} />
-      <div className="relative w-full max-w-md bg-gradient-to-br from-slate-800/90 to-slate-900/90 backdrop-blur-2xl rounded-3xl shadow-[0_8px_32px_0_rgba(0,0,0,0.4)] border border-border/50 animate-in zoom-in-95 duration-300">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/20 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative w-full max-w-md bg-white rounded-2xl shadow-xl border border-border">
         <button
           onClick={onClose}
-          className="absolute top-5 right-5 w-9 h-9 flex items-center justify-center rounded-xl text-text-muted hover:text-text-primary hover:bg-white/10 hover:backdrop-blur-sm transition-all duration-200 hover:scale-110"
+          className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-lg text-text-muted hover:text-text-primary hover:bg-surface-100 transition-colors"
         >
           <X size={18} />
         </button>
 
-        <div className="p-8">
-          <h2 className="text-2xl font-bold text-text-primary mb-6 tracking-tight">配额使用情况</h2>
+        <div className="p-6">
+          <h2 className="text-lg font-semibold text-text-primary mb-5">配额使用情况</h2>
 
-          <div className="bg-gradient-to-br from-primary-500/10 to-purple-500/10 backdrop-blur-sm border border-primary-400/20 rounded-2xl p-5 mb-5 shadow-lg">
+          <div className="bg-surface-50 border border-border rounded-xl p-4 mb-4">
             <div className="flex items-center justify-between mb-3">
-              <span className="text-text-secondary text-sm font-medium">剩余额度</span>
-              <span className="text-3xl font-bold bg-gradient-to-r from-primary-400 to-purple-400 bg-clip-text text-transparent">{user.quota - user.used}</span>
+              <span className="text-text-secondary text-sm">剩余额度</span>
+              <span className="text-2xl font-bold text-primary-500">{user.quota - user.used}</span>
             </div>
-            <div className="w-full bg-surface-200/50 rounded-full h-2.5 mb-3 overflow-hidden">
+            <div className="w-full bg-surface-200 rounded-full h-2 mb-2 overflow-hidden">
               <div
-                className="bg-gradient-to-r from-primary-500 to-purple-500 h-2.5 rounded-full transition-all duration-500 shadow-[0_0_10px_rgba(99,102,241,0.5)]"
+                className="bg-primary-500 h-2 rounded-full transition-all duration-500"
                 style={{ width: `${((user.quota - user.used) / user.quota) * 100}%` }}
               />
             </div>
@@ -89,23 +89,23 @@ export const QuotaModal: React.FC<QuotaModalProps> = ({
             </div>
           </div>
 
-          <div className="bg-surface-100/30 backdrop-blur-sm border border-border/50 rounded-xl px-4 py-2.5 mb-5 text-xs text-text-muted">
-            💡 每张图片的新建分析或重新分析都会消耗 1 次额度
+          <div className="bg-surface-50 border border-border rounded-lg px-3 py-2 mb-4 text-xs text-text-muted">
+            每张图片的新建分析或重新分析都会消耗 1 次额度
           </div>
 
-          <div className="text-sm font-semibold text-text-primary mb-3">使用记录</div>
-          <div className="max-h-80 overflow-y-auto scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-transparent">
+          <div className="text-sm font-medium text-text-primary mb-3">使用记录</div>
+          <div className="max-h-64 overflow-y-auto">
             {isLoading ? (
-              <div className="text-center py-8">
-                <Loader2 size={20} className="animate-spin mx-auto mb-2 text-primary-400" />
+              <div className="text-center py-6">
+                <Loader2 size={18} className="animate-spin mx-auto mb-2 text-primary-500" />
                 <span className="text-xs text-text-muted">加载中...</span>
               </div>
             ) : usageHistory.length === 0 ? (
-              <div className="text-center py-8 text-text-muted text-xs">暂无使用记录</div>
+              <div className="text-center py-6 text-text-muted text-xs">暂无使用记录</div>
             ) : (
               <>
                 <table className="w-full text-xs">
-                  <thead className="text-text-muted border-b border-border/50">
+                  <thead className="text-text-muted border-b border-border">
                     <tr>
                       <th className="text-left py-2 font-medium">图片</th>
                       <th className="text-left py-2 font-medium">类型</th>
@@ -115,24 +115,22 @@ export const QuotaModal: React.FC<QuotaModalProps> = ({
                   </thead>
                   <tbody className="text-text-secondary">
                     {usageHistory.map((record) => (
-                      <tr key={record.id} className="border-b border-border/50 hover:bg-surface-100/30 transition-colors">
-                        <td className="py-2.5">
+                      <tr key={record.id} className="border-b border-border hover:bg-surface-50 transition-colors">
+                        <td className="py-2">
                           <div className="flex items-center gap-2">
                             {record.imageUrl && (
-                              <img src={record.imageUrl} alt="" className="w-8 h-8 rounded object-cover bg-surface-100" />
+                              <img src={record.imageUrl} alt="" className="w-7 h-7 rounded object-cover bg-surface-100" />
                             )}
-                            <span className="truncate max-w-[120px]">{record.imageName}</span>
+                            <span className="truncate max-w-[100px]">{record.imageName}</span>
                           </div>
                         </td>
-                        <td className="py-2.5">
-                          <span className={`text-[10px] px-1.5 py-0.5 rounded ${
-                            record.type === 'retry' ? 'bg-amber-500/10 text-amber-400' : 'bg-primary-500/10 text-primary-400'
-                          }`}>
+                        <td className="py-2">
+                          <span className="text-[10px] text-text-muted">
                             {record.type === 'retry' ? '重试' : '新建'}
                           </span>
                         </td>
-                        <td className="py-2.5 text-text-muted">{formatTime(record.timestamp)}</td>
-                        <td className="py-2.5 text-right text-red-400">-{record.count || 1}</td>
+                        <td className="py-2 text-text-muted">{formatTime(record.timestamp)}</td>
+                        <td className="py-2 text-right text-text-secondary">-{record.count || 1}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -142,7 +140,7 @@ export const QuotaModal: React.FC<QuotaModalProps> = ({
                 <button
                   onClick={onLoadMore}
                   disabled={isLoadingMore}
-                  className="w-full py-2.5 mt-3 text-xs text-text-muted hover:text-text-primary border-t border-border/50 hover:bg-surface-100/30 transition-all"
+                  className="w-full py-2 mt-2 text-xs text-text-muted hover:text-text-primary border-t border-border hover:bg-surface-50 transition-colors"
                 >
                   {isLoadingMore ? '加载中...' : '加载更多'}
                 </button>
