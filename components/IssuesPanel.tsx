@@ -137,18 +137,18 @@ export const IssuesPanel: React.FC<IssuesPanelProps> = ({
   };
 
   return (
-    <div className={`${mobileTab === 'issues' ? 'flex' : 'hidden'} md:flex w-full md:w-[380px] border-l border-slate-800 bg-slate-900 flex-col`}>
+    <div className={`${mobileTab === 'issues' ? 'flex' : 'hidden'} md:flex w-full md:w-[380px] border-l border-border bg-white flex-col`}>
       {/* 标题栏 */}
-      <div className="px-3 py-2 border-b border-slate-800 flex items-center justify-between bg-slate-900">
+      <div className="px-3 py-2 border-b border-border flex items-center justify-between bg-white">
         <div className="flex items-center gap-1.5">
-          <AlertTriangle size={14} className="text-indigo-400" />
-          <span className="text-xs font-medium text-slate-200">检测问题</span>
+          <AlertTriangle size={14} className="text-primary-400" />
+          <span className="text-xs font-medium text-text-primary">检测问题</span>
         </div>
         <div className="flex items-center gap-1">
           {analyzedModels.length > 1 && (
             <button
               onClick={() => setShowCompareModal(true)}
-              className="p-1 rounded text-slate-500 hover:text-indigo-400 hover:bg-slate-800 transition-colors"
+              className="p-1 rounded text-text-muted hover:text-primary-400 hover:bg-surface-100 transition-colors"
               title="对比模型结果"
             >
               <Columns size={12} />
@@ -157,7 +157,7 @@ export const IssuesPanel: React.FC<IssuesPanelProps> = ({
           {availableModelsToAdd.length > 0 && (
             <button
               onClick={() => setShowModelMenu(!showModelMenu)}
-              className="p-1 rounded text-slate-500 hover:text-indigo-400 hover:bg-slate-800 transition-colors"
+              className="p-1 rounded text-text-muted hover:text-primary-400 hover:bg-surface-100 transition-colors"
               title="添加模型"
             >
               <Plus size={12} />
@@ -166,7 +166,7 @@ export const IssuesPanel: React.FC<IssuesPanelProps> = ({
           <button
             onClick={() => onRetryAnalysis(activeModelTab)}
             disabled={isCurrentProcessing || !currentImage}
-            className="p-1 text-slate-500 hover:text-indigo-400 hover:bg-slate-800 rounded transition-colors disabled:opacity-50"
+            className="p-1 text-text-muted hover:text-primary-400 hover:bg-surface-100 rounded transition-colors disabled:opacity-50"
             title="重新分析"
           >
             <RefreshCw size={12} className={isCurrentProcessing ? 'animate-spin' : ''} />
@@ -174,7 +174,7 @@ export const IssuesPanel: React.FC<IssuesPanelProps> = ({
         </div>
       </div>
       {/* 模型 Tabs - 可换行 */}
-      <div className="px-2 py-1.5 border-b border-slate-800 bg-slate-900/50 flex flex-wrap gap-1">
+      <div className="px-2 py-1.5 border-b border-border bg-surface-50 flex flex-wrap gap-1">
         {analyzedModels.map((modelId) => {
           const model = AVAILABLE_MODELS.find(m => m.id === modelId);
           const modelData = currentImage?.issuesByModel?.[modelId];
@@ -186,15 +186,15 @@ export const IssuesPanel: React.FC<IssuesPanelProps> = ({
               key={modelId}
               onClick={() => setActiveModelTab(modelId)}
               onContextMenu={(e) => handleContextMenu(e, modelId)}
-              className={`relative flex items-center gap-1 px-2 py-1 rounded text-[10px] font-medium transition-all group ${
+              className={`relative flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-medium transition-all group ${
                 activeModelTab === modelId
-                  ? 'bg-indigo-500/20 text-indigo-400'
-                  : 'text-slate-500 hover:text-slate-300 hover:bg-slate-800'
+                  ? 'bg-white text-text-primary shadow-sm'
+                  : 'text-text-muted hover:text-text-secondary hover:bg-white/50'
               }`}
             >
               <span>{displayName}</span>
               {issueCount > 0 && (
-                <span className="bg-red-500 text-white text-[8px] px-1 rounded-full">{issueCount}</span>
+                <span className="bg-primary-500 text-white text-[9px] px-1.5 rounded-full">{issueCount}</span>
               )}
             </button>
           );
@@ -208,9 +208,9 @@ export const IssuesPanel: React.FC<IssuesPanelProps> = ({
             className="fixed inset-0 z-[9998]"
             onClick={() => setShowModelMenu(false)}
           />
-          <div className="fixed top-20 right-4 w-48 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-[9999] overflow-hidden">
-            <div className="p-2 border-b border-slate-700">
-              <p className="text-[10px] text-slate-500">选择模型进行对比分析</p>
+          <div className="fixed top-20 right-4 w-48 bg-surface-100 border border-border rounded-lg shadow-xl z-[9999] overflow-hidden">
+            <div className="p-2 border-b border-border">
+              <p className="text-[10px] text-text-muted">选择模型进行对比分析</p>
             </div>
             {availableModelsToAdd.map((model) => (
               <button
@@ -220,10 +220,10 @@ export const IssuesPanel: React.FC<IssuesPanelProps> = ({
                   setShowModelMenu(false);
                   setActiveModelTab(model.id);
                 }}
-                className="w-full px-3 py-2 text-left hover:bg-slate-700 transition-colors"
+                className="w-full px-3 py-2 text-left hover:bg-surface-200 transition-colors"
               >
-                <div className="text-xs font-medium text-slate-300">{model.name}</div>
-                <div className="text-[10px] text-slate-500">{model.description}</div>
+                <div className="text-xs font-medium text-text-secondary">{model.name}</div>
+                <div className="text-[10px] text-text-muted">{model.description}</div>
               </button>
             ))}
           </div>
@@ -232,22 +232,22 @@ export const IssuesPanel: React.FC<IssuesPanelProps> = ({
       )}
 
       {currentImage?.description && (
-        <div className="px-4 py-2 border-b border-slate-800/50 bg-slate-800/30">
-          <div className="flex items-center gap-1.5 text-[10px] text-slate-500 mb-1">
+        <div className="px-4 py-2 border-b border-border/50 bg-surface-100/30">
+          <div className="flex items-center gap-1.5 text-[10px] text-text-muted mb-1">
             <FileText size={10} /> 图片描述
           </div>
-          <p className="text-xs text-slate-300">{currentImage.description}</p>
+          <p className="text-xs text-text-secondary">{currentImage.description}</p>
         </div>
       )}
 
       <div ref={issueListRef} className="flex-1 overflow-y-auto">
         {!currentImage ? (
-          <div className="text-center py-12 text-slate-600">
+          <div className="text-center py-12 text-text-muted">
             <AlertCircle size={24} className="mx-auto mb-2 opacity-30" />
             <p className="text-xs">上传图片后显示检测结果</p>
           </div>
         ) : isCurrentProcessing ? (
-          <div className="text-center py-12 text-slate-500">
+          <div className="text-center py-12 text-text-muted">
             <Loader2 size={24} className="mx-auto mb-2 animate-spin" />
             <p className="text-xs">正在分析...</p>
           </div>
@@ -255,20 +255,20 @@ export const IssuesPanel: React.FC<IssuesPanelProps> = ({
           <div className="p-3 space-y-3">
             {currentTabData.deterministicIssues && currentTabData.deterministicIssues.length > 0 && (
               <div className="space-y-2">
-                <div className="flex items-center gap-2 text-[10px] font-bold text-red-400 uppercase tracking-wider">
+                <div className="flex items-center gap-2 text-[10px] font-medium text-text-muted uppercase tracking-wider">
                   <Brackets size={12} />
-                  确定性问题（100%准确）
+                  确定性问题
                 </div>
                 {currentTabData.deterministicIssues.map((issue) => (
-                  <div key={issue.id} className="p-3 rounded-lg bg-red-500/10 border border-red-500/30">
+                  <div key={issue.id} className="p-3 rounded-xl bg-white border border-border shadow-sm">
                     <div className="flex items-center gap-2 mb-2">
-                      <span className="w-2 h-2 rounded-full bg-red-500 shrink-0"></span>
-                      <span className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-red-500/20 text-red-400">
+                      <span className="w-1.5 h-1.5 rounded-full bg-red-500 shrink-0"></span>
+                      <span className="text-[10px] font-medium text-text-secondary">
                         {issue.type === 'bracket_mismatch' ? '括号不配对' : issue.type === 'encoding_error' ? '编码错误' : '格式错误'}
                       </span>
                     </div>
-                    <p className="text-xs text-red-300 mb-1.5">{issue.description}</p>
-                    <div className="text-[10px] text-slate-400 font-mono bg-slate-900/50 px-2 py-1.5 rounded">
+                    <p className="text-xs text-text-primary mb-1.5">{issue.description}</p>
+                    <div className="text-[10px] text-text-muted font-mono bg-surface-50 px-2 py-1.5 rounded">
                       {issue.location}
                     </div>
                   </div>
@@ -278,9 +278,9 @@ export const IssuesPanel: React.FC<IssuesPanelProps> = ({
 
             {currentTabData.issues.length > 0 && (
               <div className="space-y-2">
-                <div className="flex items-center gap-2 text-[10px] font-bold text-amber-400 uppercase tracking-wider">
+                <div className="flex items-center gap-2 text-[10px] font-medium text-text-muted uppercase tracking-wider">
                   <ShieldAlert size={12} />
-                  AI 建议（需人工确认）
+                  AI 建议
                 </div>
                 {currentTabData.issues.map((issue) => {
                   const displayOriginal = issue.original || issue.text || '';
@@ -292,49 +292,41 @@ export const IssuesPanel: React.FC<IssuesPanelProps> = ({
                       key={issue.id}
                       data-issue-id={issue.id}
                       onClick={() => onSelectIssue(issue.id)}
-                      className={`p-3 rounded-lg cursor-pointer transition-all group ${
+                      className={`p-3 rounded-xl cursor-pointer transition-all group ${
                         selectedIssueId === issue.id
-                          ? 'bg-indigo-500/20 border border-indigo-500/50 ring-2 ring-indigo-500/30'
-                          : 'bg-slate-800/50 border border-transparent hover:bg-slate-800 hover:border-slate-700'
+                          ? 'bg-white border border-primary-500 shadow-md'
+                          : 'bg-white border border-border shadow-sm hover:shadow-md hover:border-border-hover'
                       }`}
                     >
                       <div className="flex items-center gap-2 mb-2">
-                        <span className={`w-2 h-2 rounded-full shrink-0 ${
-                          issue.severity === 'high' ? 'bg-red-500' : issue.severity === 'medium' ? 'bg-amber-500' : 'bg-slate-500'
+                        <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+                          issue.severity === 'high' ? 'bg-red-500' : issue.severity === 'medium' ? 'bg-amber-500' : 'bg-surface-300'
                         }`}></span>
-                        <span className={`text-[9px] font-bold uppercase px-1.5 py-0.5 rounded ${
-                          issue.severity === 'high'
-                            ? 'bg-red-500/20 text-red-400'
-                            : issue.severity === 'medium'
-                              ? 'bg-amber-500/20 text-amber-400'
-                              : 'bg-slate-500/20 text-slate-400'
-                        }`}>
+                        <span className="text-[10px] font-medium text-text-secondary">
                           {issue.severity === 'high' ? '紧急' : issue.severity === 'medium' ? '警告' : '提示'}
                         </span>
-                        <span className="text-[8px] text-slate-600 ml-auto">AI建议</span>
                         <button
                           onClick={(e) => { e.stopPropagation(); onCopy(copyText, issue.id); }}
-                          className="p-1 rounded hover:bg-slate-700 transition-colors opacity-0 group-hover:opacity-100"
+                          className="p-1 rounded hover:bg-surface-100 transition-colors opacity-0 group-hover:opacity-100 ml-auto"
                           title="复制"
                         >
-                          {copiedId === issue.id ? <CheckCheck size={12} className="text-emerald-400" /> : <Copy size={12} className="text-slate-500" />}
+                          {copiedId === issue.id ? <CheckCheck size={12} className="text-primary-500" /> : <Copy size={12} className="text-text-muted" />}
                         </button>
                       </div>
 
                       <div className="mb-2">
-                        <span className="text-[10px] text-slate-500">原文：</span>
-                        <div className="text-xs text-slate-300 font-mono bg-slate-800/50 px-2 py-1.5 rounded mt-1 leading-relaxed">
+                        <div className="text-xs text-text-primary font-mono bg-surface-50 px-2 py-1.5 rounded leading-relaxed">
                           {renderOriginal(displayOriginal)}
                         </div>
                       </div>
 
                       {displayProblem && (
-                        <p className="text-xs text-slate-300 mb-1.5">{displayProblem}</p>
+                        <p className="text-xs text-text-secondary mb-1.5">{displayProblem}</p>
                       )}
 
                       {issue.suggestion && (
-                        <div className="flex items-start gap-1.5 text-[11px] text-emerald-400/90 bg-emerald-500/10 px-2 py-1.5 rounded">
-                          <span className="shrink-0">💡</span>
+                        <div className="flex items-start gap-1.5 text-[11px] text-primary-600 bg-primary-50 px-2 py-1.5 rounded">
+                          <span className="shrink-0">→</span>
                           <span>{issue.suggestion}</span>
                         </div>
                       )}
@@ -345,7 +337,7 @@ export const IssuesPanel: React.FC<IssuesPanelProps> = ({
             )}
 
             {currentTabData.issues.length === 0 && (!currentTabData.deterministicIssues || currentTabData.deterministicIssues.length === 0) && (
-              <div className="text-center py-12 text-slate-600">
+              <div className="text-center py-12 text-text-muted">
                 <CheckCircle size={24} className="mx-auto mb-2 text-emerald-500/50" />
                 <p className="text-xs">未检测到问题</p>
               </div>
@@ -356,40 +348,40 @@ export const IssuesPanel: React.FC<IssuesPanelProps> = ({
 
       {/* 多模型对比弹窗 - 全屏沉浸式 */}
       {showCompareModal && createPortal(
-        <div className="fixed inset-0 z-[9999] bg-slate-950 flex flex-col">
+        <div className="fixed inset-0 z-[9999] bg-surface-50 flex flex-col">
           {/* 顶部工具栏 */}
-          <div className="shrink-0 h-14 flex items-center justify-between px-4 bg-slate-900/50">
+          <div className="shrink-0 h-14 flex items-center justify-between px-4 bg-white/50">
             {/* 图片工具 */}
             <div className="flex items-center gap-1">
               <button
                 onClick={() => setModalZoom(z => Math.max(0.5, z - 0.25))}
-                className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+                className="p-2 rounded-lg text-text-muted hover:text-text-primary hover:bg-surface-100 transition-colors"
                 title="缩小"
               >
                 <ZoomOut size={18} />
               </button>
-              <span className="text-xs text-slate-500 w-12 text-center">{Math.round(modalZoom * 100)}%</span>
+              <span className="text-xs text-text-muted w-12 text-center">{Math.round(modalZoom * 100)}%</span>
               <button
                 onClick={() => setModalZoom(z => Math.min(3, z + 0.25))}
-                className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+                className="p-2 rounded-lg text-text-muted hover:text-text-primary hover:bg-surface-100 transition-colors"
                 title="放大"
               >
                 <ZoomIn size={18} />
               </button>
               <button
                 onClick={() => setModalRotation(r => (r + 90) % 360)}
-                className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors ml-2"
+                className="p-2 rounded-lg text-text-muted hover:text-text-primary hover:bg-surface-100 transition-colors ml-2"
                 title="旋转"
               >
                 <RotateCw size={18} />
               </button>
             </div>
             {/* 图片计数 */}
-            <span className="text-xs text-slate-500">{safeModalIndex + 1} / {images.length}</span>
+            <span className="text-xs text-text-muted">{safeModalIndex + 1} / {images.length}</span>
             {/* 关闭按钮 */}
             <button
               onClick={() => setShowCompareModal(false)}
-              className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+              className="p-2 rounded-lg text-text-muted hover:text-text-primary hover:bg-surface-100 transition-colors"
             >
               <X size={18} />
             </button>
@@ -402,7 +394,7 @@ export const IssuesPanel: React.FC<IssuesPanelProps> = ({
               {safeModalIndex > 0 && (
                 <button
                   onClick={() => { setModalImageIndex(i => i - 1); setModalZoom(1); setModalRotation(0); }}
-                  className="absolute left-4 top-1/2 -translate-y-1/2 p-2 rounded-full bg-slate-800/60 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors"
+                  className="absolute left-4 top-1/2 -translate-y-1/2 p-2 rounded-full bg-surface-100/60 hover:bg-surface-200 text-text-muted hover:text-text-primary transition-colors"
                 >
                   <ChevronLeft size={24} />
                 </button>
@@ -419,7 +411,7 @@ export const IssuesPanel: React.FC<IssuesPanelProps> = ({
               {safeModalIndex < images.length - 1 && (
                 <button
                   onClick={() => { setModalImageIndex(i => i + 1); setModalZoom(1); setModalRotation(0); }}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 p-2 rounded-full bg-slate-800/60 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors"
+                  className="absolute right-4 top-1/2 -translate-y-1/2 p-2 rounded-full bg-surface-100/60 hover:bg-surface-200 text-text-muted hover:text-text-primary transition-colors"
                 >
                   <ChevronRight size={24} />
                 </button>
@@ -436,10 +428,10 @@ export const IssuesPanel: React.FC<IssuesPanelProps> = ({
                   const detIssues = modelData?.deterministicIssues || [];
 
                   return (
-                    <div key={modelId} className="w-[260px] shrink-0 bg-slate-900/80 rounded-xl flex flex-col backdrop-blur-sm">
+                    <div key={modelId} className="w-[260px] shrink-0 bg-white/80 rounded-xl flex flex-col backdrop-blur-sm">
                       <div className="px-4 py-3 shrink-0">
-                        <span className="text-sm font-medium text-white">{displayName}</span>
-                        <span className="ml-2 text-xs text-slate-500">{issues.length + detIssues.length} 问题</span>
+                        <span className="text-sm font-medium text-text-primary">{displayName}</span>
+                        <span className="ml-2 text-xs text-text-muted">{issues.length + detIssues.length} 问题</span>
                       </div>
                       <div className="flex-1 px-3 pb-3 space-y-2 overflow-y-auto">
                         {detIssues.map((issue) => (
@@ -449,19 +441,19 @@ export const IssuesPanel: React.FC<IssuesPanelProps> = ({
                           </div>
                         ))}
                         {issues.map((issue) => (
-                          <div key={issue.id} className="p-3 rounded-lg bg-slate-800/60 text-[11px]">
+                          <div key={issue.id} className="p-3 rounded-lg bg-surface-100/60 text-[11px]">
                             <div className={`inline-block px-1.5 py-0.5 rounded text-[9px] font-medium mb-1.5 ${
                               issue.severity === 'high' ? 'bg-red-500/20 text-red-400' :
-                              issue.severity === 'medium' ? 'bg-amber-500/20 text-amber-400' : 'bg-slate-600/50 text-slate-400'
+                              issue.severity === 'medium' ? 'bg-amber-500/20 text-amber-400' : 'bg-text-muted/50 text-text-muted'
                             }`}>
                               {issue.severity === 'high' ? '紧急' : issue.severity === 'medium' ? '警告' : '提示'}
                             </div>
-                            <p className="text-slate-200">{issue.original || issue.text}</p>
-                            {issue.problem && <p className="text-slate-400 mt-1.5 text-[10px]">{issue.problem}</p>}
+                            <p className="text-text-primary">{issue.original || issue.text}</p>
+                            {issue.problem && <p className="text-text-muted mt-1.5 text-[10px]">{issue.problem}</p>}
                           </div>
                         ))}
                         {issues.length === 0 && detIssues.length === 0 && (
-                          <div className="text-center py-12 text-slate-600 text-xs">无问题</div>
+                          <div className="text-center py-12 text-text-muted text-xs">无问题</div>
                         )}
                       </div>
                     </div>
@@ -479,19 +471,19 @@ export const IssuesPanel: React.FC<IssuesPanelProps> = ({
         <>
           <div className="fixed inset-0 z-[9998]" onClick={() => setContextMenu(null)} />
           <div
-            className="fixed z-[9999] bg-slate-800 border border-slate-700 rounded-lg shadow-xl py-1 min-w-[120px]"
+            className="fixed z-[9999] bg-surface-100 border border-border rounded-lg shadow-xl py-1 min-w-[120px]"
             style={{ left: contextMenu.x, top: contextMenu.y }}
           >
             <button
               onClick={() => handleCopyModelResult(contextMenu.modelId)}
-              className="w-full px-3 py-1.5 text-left text-xs text-slate-300 hover:bg-slate-700 flex items-center gap-2"
+              className="w-full px-3 py-1.5 text-left text-xs text-text-secondary hover:bg-surface-200 flex items-center gap-2"
             >
               <Copy size={12} /> 复制全文
             </button>
             {analyzedModels.length > 1 && (
               <button
                 onClick={() => handleDeleteModel(contextMenu.modelId)}
-                className="w-full px-3 py-1.5 text-left text-xs text-red-400 hover:bg-slate-700 flex items-center gap-2"
+                className="w-full px-3 py-1.5 text-left text-xs text-red-400 hover:bg-surface-200 flex items-center gap-2"
               >
                 <X size={12} /> 删除
               </button>

@@ -854,10 +854,10 @@ const App: React.FC = () => {
   // 加载中状态
   if (isCheckingAuth) {
     return (
-      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
+      <div className="min-h-screen bg-surface-50 flex items-center justify-center">
         <div className="flex items-center gap-3">
-          <Loader2 size={24} className="animate-spin text-indigo-400" />
-          <span className="text-slate-400">加载中...</span>
+          <Loader2 size={24} className="animate-spin text-primary-400" />
+          <span className="text-text-muted">加载中...</span>
         </div>
       </div>
     );
@@ -865,7 +865,7 @@ const App: React.FC = () => {
 
   return (
     <div
-      className="h-screen w-screen bg-slate-950 flex flex-col font-sans text-slate-200 overflow-hidden"
+      className="h-screen w-screen bg-surface-50 flex flex-col font-sans text-text-primary overflow-hidden"
       onDragOver={onDragOver}
       onDrop={onDrop}
     >
@@ -891,7 +891,7 @@ const App: React.FC = () => {
       )}
 
       {/* TOP BAR */}
-      <div className="h-12 border-b border-slate-800 bg-slate-900 flex items-center justify-between px-2 md:px-4 shrink-0">
+      <div className="h-12 border-b border-border bg-white flex items-center justify-between px-2 md:px-4 shrink-0">
         {/* Left: Product Name */}
         <div className="flex items-center gap-2 md:gap-3 min-w-0 flex-1">
           {/* 产品名称 - 可编辑 */}
@@ -911,13 +911,13 @@ const App: React.FC = () => {
                     handleProductNameChange(productName);
                   }
                 }}
-                className="bg-slate-800 border border-slate-600 rounded px-2 py-1 text-sm text-white w-28 md:w-40 focus:outline-none focus:border-slate-500"
+                className="bg-surface-100 border border-border-hover rounded px-2 py-1 text-sm text-text-primary w-28 md:w-40 focus:outline-none focus:border-slate-500"
                 autoFocus
               />
             ) : (
               <button
                 onClick={() => user && setIsEditingProductName(true)}
-                className="text-xs md:text-sm font-medium text-white hover:text-slate-300 transition-colors flex items-center gap-1 truncate max-w-[100px] md:max-w-none"
+                className="text-xs md:text-sm font-medium text-text-primary hover:text-text-secondary transition-colors flex items-center gap-1 truncate max-w-[100px] md:max-w-none"
                 title="点击编辑产品名称"
               >
                 {productName}
@@ -930,19 +930,19 @@ const App: React.FC = () => {
               <div className="relative">
                 <button
                   onClick={() => setShowProductList(!showProductList)}
-                  className="p-1 text-slate-500 hover:text-slate-300 hover:bg-slate-800 rounded transition-colors"
+                  className="p-1 text-text-muted hover:text-text-secondary hover:bg-surface-100 rounded transition-colors"
                   title="切换产品"
                 >
                   <ChevronDown size={14} className={`transition-transform ${showProductList ? 'rotate-180' : ''}`} />
                 </button>
 
                 {showProductList && (
-                  <div className="absolute top-full left-0 mt-1 w-64 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-50 max-h-80 overflow-hidden">
+                  <div className="absolute top-full left-0 mt-1 w-64 bg-surface-100 border border-border rounded-lg shadow-xl z-50 max-h-80 overflow-hidden">
                     {/* 新建产品 */}
-                    <div className="p-2 border-b border-slate-700">
+                    <div className="p-2 border-b border-border">
                       <button
                         onClick={handleCreateNewProduct}
-                        className="w-full px-3 py-2 text-xs text-slate-300 hover:bg-slate-700 rounded flex items-center gap-2"
+                        className="w-full px-3 py-2 text-xs text-text-secondary hover:bg-surface-200 rounded flex items-center gap-2"
                       >
                         <ImagePlus size={12} />
                         新建产品
@@ -952,7 +952,7 @@ const App: React.FC = () => {
                     {/* 历史产品列表 */}
                     <div className="max-h-60 overflow-y-auto">
                       {historySessions.length === 0 ? (
-                        <div className="p-3 text-[10px] text-slate-500 text-center">
+                        <div className="p-3 text-[10px] text-text-muted text-center">
                           暂无历史产品
                         </div>
                       ) : (
@@ -960,15 +960,15 @@ const App: React.FC = () => {
                           <button
                             key={s.id}
                             onClick={() => handleSwitchSession(s)}
-                            className={`w-full px-3 py-2 text-left hover:bg-slate-700 transition-colors flex items-center justify-between ${
-                              s.id === sessionId ? 'bg-slate-700/50' : ''
+                            className={`w-full px-3 py-2 text-left hover:bg-surface-200 transition-colors flex items-center justify-between ${
+                              s.id === sessionId ? 'bg-surface-200/50' : ''
                             }`}
                           >
                             <div className="flex-1 min-w-0">
-                              <div className={`text-xs font-medium truncate ${s.id === sessionId ? 'text-white' : 'text-slate-300'}`}>
+                              <div className={`text-xs font-medium truncate ${s.id === sessionId ? 'text-text-primary' : 'text-text-secondary'}`}>
                                 {s.productName}
                               </div>
-                              <div className="text-[10px] text-slate-500 flex items-center gap-2">
+                              <div className="text-[10px] text-text-muted flex items-center gap-2">
                                 <span>{s.imageCount} 张图片</span>
                                 {s.updatedAt?.toDate && (
                                   <span>{s.updatedAt.toDate().toLocaleDateString()}</span>
@@ -987,17 +987,17 @@ const App: React.FC = () => {
           </div>
 
           {/* 分隔线 - 桌面端 */}
-          <div className="h-5 w-px bg-slate-700 hidden md:block" />
+          <div className="h-5 w-px bg-surface-200 hidden md:block" />
 
           {/* 云同步状态 - 桌面端 */}
           {user && (
             <div className="hidden md:flex items-center gap-1.5" title={cloudSyncEnabled ? '云同步已开启' : '云同步已关闭'}>
               {isSyncing || isLoadingFromCloud ? (
-                <Loader2 size={12} className="animate-spin text-slate-500" />
+                <Loader2 size={12} className="animate-spin text-text-muted" />
               ) : (
-                <Cloud size={12} className="text-slate-500" />
+                <Cloud size={12} className="text-text-muted" />
               )}
-              <span className="text-[10px] text-slate-500">
+              <span className="text-[10px] text-text-muted">
                 {isSyncing ? '同步中' : isLoadingFromCloud ? '加载中' : '已同步'}
               </span>
             </div>
@@ -1007,7 +1007,7 @@ const App: React.FC = () => {
         {/* Center: Image Tools - 桌面端显示 */}
         <div className="hidden md:flex items-center gap-2">
           {/* 添加图片 */}
-          <label className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium rounded border border-slate-700 cursor-pointer transition-colors">
+          <label className="flex items-center gap-1.5 px-3 py-1.5 bg-surface-100 hover:bg-surface-200 text-text-secondary text-xs font-medium rounded border border-border cursor-pointer transition-colors">
             <ImagePlus size={14} />
             <span>添加图片</span>
             <input type="file" accept="image/*" className="hidden" onChange={(e) => e.target.files?.[0] && processFile(e.target.files[0])} />
@@ -1015,41 +1015,41 @@ const App: React.FC = () => {
 
           {/* 图片计数 */}
           {images.length > 0 && (
-            <div className="px-2 py-1 bg-slate-800 rounded text-[10px] text-slate-400">
+            <div className="px-2 py-1 bg-surface-100 rounded text-[10px] text-text-muted">
               {images.length}/8
             </div>
           )}
 
           {/* 分隔线 */}
-          {currentImage && <div className="h-5 w-px bg-slate-700" />}
+          {currentImage && <div className="h-5 w-px bg-surface-200" />}
 
           {/* 图片查看工具 */}
           {currentImage && (
             <>
               <button
                 onClick={() => setShowOverlay(!showOverlay)}
-                className={`p-1.5 rounded transition-colors ${showOverlay ? 'bg-slate-800 text-white' : 'text-slate-500 hover:bg-slate-800'}`}
+                className={`p-1.5 rounded transition-colors ${showOverlay ? 'bg-surface-100 text-text-primary' : 'text-text-muted hover:bg-surface-100'}`}
                 title="显示/隐藏标注"
               >
                 {showOverlay ? <Eye size={14} /> : <EyeOff size={14} />}
               </button>
-              <button onClick={() => setImageScale(s => Math.min(3, s * 1.2))} className="p-1.5 text-slate-500 hover:bg-slate-800 hover:text-white rounded transition-colors" title="放大">
+              <button onClick={() => setImageScale(s => Math.min(3, s * 1.2))} className="p-1.5 text-text-muted hover:bg-surface-100 hover:text-text-primary rounded transition-colors" title="放大">
                 <ZoomIn size={14} />
               </button>
-              <button onClick={() => setImageScale(s => Math.max(0.3, s / 1.2))} className="p-1.5 text-slate-500 hover:bg-slate-800 hover:text-white rounded transition-colors" title="缩小">
+              <button onClick={() => setImageScale(s => Math.max(0.3, s / 1.2))} className="p-1.5 text-text-muted hover:bg-surface-100 hover:text-text-primary rounded transition-colors" title="缩小">
                 <ZoomOut size={14} />
               </button>
-              <span className="text-[10px] text-slate-500 px-1 min-w-[36px] text-center">{Math.round(imageScale * 100)}%</span>
+              <span className="text-[10px] text-text-muted px-1 min-w-[36px] text-center">{Math.round(imageScale * 100)}%</span>
               <button onClick={() => {
                 setImageScale(1);
                 setImages(imgs => imgs.map((img, i) => i === currentImageIndex ? { ...img, rotation: 0 } : img));
-              }} className="p-1.5 text-slate-500 hover:bg-slate-800 hover:text-white rounded transition-colors" title="重置">
+              }} className="p-1.5 text-text-muted hover:bg-surface-100 hover:text-text-primary rounded transition-colors" title="重置">
                 <Maximize2 size={14} />
               </button>
-              <button onClick={() => setImages(imgs => imgs.map((img, i) => i === currentImageIndex ? { ...img, rotation: (img.rotation || 0) - 90 } : img))} className="p-1.5 text-slate-500 hover:bg-slate-800 hover:text-white rounded transition-colors" title="逆时针旋转">
+              <button onClick={() => setImages(imgs => imgs.map((img, i) => i === currentImageIndex ? { ...img, rotation: (img.rotation || 0) - 90 } : img))} className="p-1.5 text-text-muted hover:bg-surface-100 hover:text-text-primary rounded transition-colors" title="逆时针旋转">
                 <RotateCcw size={14} />
               </button>
-              <button onClick={() => setImages(imgs => imgs.map((img, i) => i === currentImageIndex ? { ...img, rotation: (img.rotation || 0) + 90 } : img))} className="p-1.5 text-slate-500 hover:bg-slate-800 hover:text-white rounded transition-colors" title="顺时针旋转">
+              <button onClick={() => setImages(imgs => imgs.map((img, i) => i === currentImageIndex ? { ...img, rotation: (img.rotation || 0) + 90 } : img))} className="p-1.5 text-text-muted hover:bg-surface-100 hover:text-text-primary rounded transition-colors" title="顺时针旋转">
                 <RotateCw size={14} />
               </button>
             </>
@@ -1058,10 +1058,10 @@ const App: React.FC = () => {
           {/* 清空 */}
           {images.length > 0 && (
             <>
-              <div className="h-5 w-px bg-slate-700" />
+              <div className="h-5 w-px bg-surface-200" />
               <button
                 onClick={handleReset}
-                className="p-1.5 text-slate-500 hover:text-white hover:bg-slate-800 rounded transition-colors"
+                className="p-1.5 text-text-muted hover:text-text-primary hover:bg-surface-100 rounded transition-colors"
                 title="清空全部"
               >
                 <Trash2 size={14} />
@@ -1076,29 +1076,29 @@ const App: React.FC = () => {
           <div className="relative hidden md:block">
             <button
               onClick={() => setShowModelSelector(!showModelSelector)}
-              className="bg-slate-800 px-2.5 py-1 rounded border border-slate-700 text-[11px] flex items-center gap-1.5 hover:border-slate-600 transition-colors"
+              className="bg-surface-100 px-2.5 py-1 rounded border border-border text-[11px] flex items-center gap-1.5 hover:border-border-hover transition-colors"
             >
-              <span className="text-slate-400">
+              <span className="text-text-muted">
                 {AVAILABLE_MODELS.find(m => m.id === currentModel)?.name || 'Gemini'}
               </span>
-              <ChevronDown size={12} className={`text-slate-500 transition-transform ${showModelSelector ? 'rotate-180' : ''}`} />
+              <ChevronDown size={12} className={`text-text-muted transition-transform ${showModelSelector ? 'rotate-180' : ''}`} />
             </button>
 
             {showModelSelector && (
-              <div className="absolute top-full right-0 mt-1 bg-slate-800 border border-slate-700 rounded-lg shadow-xl overflow-hidden min-w-[180px] z-50">
+              <div className="absolute top-full right-0 mt-1 bg-surface-100 border border-border rounded-lg shadow-xl overflow-hidden min-w-[180px] z-50">
                 {AVAILABLE_MODELS.map(model => (
                   <button
                     key={model.id}
                     onClick={() => handleModelChange(model.id)}
-                    className={`w-full px-3 py-2 text-left hover:bg-slate-700 transition-colors flex items-center justify-between ${
-                      currentModel === model.id ? 'bg-slate-700' : ''
+                    className={`w-full px-3 py-2 text-left hover:bg-surface-200 transition-colors flex items-center justify-between ${
+                      currentModel === model.id ? 'bg-surface-200' : ''
                     }`}
                   >
                     <div>
-                      <div className={`text-xs font-medium ${currentModel === model.id ? 'text-white' : 'text-slate-300'}`}>
+                      <div className={`text-xs font-medium ${currentModel === model.id ? 'text-text-primary' : 'text-text-secondary'}`}>
                         {model.name}
                       </div>
-                      <div className="text-[10px] text-slate-500">{model.description}</div>
+                      <div className="text-[10px] text-text-muted">{model.description}</div>
                     </div>
                     {currentModel === model.id && <div className="w-1.5 h-1.5 bg-white rounded-full"></div>}
                   </button>
@@ -1112,37 +1112,37 @@ const App: React.FC = () => {
               {/* 配额 */}
               <button
                 onClick={handleOpenQuotaModal}
-                className="flex items-center gap-1 md:gap-1.5 px-1.5 md:px-2 py-1 bg-slate-800 hover:bg-slate-700 rounded text-[10px] transition-colors"
+                className="flex items-center gap-1 md:gap-1.5 px-1.5 md:px-2 py-1 bg-surface-100 hover:bg-surface-200 rounded text-[10px] transition-colors"
                 title="点击查看配额详情"
               >
-                <span className="text-slate-500 hidden md:inline">额度</span>
-                <span className="text-slate-300 font-medium tabular-nums">{user.quota - user.used}/{user.quota}</span>
+                <span className="text-text-muted hidden md:inline">额度</span>
+                <span className="text-text-secondary font-medium tabular-nums">{user.quota - user.used}/{user.quota}</span>
               </button>
 
               {/* 用户头像 */}
               <div className="relative group">
-                <button className="flex items-center gap-1 md:gap-1.5 p-1 rounded hover:bg-slate-800 transition-all">
-                  <div className="w-6 h-6 rounded-full bg-slate-700 overflow-hidden">
+                <button className="flex items-center gap-1 md:gap-1.5 p-1 rounded hover:bg-surface-100 transition-all">
+                  <div className="w-6 h-6 rounded-full bg-surface-200 overflow-hidden">
                     {user.photoURL ? (
                       <img src={user.photoURL} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                     ) : (
-                      <div className="w-full h-full flex items-center justify-center text-[10px] font-medium text-slate-400">
+                      <div className="w-full h-full flex items-center justify-center text-[10px] font-medium text-text-muted">
                         {(user.displayName || user.email || 'U')[0].toUpperCase()}
                       </div>
                     )}
                   </div>
-                  <ChevronDown size={12} className="text-slate-500 hidden md:block" />
+                  <ChevronDown size={12} className="text-text-muted hidden md:block" />
                 </button>
 
                 {/* 下拉菜单 */}
-                <div className="absolute top-full right-0 mt-1 w-44 py-1 bg-slate-800 border border-slate-700 rounded-lg shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50">
-                  <div className="px-3 py-2 border-b border-slate-700">
-                    <div className="text-xs font-medium text-slate-300 truncate">{user.displayName || '用户'}</div>
-                    <div className="text-[10px] text-slate-500 truncate">{user.email}</div>
+                <div className="absolute top-full right-0 mt-1 w-44 py-1 bg-surface-100 border border-border rounded-lg shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50">
+                  <div className="px-3 py-2 border-b border-border">
+                    <div className="text-xs font-medium text-text-secondary truncate">{user.displayName || '用户'}</div>
+                    <div className="text-[10px] text-text-muted truncate">{user.email}</div>
                   </div>
                   <button
                     onClick={handleLogout}
-                    className="w-full px-3 py-2 text-left text-xs text-slate-400 hover:text-slate-200 hover:bg-slate-700 transition-colors flex items-center gap-2"
+                    className="w-full px-3 py-2 text-left text-xs text-text-muted hover:text-text-primary hover:bg-surface-200 transition-colors flex items-center gap-2"
                   >
                     <LogOut size={12} />
                     退出登录
@@ -1165,12 +1165,12 @@ const App: React.FC = () => {
       {/* MAIN CONTENT */}
       <div className="flex-1 flex min-h-0 pb-14 md:pb-0">
         {/* LEFT: Thumbnails - 桌面端显示，移动端通过底部导航切换 */}
-        <div className={`${mobileTab === 'images' ? 'flex' : 'hidden'} md:flex w-full md:w-[140px] border-r border-slate-800 bg-slate-950 p-2 overflow-y-auto shrink-0 flex-col`}>
-          <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">
+        <div className={`${mobileTab === 'images' ? 'flex' : 'hidden'} md:flex w-full md:w-[140px] border-r border-border bg-surface-50 p-2 overflow-y-auto shrink-0 flex-col`}>
+          <div className="text-[10px] font-bold text-text-muted uppercase tracking-wider mb-2">
             图片列表
           </div>
           {/* 移动端添加图片按钮 */}
-          <label className="md:hidden flex items-center justify-center gap-1.5 px-3 py-2 mb-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium rounded cursor-pointer transition-colors">
+          <label className="md:hidden flex items-center justify-center gap-1.5 px-3 py-2 mb-2 bg-primary-600 hover:bg-primary-500 text-text-primary text-xs font-medium rounded cursor-pointer transition-colors">
             <ImagePlus size={14} />
             <span>添加图片</span>
             <input type="file" accept="image/*" className="hidden" onChange={(e) => {
@@ -1189,34 +1189,34 @@ const App: React.FC = () => {
                   setMobileTab('viewer');
                 }}
                 className={`relative group cursor-pointer rounded-lg overflow-hidden border-2 transition-all aspect-square md:aspect-auto ${
-                  currentImageIndex === idx ? 'border-indigo-500' : 'border-transparent hover:border-slate-600'
+                  currentImageIndex === idx ? 'border-primary-500' : 'border-transparent hover:border-border-hover'
                 }`}
               >
                 <img src={img.src} alt="" className="w-full h-full md:h-20 object-cover" />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
                 <div className="absolute bottom-1 left-1 right-1 flex items-center justify-between">
-                  <span className="text-[8px] text-white truncate max-w-[60px]">{img.file.name}</span>
+                  <span className="text-[8px] text-text-primary truncate max-w-[60px]">{img.file.name}</span>
                   {img.issues.length > 0 ? (
-                    <span className="text-[8px] bg-red-500 text-white px-1 rounded">{img.issues.length}</span>
+                    <span className="text-[8px] bg-red-500 text-text-primary px-1 rounded">{img.issues.length}</span>
                   ) : img.description && (
-                    <span className="text-[8px] bg-emerald-500 text-white px-1 rounded">✓</span>
+                    <span className="text-[8px] bg-emerald-500 text-text-primary px-1 rounded">✓</span>
                   )}
                 </div>
                 <button
                   onClick={(e) => { e.stopPropagation(); handleRemoveImage(img.id); }}
                   className="absolute top-1 right-1 p-0.5 bg-red-500/80 rounded opacity-0 group-hover:opacity-100 transition-opacity"
                 >
-                  <Trash2 size={10} className="text-white" />
+                  <Trash2 size={10} className="text-text-primary" />
                 </button>
                 {processingImageId === img.id && (
-                  <div className="absolute inset-0 bg-slate-900/80 flex items-center justify-center">
-                    <Loader2 size={14} className="animate-spin text-indigo-400" />
+                  <div className="absolute inset-0 bg-white/80 flex items-center justify-center">
+                    <Loader2 size={14} className="animate-spin text-primary-400" />
                   </div>
                 )}
               </div>
             ))}
             {images.length === 0 && (
-              <div className="col-span-3 p-4 border-2 border-dashed border-slate-800 rounded-lg text-center">
+              <div className="col-span-3 p-4 border-2 border-dashed border-border rounded-lg text-center">
                 <ImagePlus size={20} className="mx-auto text-slate-700 mb-1" />
                 <span className="text-[9px] text-slate-600 hidden md:block">点击顶部按钮添加</span>
                 <span className="text-[9px] text-slate-600 md:hidden">点击上方按钮添加图片</span>
@@ -1226,7 +1226,7 @@ const App: React.FC = () => {
         </div>
 
         {/* CENTER: Image Viewer */}
-        <div className={`${mobileTab === 'viewer' ? 'flex' : 'hidden'} md:flex flex-1 relative bg-slate-900 overflow-hidden items-center justify-center`}>
+        <div className={`${mobileTab === 'viewer' ? 'flex' : 'hidden'} md:flex flex-1 relative bg-white overflow-hidden items-center justify-center`}>
           {/* Grid Background */}
           <div
             className="absolute inset-0 opacity-10 pointer-events-none"
@@ -1268,22 +1268,22 @@ const App: React.FC = () => {
                       />
                       {/* 扫描线上的状态文字 */}
                       <div
-                        className="absolute left-1/2 -translate-x-1/2 pointer-events-none z-30 flex items-center gap-2 px-3 py-1 bg-slate-900/90 backdrop-blur-sm rounded-full border border-indigo-500/50 text-[10px] text-indigo-300 whitespace-nowrap"
+                        className="absolute left-1/2 -translate-x-1/2 pointer-events-none z-30 flex items-center gap-2 px-3 py-1 bg-white/90 backdrop-blur-sm rounded-full border border-primary-500/50 text-[10px] text-indigo-300 whitespace-nowrap"
                         style={{
                           animation: 'scanLine 2.5s ease-in-out infinite',
                         }}
                       >
-                        <span className="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-pulse" />
+                        <span className="w-1.5 h-1.5 bg-primary-400 rounded-full animate-pulse" />
                         {processingStep === 1 ? 'AI 视觉分析' : '规则检测'}
                       </div>
                       {/* 顶部和底部边缘发光 */}
-                      <div className="absolute top-0 left-0 right-0 h-8 bg-gradient-to-b from-indigo-500/20 to-transparent pointer-events-none z-10" />
-                      <div className="absolute bottom-0 left-0 right-0 h-8 bg-gradient-to-t from-indigo-500/20 to-transparent pointer-events-none z-10" />
+                      <div className="absolute top-0 left-0 right-0 h-8 bg-gradient-to-b from-primary-500/20 to-transparent pointer-events-none z-10" />
+                      <div className="absolute bottom-0 left-0 right-0 h-8 bg-gradient-to-t from-primary-500/20 to-transparent pointer-events-none z-10" />
                       {/* 四角标记 */}
-                      <div className="absolute top-2 left-2 w-4 h-4 border-l-2 border-t-2 border-indigo-400 pointer-events-none z-10" />
-                      <div className="absolute top-2 right-2 w-4 h-4 border-r-2 border-t-2 border-indigo-400 pointer-events-none z-10" />
-                      <div className="absolute bottom-2 left-2 w-4 h-4 border-l-2 border-b-2 border-indigo-400 pointer-events-none z-10" />
-                      <div className="absolute bottom-2 right-2 w-4 h-4 border-r-2 border-b-2 border-indigo-400 pointer-events-none z-10" />
+                      <div className="absolute top-2 left-2 w-4 h-4 border-l-2 border-t-2 border-primary-400 pointer-events-none z-10" />
+                      <div className="absolute top-2 right-2 w-4 h-4 border-r-2 border-t-2 border-primary-400 pointer-events-none z-10" />
+                      <div className="absolute bottom-2 left-2 w-4 h-4 border-l-2 border-b-2 border-primary-400 pointer-events-none z-10" />
+                      <div className="absolute bottom-2 right-2 w-4 h-4 border-r-2 border-b-2 border-primary-400 pointer-events-none z-10" />
                     </>
                   )}
 
@@ -1294,14 +1294,14 @@ const App: React.FC = () => {
                         onClick={() => setSelectedIssueId(issue.id)}
                         className={`absolute rounded cursor-pointer transition-all ${
                           selectedIssueId === issue.id
-                            ? 'border-2 border-indigo-400 bg-indigo-400/30 shadow-[0_0_20px_rgba(99,102,241,0.6)] z-10'
+                            ? 'border-2 border-primary-400 bg-primary-400/30 shadow-[0_0_20px_rgba(99,102,241,0.6)] z-10'
                             : issue.severity === 'high'
                               ? 'border-2 border-red-500 bg-red-500/20 hover:bg-red-500/40'
                               : 'border-2 border-amber-400 bg-amber-400/20 hover:bg-amber-400/40'
                         }`}
                         style={getStyleForBox(issue.box_2d)}
                       >
-                        <div className={`absolute -top-8 left-1/2 -translate-x-1/2 bg-slate-900 text-white text-[10px] px-2 py-1 rounded shadow-lg whitespace-nowrap pointer-events-none border border-slate-700 transition-opacity ${selectedIssueId === issue.id ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
+                        <div className={`absolute -top-8 left-1/2 -translate-x-1/2 bg-white text-text-primary text-[10px] px-2 py-1 rounded shadow-lg whitespace-nowrap pointer-events-none border border-border transition-opacity ${selectedIssueId === issue.id ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
                           {issue.original || issue.text}
                         </div>
                       </div>
@@ -1314,12 +1314,12 @@ const App: React.FC = () => {
             </>
           ) : (
             <div className="text-center">
-              <div className="p-6 bg-slate-800/30 rounded-full mb-4 inline-block">
-                <ImagePlus className="text-slate-500" size={48} />
+              <div className="p-6 bg-surface-100/30 rounded-full mb-4 inline-block">
+                <ImagePlus className="text-text-muted" size={48} />
               </div>
-              <p className="text-slate-400 font-medium mb-2">Ctrl+V 粘贴图片</p>
+              <p className="text-text-muted font-medium mb-2">Ctrl+V 粘贴图片</p>
               <p className="text-slate-600 text-sm mb-4">或拖拽图片到此处</p>
-              <label className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium rounded-lg cursor-pointer transition-colors">
+              <label className="inline-flex items-center gap-2 px-4 py-2 bg-primary-600 hover:bg-primary-500 text-text-primary text-sm font-medium rounded-lg cursor-pointer transition-colors">
                 <Upload size={16} />
                 选择文件
                 <input type="file" accept="image/*" className="hidden" onChange={(e) => e.target.files?.[0] && processFile(e.target.files[0])} />
@@ -1335,14 +1335,14 @@ const App: React.FC = () => {
               <button
                 onClick={() => setCurrentImageIndex(i => Math.max(0, i - 1))}
                 disabled={currentImageIndex === 0}
-                className="absolute left-4 top-1/2 -translate-y-1/2 p-2 bg-slate-800/80 rounded-full disabled:opacity-30 hover:bg-slate-700 transition-colors"
+                className="absolute left-4 top-1/2 -translate-y-1/2 p-2 bg-surface-100/80 rounded-full disabled:opacity-30 hover:bg-surface-200 transition-colors"
               >
                 <ChevronLeft size={20} />
               </button>
               <button
                 onClick={() => setCurrentImageIndex(i => Math.min(images.length - 1, i + 1))}
                 disabled={currentImageIndex === images.length - 1}
-                className="absolute right-4 top-1/2 -translate-y-1/2 p-2 bg-slate-800/80 rounded-full disabled:opacity-30 hover:bg-slate-700 transition-colors"
+                className="absolute right-4 top-1/2 -translate-y-1/2 p-2 bg-surface-100/80 rounded-full disabled:opacity-30 hover:bg-surface-200 transition-colors"
               >
                 <ChevronRight size={20} />
               </button>
@@ -1383,10 +1383,10 @@ const App: React.FC = () => {
 
       {/* BOTTOM BAR */}
       {/* BOTTOM PANEL - QIL (桌面端显示，移动端通过导航切换全屏) */}
-      <div style={{ height: mobileTab === 'qil' ? 'auto' : bottomHeight }} className={`${mobileTab === 'qil' ? 'flex absolute inset-0 top-12 bottom-14 z-30' : 'hidden'} md:flex md:static md:z-auto border-t border-slate-800 bg-slate-950 flex-col shrink-0 relative`}>
+      <div style={{ height: mobileTab === 'qil' ? 'auto' : bottomHeight }} className={`${mobileTab === 'qil' ? 'flex absolute inset-0 top-12 bottom-14 z-30' : 'hidden'} md:flex md:static md:z-auto border-t border-border bg-surface-50 flex-col shrink-0 relative`}>
         <div
           onMouseDown={handleResizeStart}
-          className={`absolute top-0 left-0 right-0 h-1.5 cursor-ns-resize hover:bg-indigo-500/50 transition-colors hidden md:block ${isResizing ? 'bg-indigo-500/50' : ''}`}
+          className={`absolute top-0 left-0 right-0 h-1.5 cursor-ns-resize hover:bg-primary-500/50 transition-colors hidden md:block ${isResizing ? 'bg-primary-500/50' : ''}`}
         />
 
         <div className="flex-1 flex flex-col md:flex-row min-h-0 pt-1 overflow-hidden">
@@ -1402,14 +1402,14 @@ const App: React.FC = () => {
 
           {/* Specs Table */}
           <div className="flex-1 flex flex-col min-w-0">
-            <div className="px-3 py-2 bg-slate-900 border-b border-slate-800 flex items-center gap-1 overflow-x-auto shrink-0">
+            <div className="px-3 py-2 bg-white border-b border-border flex items-center gap-1 overflow-x-auto shrink-0">
               <FileSpreadsheet size={12} className="text-emerald-400 shrink-0 mr-1" />
               <button
                 onClick={() => setSpecsTab('qil')}
                 className={`px-3 py-1 text-[10px] font-bold uppercase tracking-wider rounded transition-all shrink-0 ${
                   specsTab === 'qil'
-                    ? 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/50'
-                    : 'text-slate-500 hover:text-slate-300 hover:bg-slate-800'
+                    ? 'bg-primary-500/20 text-primary-400 border border-primary-500/50'
+                    : 'text-text-muted hover:text-text-secondary hover:bg-surface-100'
                 }`}
               >
                 QIL ({manualSourceFields.length})
@@ -1420,8 +1420,8 @@ const App: React.FC = () => {
                   onClick={() => setSpecsTab(img.id)}
                   className={`px-3 py-1 text-[10px] font-medium rounded transition-all shrink-0 truncate max-w-[120px] ${
                     specsTab === img.id
-                      ? 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/50'
-                      : 'text-slate-500 hover:text-slate-300 hover:bg-slate-800'
+                      ? 'bg-primary-500/20 text-primary-400 border border-primary-500/50'
+                      : 'text-text-muted hover:text-text-secondary hover:bg-surface-100'
                   }`}
                   title={img.file.name}
                 >
@@ -1432,8 +1432,8 @@ const App: React.FC = () => {
                 onClick={() => setSpecsTab('diff')}
                 className={`px-3 py-1 text-[10px] font-bold uppercase tracking-wider rounded transition-all shrink-0 ${
                   specsTab === 'diff'
-                    ? 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/50'
-                    : 'text-slate-500 hover:text-slate-300 hover:bg-slate-800'
+                    ? 'bg-primary-500/20 text-primary-400 border border-primary-500/50'
+                    : 'text-text-muted hover:text-text-secondary hover:bg-surface-100'
                 }`}
               >
                 对比汇总
@@ -1451,21 +1451,21 @@ const App: React.FC = () => {
                 ) : (
                   <div className="h-full flex flex-col">
                     <div className="flex items-center justify-between mb-2 px-1">
-                      <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                      <span className="text-[10px] font-bold text-text-muted uppercase tracking-wider">
                         QIL 源数据 {manualSourceFields.length > 0 && `(已解析 ${manualSourceFields.length} 个字段)`}
                       </span>
                       {qilRawText && (
                         <button
                           onClick={() => handleCopy(qilRawText, 'qil-raw-text')}
-                          className="p-1 rounded hover:bg-slate-800 transition-colors"
+                          className="p-1 rounded hover:bg-surface-100 transition-colors"
                           title="复制全部"
                         >
-                          {copiedId === 'qil-raw-text' ? <CheckCheck size={12} className="text-emerald-400" /> : <Copy size={12} className="text-slate-500" />}
+                          {copiedId === 'qil-raw-text' ? <CheckCheck size={12} className="text-emerald-400" /> : <Copy size={12} className="text-text-muted" />}
                         </button>
                       )}
                     </div>
                     {qilRawText ? (
-                      <pre className="flex-1 text-xs text-slate-300 font-mono bg-slate-800/50 p-3 rounded-lg whitespace-pre-wrap leading-relaxed border border-slate-700/50 overflow-y-auto">
+                      <pre className="flex-1 text-xs text-text-secondary font-mono bg-surface-100/50 p-3 rounded-lg whitespace-pre-wrap leading-relaxed border border-border/50 overflow-y-auto">
                         {qilRawText}
                       </pre>
                     ) : (
@@ -1562,8 +1562,8 @@ const App: React.FC = () => {
                           onClick={() => setShowOnlyDiff(!showOnlyDiff)}
                           className={`px-3 py-1.5 text-[10px] font-medium rounded-lg transition-all ${
                             showOnlyDiff
-                              ? 'bg-indigo-600 text-white'
-                              : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
+                              ? 'bg-primary-600 text-text-primary'
+                              : 'bg-surface-100 text-text-muted hover:bg-surface-200'
                           }`}
                         >
                           {showOnlyDiff ? '显示全部' : '只看差异'}
@@ -1580,16 +1580,16 @@ const App: React.FC = () => {
                                   ? 'bg-red-500/5 border-red-500/30 shadow-lg shadow-red-500/10'
                                   : hasWarning
                                     ? 'bg-amber-500/5 border-amber-500/30'
-                                    : 'bg-slate-800/30 border-slate-700/50'
+                                    : 'bg-surface-100/30 border-border/50'
                               }`}
                             >
                               {/* 字段名 */}
-                              <div className="px-3 py-2 border-b border-slate-700/50 flex items-center justify-between">
+                              <div className="px-3 py-2 border-b border-border/50 flex items-center justify-between">
                                 <div className="flex items-center gap-2">
                                   <span className={`w-2 h-2 rounded-full ${
                                     hasError ? 'bg-red-500' : hasWarning ? 'bg-amber-500' : 'bg-emerald-500'
                                   }`}></span>
-                                  <span className="text-xs font-medium text-slate-200">{field.key}</span>
+                                  <span className="text-xs font-medium text-text-primary">{field.key}</span>
                                 </div>
                                 {(hasError || hasWarning) && (
                                   <span className={`text-[9px] font-bold uppercase px-2 py-0.5 rounded ${
@@ -1606,21 +1606,21 @@ const App: React.FC = () => {
                               <div className="p-3 grid grid-cols-2 gap-3">
                                 {/* QIL 值 */}
                                 <div>
-                                  <div className="text-[9px] text-slate-500 uppercase tracking-wider mb-1 flex items-center gap-1">
+                                  <div className="text-[9px] text-text-muted uppercase tracking-wider mb-1 flex items-center gap-1">
                                     <FileSpreadsheet size={10} />
                                     QIL 标准
                                   </div>
                                   <div
                                     onClick={() => handleCopy(field.value, `qil-${idx}`)}
-                                    className="group relative text-xs font-mono bg-indigo-500/10 text-indigo-300 px-3 py-2 rounded-lg cursor-pointer hover:bg-indigo-500/20 transition-all border border-indigo-500/30"
+                                    className="group relative text-xs font-mono bg-primary-500/10 text-indigo-300 px-3 py-2 rounded-lg cursor-pointer hover:bg-primary-500/20 transition-all border border-primary-500/30"
                                   >
                                     <div className="pr-6">{field.value}</div>
                                     <Copy
                                       size={12}
-                                      className="absolute right-2 top-1/2 -translate-y-1/2 text-indigo-400 opacity-0 group-hover:opacity-100 transition-opacity"
+                                      className="absolute right-2 top-1/2 -translate-y-1/2 text-primary-400 opacity-0 group-hover:opacity-100 transition-opacity"
                                     />
                                     {copiedId === `qil-${idx}` && (
-                                      <div className="absolute -top-6 right-0 bg-emerald-500 text-white text-[9px] px-2 py-0.5 rounded">
+                                      <div className="absolute -top-6 right-0 bg-emerald-500 text-text-primary text-[9px] px-2 py-0.5 rounded">
                                         已复制
                                       </div>
                                     )}
@@ -1629,7 +1629,7 @@ const App: React.FC = () => {
 
                                 {/* 图片值 */}
                                 <div>
-                                  <div className="text-[9px] text-slate-500 uppercase tracking-wider mb-1 flex items-center gap-1">
+                                  <div className="text-[9px] text-text-muted uppercase tracking-wider mb-1 flex items-center gap-1">
                                     <Image size={10} />
                                     图片实际
                                   </div>
@@ -1645,7 +1645,7 @@ const App: React.FC = () => {
                                               ? 'bg-amber-500/10 text-amber-300 border-amber-500/30 hover:bg-amber-500/20'
                                               : result.status === 'error'
                                                 ? 'bg-red-500/10 text-red-300 border-red-500/30 hover:bg-red-500/20'
-                                                : 'bg-slate-800/50 text-slate-500 border-slate-700/50'
+                                                : 'bg-surface-100/50 text-text-muted border-border/50'
                                         }`}
                                       >
                                         <div className="flex items-center gap-2 pr-6">
@@ -1657,11 +1657,11 @@ const App: React.FC = () => {
                                           className={`absolute right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity ${
                                             result.status === 'match' ? 'text-emerald-400' :
                                             result.status === 'warning' ? 'text-amber-400' :
-                                            result.status === 'error' ? 'text-red-400' : 'text-slate-400'
+                                            result.status === 'error' ? 'text-red-400' : 'text-text-muted'
                                           }`}
                                         />
                                         {copiedId === `img-${idx}-${imgIdx}` && (
-                                          <div className="absolute -top-6 right-0 bg-emerald-500 text-white text-[9px] px-2 py-0.5 rounded">
+                                          <div className="absolute -top-6 right-0 bg-emerald-500 text-text-primary text-[9px] px-2 py-0.5 rounded">
                                             已复制
                                           </div>
                                         )}
@@ -1692,16 +1692,16 @@ const App: React.FC = () => {
                       ) : (
                         <div className="h-full flex flex-col">
                           <div className="flex items-center justify-between mb-2 px-1">
-                            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">OCR 原文</span>
+                            <span className="text-[10px] font-bold text-text-muted uppercase tracking-wider">OCR 原文</span>
                             <button
                               onClick={() => handleCopy(currentOcrText, 'ocr-text')}
-                              className="p-1 rounded hover:bg-slate-800 transition-colors"
+                              className="p-1 rounded hover:bg-surface-100 transition-colors"
                               title="复制全部"
                             >
-                              {copiedId === 'ocr-text' ? <CheckCheck size={12} className="text-emerald-400" /> : <Copy size={12} className="text-slate-500" />}
+                              {copiedId === 'ocr-text' ? <CheckCheck size={12} className="text-emerald-400" /> : <Copy size={12} className="text-text-muted" />}
                             </button>
                           </div>
-                          <pre className="flex-1 text-xs text-slate-300 font-mono bg-slate-800/50 p-3 rounded-lg whitespace-pre-wrap leading-relaxed border border-slate-700/50 overflow-y-auto">
+                          <pre className="flex-1 text-xs text-text-secondary font-mono bg-surface-100/50 p-3 rounded-lg whitespace-pre-wrap leading-relaxed border border-border/50 overflow-y-auto">
                             {currentOcrText}
                           </pre>
                         </div>
@@ -1716,17 +1716,17 @@ const App: React.FC = () => {
       </div>
 
       {/* Mobile Bottom Navigation */}
-      <div className="md:hidden fixed bottom-0 left-0 right-0 h-14 bg-slate-900 border-t border-slate-800 flex items-center justify-around px-2 z-40">
+      <div className="md:hidden fixed bottom-0 left-0 right-0 h-14 bg-white border-t border-border flex items-center justify-around px-2 z-40">
         <button
           onClick={() => setMobileTab('images')}
           className={`relative flex flex-col items-center justify-center gap-0.5 py-1.5 px-3 rounded-lg transition-colors ${
-            mobileTab === 'images' ? 'text-indigo-400 bg-slate-800' : 'text-slate-500'
+            mobileTab === 'images' ? 'text-primary-400 bg-surface-100' : 'text-text-muted'
           }`}
         >
           <List size={18} />
           <span className="text-[9px]">图片</span>
           {images.length > 0 && (
-            <span className="absolute -top-0.5 -right-0.5 min-w-4 h-4 px-1 bg-indigo-500 text-white text-[8px] rounded-full flex items-center justify-center">
+            <span className="absolute -top-0.5 -right-0.5 min-w-4 h-4 px-1 bg-primary-500 text-text-primary text-[8px] rounded-full flex items-center justify-center">
               {images.length}
             </span>
           )}
@@ -1734,7 +1734,7 @@ const App: React.FC = () => {
         <button
           onClick={() => setMobileTab('viewer')}
           className={`flex flex-col items-center justify-center gap-0.5 py-1.5 px-3 rounded-lg transition-colors ${
-            mobileTab === 'viewer' ? 'text-indigo-400 bg-slate-800' : 'text-slate-500'
+            mobileTab === 'viewer' ? 'text-primary-400 bg-surface-100' : 'text-text-muted'
           }`}
         >
           <Eye size={18} />
@@ -1743,13 +1743,13 @@ const App: React.FC = () => {
         <button
           onClick={() => setMobileTab('issues')}
           className={`relative flex flex-col items-center justify-center gap-0.5 py-1.5 px-3 rounded-lg transition-colors ${
-            mobileTab === 'issues' ? 'text-indigo-400 bg-slate-800' : 'text-slate-500'
+            mobileTab === 'issues' ? 'text-primary-400 bg-surface-100' : 'text-text-muted'
           }`}
         >
           <AlertTriangle size={18} />
           <span className="text-[9px]">问题</span>
           {currentImage && (currentImage.issues.length + (currentImage.deterministicIssues?.length || 0)) > 0 && (
-            <span className="absolute -top-0.5 -right-0.5 min-w-4 h-4 px-1 bg-red-500 text-white text-[8px] rounded-full flex items-center justify-center">
+            <span className="absolute -top-0.5 -right-0.5 min-w-4 h-4 px-1 bg-red-500 text-text-primary text-[8px] rounded-full flex items-center justify-center">
               {currentImage.issues.length + (currentImage.deterministicIssues?.length || 0)}
             </span>
           )}
@@ -1757,13 +1757,13 @@ const App: React.FC = () => {
         <button
           onClick={() => setMobileTab('qil')}
           className={`relative flex flex-col items-center justify-center gap-0.5 py-1.5 px-3 rounded-lg transition-colors ${
-            mobileTab === 'qil' ? 'text-indigo-400 bg-slate-800' : 'text-slate-500'
+            mobileTab === 'qil' ? 'text-primary-400 bg-surface-100' : 'text-text-muted'
           }`}
         >
           <Table size={18} />
           <span className="text-[9px]">QIL</span>
           {manualSourceFields.length > 0 && (
-            <span className="absolute -top-0.5 -right-0.5 min-w-4 h-4 px-1 bg-emerald-500 text-white text-[8px] rounded-full flex items-center justify-center">
+            <span className="absolute -top-0.5 -right-0.5 min-w-4 h-4 px-1 bg-emerald-500 text-text-primary text-[8px] rounded-full flex items-center justify-center">
               {manualSourceFields.length}
             </span>
           )}
@@ -1772,7 +1772,7 @@ const App: React.FC = () => {
 
       {/* Error Toast */}
       {errorMessage && (
-        <div className="absolute top-20 left-1/2 -translate-x-1/2 bg-red-500/90 text-white px-6 py-3 rounded-lg shadow-2xl z-50 text-sm font-medium flex items-center gap-3 backdrop-blur-sm border border-red-400/50">
+        <div className="absolute top-20 left-1/2 -translate-x-1/2 bg-red-500/90 text-text-primary px-6 py-3 rounded-lg shadow-2xl z-50 text-sm font-medium flex items-center gap-3 backdrop-blur-sm border border-red-400/50">
           <AlertCircle size={20} />
           <span>{errorMessage}</span>
           <button onClick={() => setErrorMessage(null)} className="ml-2 hover:bg-white/20 p-1 rounded">

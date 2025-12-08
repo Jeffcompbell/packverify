@@ -130,26 +130,26 @@ export const QilPanel = forwardRef<QilPanelRef, QilPanelProps>(({
   }, [qilImages, manualSourceFields, onFieldsUpdate, onError]);
 
   return (
-    <div className="w-full md:w-[320px] border-b md:border-b-0 md:border-r border-slate-800 p-3 flex flex-col shrink-0 max-h-[40%] md:max-h-none">
-      <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-2">
-        <Table size={12} className="text-indigo-400" />
+    <div className="w-full md:w-[320px] border-b md:border-b-0 md:border-r border-border p-3 flex flex-col shrink-0 max-h-[40%] md:max-h-none">
+      <div className="text-[10px] font-bold text-text-muted uppercase tracking-wider mb-2 flex items-center gap-2">
+        <Table size={12} className="text-primary-400" />
         QIL 源数据
       </div>
 
       {/* 模式切换 */}
-      <div className="flex gap-1 mb-2 bg-slate-900 p-0.5 rounded">
+      <div className="flex gap-1 mb-2 bg-surface-100 p-0.5 rounded-lg">
         <button
           onClick={() => setQilInputMode('text')}
-          className={`flex-1 flex items-center justify-center gap-1 px-2 py-1 rounded text-[10px] transition-all ${
-            qilInputMode === 'text' ? 'bg-indigo-600 text-white' : 'text-slate-500 hover:text-slate-300'
+          className={`flex-1 flex items-center justify-center gap-1 px-2 py-1 rounded-md text-[10px] font-medium transition-all ${
+            qilInputMode === 'text' ? 'bg-white text-text-primary shadow-sm' : 'text-text-muted hover:text-text-secondary'
           }`}
         >
           <ClipboardCheck size={10} /> 文本
         </button>
         <button
           onClick={() => setQilInputMode('image')}
-          className={`flex-1 flex items-center justify-center gap-1 px-2 py-1 rounded text-[10px] transition-all ${
-            qilInputMode === 'image' ? 'bg-indigo-600 text-white' : 'text-slate-500 hover:text-slate-300'
+          className={`flex-1 flex items-center justify-center gap-1 px-2 py-1 rounded-md text-[10px] font-medium transition-all ${
+            qilInputMode === 'image' ? 'bg-white text-text-primary shadow-sm' : 'text-text-muted hover:text-text-secondary'
           }`}
         >
           <Image size={10} /> 图片
@@ -160,7 +160,7 @@ export const QilPanel = forwardRef<QilPanelRef, QilPanelProps>(({
       {qilInputMode === 'text' ? (
         <div className="flex-1 relative">
           <textarea
-            className="w-full h-full bg-slate-900 border border-slate-800 rounded p-2 text-[11px] text-slate-300 placeholder:text-slate-600 focus:outline-none focus:ring-1 focus:ring-indigo-500 resize-none font-mono"
+            className="w-full h-full bg-white border border-border rounded p-2 text-[11px] text-text-secondary placeholder:text-text-muted focus:outline-none focus:ring-1 focus:ring-primary-500 resize-none font-mono"
             placeholder="粘贴 QIL 表格数据..."
             value={qilInputText}
             onChange={(e) => setQilInputText(e.target.value)}
@@ -168,7 +168,7 @@ export const QilPanel = forwardRef<QilPanelRef, QilPanelProps>(({
           <button
             onClick={handleParseText}
             disabled={!qilInputText.trim() || isProcessing}
-            className="absolute bottom-2 right-2 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-[10px] px-2 py-1 rounded flex items-center gap-1"
+            className="absolute bottom-2 right-2 bg-primary-500 hover:bg-primary-600 disabled:opacity-50 text-white text-[10px] px-2.5 py-1 rounded-md flex items-center gap-1 shadow-sm"
           >
             <Search size={10} /> 解析
           </button>
@@ -177,7 +177,7 @@ export const QilPanel = forwardRef<QilPanelRef, QilPanelProps>(({
         /* 图片输入模式 */
         <div
           ref={qilDropRef}
-          className="qil-input-area flex-1 bg-slate-900 border-2 border-dashed border-slate-700 rounded flex flex-col cursor-pointer hover:border-indigo-500/50 transition-colors relative overflow-hidden"
+          className="qil-input-area flex-1 bg-white border-2 border-dashed border-border rounded flex flex-col cursor-pointer hover:border-primary-500/50 transition-colors relative overflow-hidden"
           tabIndex={0}
           onClick={() => {
             if (qilImages.length < 4) {
@@ -204,15 +204,15 @@ export const QilPanel = forwardRef<QilPanelRef, QilPanelProps>(({
               <div className="grid grid-cols-2 gap-2">
                 {qilImages.map((qilImg) => (
                   <div key={qilImg.id} className="relative group">
-                    <img src={qilImg.src} alt="QIL" className="w-full h-24 object-cover rounded border border-slate-700" />
+                    <img src={qilImg.src} alt="QIL" className="w-full h-24 object-cover rounded border border-border" />
                     {qilImg.parsed && (
-                      <div className="absolute top-1 left-1 bg-emerald-500/80 text-white text-[8px] px-1 rounded">
+                      <div className="absolute top-1 left-1 bg-emerald-500/80 text-text-primary text-[8px] px-1 rounded">
                         已解析
                       </div>
                     )}
                     {parsingQilId === qilImg.id && (
-                      <div className="absolute inset-0 bg-slate-900/80 flex items-center justify-center rounded">
-                        <Loader2 size={16} className="animate-spin text-indigo-400" />
+                      <div className="absolute inset-0 bg-white/80 flex items-center justify-center rounded">
+                        <Loader2 size={16} className="animate-spin text-primary-400" />
                       </div>
                     )}
                     <button
@@ -222,12 +222,12 @@ export const QilPanel = forwardRef<QilPanelRef, QilPanelProps>(({
                       }}
                       className="absolute top-1 right-1 p-0.5 bg-red-500/80 rounded opacity-0 group-hover:opacity-100 transition-opacity"
                     >
-                      <XCircle size={10} className="text-white" />
+                      <XCircle size={10} className="text-text-primary" />
                     </button>
                   </div>
                 ))}
                 {qilImages.length < 4 && (
-                  <div className="h-24 border-2 border-dashed border-slate-700 rounded flex flex-col items-center justify-center text-slate-600 hover:border-indigo-500/50 hover:text-slate-500 transition-colors">
+                  <div className="h-24 border-2 border-dashed border-border rounded flex flex-col items-center justify-center text-text-muted hover:border-primary-500/50 hover:text-text-muted transition-colors">
                     <ImagePlus size={16} />
                     <span className="text-[9px] mt-1">添加</span>
                   </div>
@@ -240,7 +240,7 @@ export const QilPanel = forwardRef<QilPanelRef, QilPanelProps>(({
                     handleParseAllQilImages();
                   }}
                   disabled={isParsingQil}
-                  className="mt-2 w-full py-1.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white rounded text-[10px] flex items-center justify-center gap-1"
+                  className="mt-2 w-full py-1.5 bg-primary-600 hover:bg-primary-500 disabled:opacity-50 text-text-primary rounded text-[10px] flex items-center justify-center gap-1"
                 >
                   {isParsingQil ? <Loader2 size={10} className="animate-spin" /> : <Search size={10} />}
                   {isParsingQil ? '解析中...' : `解析 ${qilImages.filter(img => !img.parsed).length} 张图片`}
@@ -249,8 +249,8 @@ export const QilPanel = forwardRef<QilPanelRef, QilPanelProps>(({
             </div>
           ) : (
             <div className="flex-1 flex flex-col items-center justify-center">
-              <Upload size={20} className="text-slate-600 mb-1" />
-              <span className="text-[10px] text-slate-600">Ctrl+V 粘贴 QIL 截图</span>
+              <Upload size={20} className="text-text-muted mb-1" />
+              <span className="text-[10px] text-text-muted">Ctrl+V 粘贴 QIL 截图</span>
               <span className="text-[9px] text-slate-700 mt-1">或点击/拖拽上传（最多4张）</span>
             </div>
           )}
