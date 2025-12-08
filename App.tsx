@@ -72,9 +72,6 @@ const App: React.FC = () => {
   // Specs tab
   const [specsTab, setSpecsTab] = useState<string>('qil');
 
-  // Right panel tab
-  const [rightPanelTab, setRightPanelTab] = useState<'issues' | 'ocr'>('issues');
-
   // Mobile view tab
   const [mobileTab, setMobileTab] = useState<'images' | 'viewer' | 'issues' | 'qil'>('viewer');
 
@@ -1255,8 +1252,6 @@ const App: React.FC = () => {
         <IssuesPanel
           currentImage={currentImage}
           isCurrentProcessing={isCurrentProcessing}
-          rightPanelTab={rightPanelTab}
-          onTabChange={setRightPanelTab}
           onRetryAnalysis={() => currentImage && handleRetryAnalysis(currentImage.id)}
           selectedIssueId={selectedIssueId}
           onSelectIssue={setSelectedIssueId}
@@ -1311,7 +1306,7 @@ const App: React.FC = () => {
                   }`}
                   title={img.file.name}
                 >
-                  图片{idx + 1} ({img.specs?.length || 0})
+                  图片{idx + 1} OCR
                 </button>
               ))}
               <button
@@ -1487,37 +1482,34 @@ const App: React.FC = () => {
                 })()
               ) : (
                 (() => {
-                  const currentSpecs = images.find(img => img.id === specsTab)?.specs || [];
-
-                  if (currentSpecs.length === 0) {
-                    return (
-                      <div className="h-full flex flex-col items-center justify-center text-slate-700">
-                        <Table size={24} className="mb-2 opacity-30" />
-                        <span className="text-xs">暂无规格数据</span>
-                        <span className="text-[10px] text-slate-600 mt-1">图片分析后自动提取</span>
-                      </div>
-                    );
-                  }
+                  const currentOcrText = images.find(img => img.id === specsTab)?.ocrText || '';
 
                   return (
-                    <table className="w-full text-[11px]">
-                      <thead className="bg-slate-800 sticky top-0">
-                        <tr>
-                          <th className="text-left px-3 py-2 text-slate-500 font-medium">分类</th>
-                          <th className="text-left px-3 py-2 text-slate-500 font-medium">项目</th>
-                          <th className="text-left px-3 py-2 text-slate-500 font-medium">值</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-800/50">
-                        {currentSpecs.map((spec: ImageSpec, idx: number) => (
-                          <tr key={idx} className="hover:bg-slate-800/30">
-                            <td className="px-3 py-2 text-slate-500">{spec.category}</td>
-                            <td className="px-3 py-2 text-slate-300 font-medium">{spec.key}</td>
-                            <td className="px-3 py-2 text-slate-400 font-mono">{spec.value}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                    <div className="h-full">
+                      {!currentOcrText ? (
+                        <div className="h-full flex flex-col items-center justify-center text-slate-700">
+                          <Type size={24} className="mb-2 opacity-30" />
+                          <span className="text-xs">暂无 OCR 数据</span>
+                          <span className="text-[10px] text-slate-600 mt-1">图片分析后自动提取</span>
+                        </div>
+                      ) : (
+                        <div className="h-full flex flex-col">
+                          <div className="flex items-center justify-between mb-2 px-1">
+                            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">OCR 原文</span>
+                            <button
+                              onClick={() => handleCopy(currentOcrText, 'ocr-text')}
+                              className="p-1 rounded hover:bg-slate-800 transition-colors"
+                              title="复制全部"
+                            >
+                              {copiedId === 'ocr-text' ? <CheckCheck size={12} className="text-emerald-400" /> : <Copy size={12} className="text-slate-500" />}
+                            </button>
+                          </div>
+                          <pre className="flex-1 text-xs text-slate-300 font-mono bg-slate-800/50 p-3 rounded-lg whitespace-pre-wrap leading-relaxed border border-slate-700/50 overflow-y-auto">
+                            {currentOcrText}
+                          </pre>
+                        </div>
+                      )}
+                    </div>
                   );
                 })()
               )}

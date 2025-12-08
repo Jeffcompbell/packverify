@@ -5,8 +5,6 @@ import { ImageItem } from '../types';
 interface IssuesPanelProps {
   currentImage: ImageItem | null;
   isCurrentProcessing: boolean;
-  rightPanelTab: 'issues' | 'ocr';
-  onTabChange: (tab: 'issues' | 'ocr') => void;
   onRetryAnalysis: () => void;
   selectedIssueId: string | null;
   onSelectIssue: (id: string) => void;
@@ -19,8 +17,6 @@ interface IssuesPanelProps {
 export const IssuesPanel: React.FC<IssuesPanelProps> = ({
   currentImage,
   isCurrentProcessing,
-  rightPanelTab,
-  onTabChange,
   onRetryAnalysis,
   selectedIssueId,
   onSelectIssue,
@@ -42,34 +38,16 @@ export const IssuesPanel: React.FC<IssuesPanelProps> = ({
 
   return (
     <div className={`${mobileTab === 'issues' ? 'flex' : 'hidden'} md:flex w-full md:w-[380px] border-l border-slate-800 bg-slate-900 flex-col`}>
-      <div className="px-2 py-2 border-b border-slate-800 flex items-center gap-1 bg-slate-900">
-        <button
-          onClick={() => onTabChange('issues')}
-          className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-all ${
-            rightPanelTab === 'issues'
-              ? 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/50'
-              : 'text-slate-500 hover:text-slate-300 hover:bg-slate-800'
-          }`}
-        >
-          <AlertTriangle size={14} />
-          检测问题
+      <div className="px-4 py-3 border-b border-slate-800 flex items-center justify-between bg-slate-900">
+        <div className="flex items-center gap-2">
+          <AlertTriangle size={16} className="text-indigo-400" />
+          <span className="text-sm font-medium text-slate-200">检测问题</span>
           {currentImage && (currentImage.issues.length + (currentImage.deterministicIssues?.length || 0)) > 0 && (
-            <span className="bg-red-500 text-white text-[9px] px-1.5 rounded-full">
+            <span className="bg-red-500 text-white text-[10px] px-2 py-0.5 rounded-full font-medium">
               {currentImage.issues.length + (currentImage.deterministicIssues?.length || 0)}
             </span>
           )}
-        </button>
-        <button
-          onClick={() => onTabChange('ocr')}
-          className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-all ${
-            rightPanelTab === 'ocr'
-              ? 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/50'
-              : 'text-slate-500 hover:text-slate-300 hover:bg-slate-800'
-          }`}
-        >
-          <Type size={14} />
-          OCR 原文
-        </button>
+        </div>
         <button
           onClick={onRetryAnalysis}
           disabled={isCurrentProcessing || !currentImage}
@@ -99,29 +77,6 @@ export const IssuesPanel: React.FC<IssuesPanelProps> = ({
           <div className="text-center py-12 text-slate-500">
             <Loader2 size={24} className="mx-auto mb-2 animate-spin" />
             <p className="text-xs">正在分析...</p>
-          </div>
-        ) : rightPanelTab === 'ocr' ? (
-          <div className="p-3">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">识别文字</span>
-              <button
-                onClick={() => currentImage.ocrText && onCopy(currentImage.ocrText, 'ocr-text')}
-                className="p-1 rounded hover:bg-slate-800 transition-colors"
-                title="复制全部"
-              >
-                {copiedId === 'ocr-text' ? <CheckCheck size={12} className="text-emerald-400" /> : <Copy size={12} className="text-slate-500" />}
-              </button>
-            </div>
-            {currentImage.ocrText ? (
-              <pre className="text-xs text-slate-300 font-mono bg-slate-800/50 p-3 rounded-lg whitespace-pre-wrap leading-relaxed border border-slate-700/50 max-h-[500px] overflow-y-auto">
-                {currentImage.ocrText}
-              </pre>
-            ) : (
-              <div className="text-center py-8 text-slate-600">
-                <Type size={24} className="mx-auto mb-2 opacity-30" />
-                <p className="text-xs">暂无 OCR 数据</p>
-              </div>
-            )}
           </div>
         ) : (
           <div className="p-3 space-y-3">
@@ -220,7 +175,6 @@ export const IssuesPanel: React.FC<IssuesPanelProps> = ({
               <div className="text-center py-12 text-slate-600">
                 <CheckCircle size={24} className="mx-auto mb-2 text-emerald-500/50" />
                 <p className="text-xs">未检测到问题</p>
-                <p className="text-[10px] text-slate-700 mt-1">建议查看 OCR 原文自行核对</p>
               </div>
             )}
           </div>
