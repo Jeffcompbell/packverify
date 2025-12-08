@@ -63,30 +63,35 @@ export const initialImageAnalysis = async (base64Image: string, mimeType: string
 
 ## 任务
 1. 描述图片内容
-2. 逐字逐句列出你看到的所有文字（保留原始格式）
-3. 检查并标记文字错误
+2. 识别图片上的所有语言（英文、法文、中文、西班牙文等）
+3. 逐字逐句列出你看到的所有文字（按语言分组）
+4. 检查并标记文字错误
 
-## 必须检查的印刷错误
-- **错别字**：中文错字、漏字、多字
-- **拼写错误**：英文单词拼写错误
-- **空格问题**：英文单词间缺少空格（如"HelloWorld"应为"Hello World"）
-- **标点错误**：标点缺失、多余、中英文标点混用
-- **括号不配对**：左右括号数量不一致
-- **数字错误**：日期、重量等数字明显错误
+## 多语言检查
+包装通常包含多种语言，请按各语言标准检查：
+- **英文**：拼写、语法、空格
+- **法文**：拼写、重音符号（é, è, ê, à, ç）
+- **中文**：错别字、漏字
+- **西班牙文**：拼写、重音符号
+
+## 必须检查的错误
+- 拼写错误（按各语言标准）
+- 括号不配对
+- 标点错误
+- 空格缺失
 
 ## 不要报告
 - 设计风格、布局
 - 颜色、字体选择
-- 图片质量
 
 ## 输出JSON
 {
   "description": "一句话描述图片",
-  "observedText": "完整列出图片中所有可见文字，用换行分隔",
+  "observedText": "按语言分组列出所有文字，格式：[English] xxx [Français] xxx [中文] xxx",
   "initialIssues": [
     {
       "type": "content",
-      "text": "具体的文字错误",
+      "text": "[语言] 具体错误",
       "original": "原文",
       "location": "位置",
       "confidence": "high/medium/low"
@@ -131,33 +136,36 @@ export const initialImageAnalysis = async (base64Image: string, mimeType: string
     }
 };
 
-// Step 2: OCR text extraction
+// Step 2: OCR text extraction - 高精度模式
 export const ocrExtractText = async (base64Image: string, mimeType: string): Promise<string> => {
     try {
         const client = getClient();
         const modelId = getModelId();
         console.log("Step 2: OCR text extraction with model:", modelId);
 
-        const prompt = `你是专业OCR系统，请精确提取图片中的【所有】文字，包括最小的字。
+        const prompt = `你是专业OCR系统，请**极度精确**地提取图片中的所有文字。
 
-## 核心要求
-1. **必须提取所有文字**：
-   - 大标题、正文、小字、成分表、警告语、条码数字
-   - 特别注意：侧边、角落、旋转的文字也要提取
+## 最高优先级：准确性
+- 如果某个字/词看不清楚，用 [?] 标记，例如：ingred[?]ents
+- 绝对不要猜测或补全任何内容
+- 宁可标记不确定，也不要输出错误内容
 
-2. **保留原始状态**：
-   - 不要自动修正任何错误
-   - 不要添加缺失的空格或标点
-   - 如实呈现图片上的内容
+## 提取要求
+1. 提取所有可见文字（标题、正文、小字、警告语）
+2. 保持原样，不修正任何内容
+3. 模糊/不清晰的部分用 [?] 标记
 
-3. **特别注意符号**：
-   - 括号：() （）[] 【】{} 必须准确
-   - 标点：，。、；：要准确
+## 特殊字符处理
+- 容易混淆的字符要仔细辨认：
+  - l (小写L) vs I (大写i) vs 1 (数字1)
+  - O (字母O) vs 0 (数字0)
+  - rn vs m
+- 如果不确定，用 [l/I/1] 这样的格式标记
 
-## 输出
-按从上到下、从左到右顺序输出所有文字。
-每个文本块换行。
-不要任何解释，只输出原文。`;
+## 输出格式
+按从上到下、从左到右顺序输出。
+每个独立文本块换行。
+只输出提取的文字，不要任何解释。`;
 
         const response = await client.chat.completions.create({
             model: modelId,
@@ -197,57 +205,59 @@ export const finalVerification = async (
         const modelId = getModelId();
         console.log("Step 3: Final verification with model:", modelId);
 
-        const prompt = `你是资深印前QC终审专员，专门检查印刷品的文字错误。
+        const prompt = `你是资深印前QC终审专员。你的任务是**极度谨慎地**检查印刷品文字错误。
 
-## 第一轮分析（视觉）
+## 第一轮分析结果（视觉）
 描述：${initialAnalysis.description}
-观察到的文字：
-${initialAnalysis.observedText}
+观察文字：${initialAnalysis.observedText}
+初步问题：${JSON.stringify(initialAnalysis.initialIssues, null, 2)}
 
-初步问题：
-${JSON.stringify(initialAnalysis.initialIssues, null, 2)}
-
-## 第二轮分析（OCR精确提取）
+## 第二轮分析结果（OCR）
 ${ocrText}
 
-## 终审任务
-**仔细检查上面OCR提取的文字**，找出所有印刷错误：
+## ⚠️ 极其重要的验证规则
 
-### 检查清单（逐项检查）
-1. **括号配对**：数一数左括号和右括号的数量是否相等
-   - 检查 ( 和 ) 的数量
-   - 检查成分表中的括号是否都闭合
+### 误报风险说明
+GPT Vision 和 OCR 都可能出现识别错误，特别是：
+- 小字体文字容易漏读字母
+- 相似字符容易混淆（l/I/1, O/0, rn/m）
+- 模糊区域容易误读
 
-2. **错别字**：中文有没有错字、漏字、多字
+### 验证流程
+1. **对比两轮结果**：如果 Vision 和 OCR 结果不一致，说明识别不可靠，**不要报告**
+2. **检查 [?] 标记**：OCR 中标记为不确定的内容，**绝对不要作为错误报告**
+3. **常见词检查**：如果一个"错误"看起来像是常见英文词被误读（如 intimate, ingredients, preservatives），**不要报告**
+4. **多次出现验证**：如果同一个词在图片上多次出现，检查是否一致
 
-3. **拼写错误**：英文单词有没有拼错
+### 只报告这些确定性错误
+- 明显的拼写错误（两轮分析都确认的）
+- 明显的括号不配对
+- 明显的标点问题
 
-4. **空格缺失**：英文单词是否连在一起
-
-5. **标点问题**：标点是否缺失或多余
-
-### 不要报告
-- 设计布局
-- 颜色字体
+### 绝对不要报告
+- 任何只在一轮分析中发现的"错误"
+- OCR 中带 [?] 标记附近的内容
+- 可能是识别问题而非真正错误的内容
+- 常见单词的"变体"（很可能是误读）
 
 ## 输出json格式
 {
-  "description": "图片描述",
+  "description": "图片内容描述",
   "issues": [
     {
       "type": "content",
-      "original": "问题原文（2-10个字）",
-      "problem": "问题描述",
-      "suggestion": "建议修改为：xxx",
-      "severity": "high/medium/low",
+      "language": "English/Français/中文",
+      "original": "完整句子（20-50字），用 **双星号** 标记错误词",
+      "problem": "简洁说明：xxx 应为 yyy",
+      "suggestion": "正确写法",
+      "severity": "high",
       "box_2d": [ymin, xmin, ymax, xmax]
     }
   ]
 }
 
-规则：
-- 只报告文字错误
-- 没有错误就返回空issues数组`;
+**最高原则：宁可漏报10个真错误，也不要误报1个正确内容！**
+如果没有100%确定的错误，返回空 issues 数组。`;
 
         const response = await client.chat.completions.create({
             model: modelId,
