@@ -15,10 +15,11 @@ import {
   Type, Brackets, ShieldAlert, GitCompare, LogOut, User as UserIcon, X, Cloud, CloudOff,
   Menu, Home, List, Settings, Package
 } from 'lucide-react';
-import { LoginModal } from './components/LoginModal';
+import { LoginModal, GoogleIcon } from './components/LoginModal';
 import { QuotaModal } from './components/QuotaModal';
 import { AllProductsPage } from './components/AllProductsPage';
 import { IssuesPanel } from './components/IssuesPanel';
+import { QilPanel, QilPanelRef } from './components/QilPanel';
 import { base64ToBlobUrl, createVirtualFile, generateProductName, STORAGE_KEY } from './utils/helpers';
 import { StoredImageItem } from './types/storage';
 
@@ -77,14 +78,8 @@ const App: React.FC = () => {
   // Mobile view tab
   const [mobileTab, setMobileTab] = useState<'images' | 'viewer' | 'issues' | 'qil'>('viewer');
 
-  // QIL Input
-  const [qilInputMode, setQilInputMode] = useState<'text' | 'image'>('text');
-  const [qilInputText, setQilInputText] = useState('');
-  const [qilImages, setQilImages] = useState<{ id: string; src: string; base64: string; mimeType: string; parsed: boolean }[]>([]);
-  const [isParsingQil, setIsParsingQil] = useState(false);
-  const [parsingQilId, setParsingQilId] = useState<string | null>(null);
-  const qilDropRef = useRef<HTMLDivElement>(null);
   const issueListRef = useRef<HTMLDivElement>(null);
+  const qilPanelRef = useRef<QilPanelRef>(null);
 
   // Current image
   const currentImage = images[currentImageIndex] || null;
@@ -126,9 +121,6 @@ const App: React.FC = () => {
         if (data.manualSourceFields) {
           setManualSourceFields(data.manualSourceFields);
         }
-        if (data.qilInputText) {
-          setQilInputText(data.qilInputText);
-        }
       }
     } catch (err) {
       console.error('Failed to restore data:', err);
@@ -156,15 +148,14 @@ const App: React.FC = () => {
       const data = {
         images: storedImages,
         currentIndex: currentImageIndex,
-        manualSourceFields,
-        qilInputText
+        manualSourceFields
       };
 
       localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
     } catch (err) {
       console.error('Failed to save data:', err);
     }
-  }, [images, currentImageIndex, manualSourceFields, qilInputText]);
+  }, [images, currentImageIndex, manualSourceFields]);
 
   // 当选中问题时，滚动到对应的列表项
   useEffect(() => {
@@ -253,7 +244,6 @@ const App: React.FC = () => {
             setImages(loadedImages);
           }
           setManualSourceFields(session.qilFields || []);
-          setQilInputText(session.qilInputText || '');
           console.log(`Loaded ${cloudImages.length} images from cloud`);
         }
 
@@ -488,32 +478,25 @@ const App: React.FC = () => {
     }
   }, [user, images, manualSourceFields, cloudSyncEnabled, sessionId]);
 
-  const handleParseSource = useCallback(async (text: string) => {
-    setIsProcessing(true);
-    try {
-      const fields = await parseSourceText(text);
-      setManualSourceFields(fields);
+  const handleUpdateQilFields = useCallback(async (fields: SourceField[]) => {
+    setManualSourceFields(fields);
 
-      if (currentImage) {
-        const diffs = await performSmartDiff(currentImage.base64, fields);
-        setImages(prev => prev.map(img =>
-          img.id === currentImage.id ? { ...img, diffs } : img
-        ));
-      }
+    // 对当前图片执行 diff
+    if (currentImage && currentImage.specs?.length) {
+      const diffs = localDiffSpecs(fields, currentImage.specs);
+      setImages(prev => prev.map(img =>
+        img.id === currentImage.id ? { ...img, diffs } : img
+      ));
+    }
 
-      // 云同步 - 保存 QIL 数据
-      if (cloudSyncEnabled && sessionId && user) {
-        try {
-          await saveQilToCloud(user.uid, sessionId, fields, text);
-          console.log('QIL data synced to cloud');
-        } catch (error) {
-          console.error('Failed to sync QIL to cloud:', error);
-        }
+    // 云同步 - 保存 QIL 数据
+    if (cloudSyncEnabled && sessionId && user) {
+      try {
+        await saveQilToCloud(user.uid, sessionId, fields, '');
+        console.log('QIL data synced to cloud');
+      } catch (error) {
+        console.error('Failed to sync QIL to cloud:', error);
       }
-    } catch (err) {
-      setErrorMessage("Failed to parse source text.");
-    } finally {
-      setIsProcessing(false);
     }
   }, [currentImage, cloudSyncEnabled, sessionId, user]);
 
@@ -547,8 +530,6 @@ const App: React.FC = () => {
     setErrorMessage(null);
     setSelectedIssueId(null);
     setImageScale(1);
-    setQilImages([]);
-    setQilInputText('');
     localStorage.removeItem(STORAGE_KEY);
 
     // 云同步 - 清空会话
@@ -612,9 +593,7 @@ const App: React.FC = () => {
         }
 
         setManualSourceFields(session.qilFields || []);
-        setQilInputText(session.qilInputText || '');
         setCurrentImageIndex(0);
-        setQilImages([]);
       }
     } catch (error) {
       console.error('Failed to switch session:', error);
@@ -636,8 +615,6 @@ const App: React.FC = () => {
       setProductName(newName);
       setImages([]);
       setManualSourceFields([]);
-      setQilInputText('');
-      setQilImages([]);
       setCurrentImageIndex(0);
       setShowProductList(false);
 
@@ -699,68 +676,6 @@ const App: React.FC = () => {
     }
   }, [user, quotaUsageHistory, isLoadingMoreQuotaHistory]);
 
-  // QIL 图片处理 - 支持多张
-  const handleQilImageFile = useCallback(async (file: File) => {
-    if (!file.type.startsWith('image/')) return;
-    if (qilImages.length >= 4) {
-      setErrorMessage('QIL 最多支持 4 张图片');
-      return;
-    }
-    const url = URL.createObjectURL(file);
-    const base64 = await fileToGenerativePart(file);
-    const newQilImage = {
-      id: `qil-${Date.now()}`,
-      src: url,
-      base64,
-      mimeType: file.type,
-      parsed: false
-    };
-    setQilImages(prev => [...prev, newQilImage]);
-    setQilInputMode('image');
-  }, [qilImages.length]);
-
-  // QIL 图片删除
-  const handleRemoveQilImage = useCallback((id: string) => {
-    setQilImages(prev => prev.filter(img => img.id !== id));
-  }, []);
-
-  // QIL 解析所有图片
-  const handleParseAllQilImages = useCallback(async () => {
-    const unparsedImages = qilImages.filter(img => !img.parsed);
-    if (unparsedImages.length === 0) return;
-
-    setIsParsingQil(true);
-    setErrorMessage(null);
-
-    try {
-      let allFields: SourceField[] = [...manualSourceFields];
-
-      for (const qilImg of unparsedImages) {
-        setParsingQilId(qilImg.id);
-        const fields = await parseQILImage(qilImg.base64, qilImg.mimeType);
-        allFields = [...allFields, ...fields];
-        setQilImages(prev => prev.map(img =>
-          img.id === qilImg.id ? { ...img, parsed: true } : img
-        ));
-      }
-
-      // 去重
-      const uniqueFields = allFields.reduce((acc, field) => {
-        if (!acc.find(f => f.key === field.key)) {
-          acc.push(field);
-        }
-        return acc;
-      }, [] as SourceField[]);
-
-      setManualSourceFields(uniqueFields);
-    } catch (error: any) {
-      setErrorMessage(error.message || 'QIL 图片解析失败');
-    } finally {
-      setIsParsingQil(false);
-      setParsingQilId(null);
-    }
-  }, [qilImages, manualSourceFields]);
-
   // Global Paste Handler
   useEffect(() => {
     const handlePaste = (e: ClipboardEvent) => {
@@ -774,8 +689,8 @@ const App: React.FC = () => {
         if (items[i].type.indexOf('image') !== -1) {
           const file = items[i].getAsFile();
           if (file) {
-            if (isQilFocused || qilInputMode === 'image') {
-              handleQilImageFile(file);
+            if (isQilFocused && qilPanelRef.current) {
+              qilPanelRef.current.handleQilImageFile(file);
             } else {
               processFile(file);
             }
@@ -786,7 +701,7 @@ const App: React.FC = () => {
     };
     window.addEventListener('paste', handlePaste);
     return () => window.removeEventListener('paste', handlePaste);
-  }, [processFile, qilInputMode, handleQilImageFile]);
+  }, [processFile]);
 
   // Global Drag & Drop
   const onDragOver = useCallback((e: React.DragEvent) => e.preventDefault(), []);
@@ -1361,138 +1276,15 @@ const App: React.FC = () => {
         />
 
         <div className="flex-1 flex flex-col md:flex-row min-h-0 pt-1 overflow-hidden">
-          {/* QIL Input */}
-          <div className="w-full md:w-[320px] border-b md:border-b-0 md:border-r border-slate-800 p-3 flex flex-col shrink-0 max-h-[40%] md:max-h-none">
-            <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-2">
-              <Table size={12} className="text-indigo-400" />
-              QIL 源数据
-            </div>
-
-            <div className="flex gap-1 mb-2 bg-slate-900 p-0.5 rounded">
-              <button
-                onClick={() => setQilInputMode('text')}
-                className={`flex-1 flex items-center justify-center gap-1 px-2 py-1 rounded text-[10px] transition-all ${
-                  qilInputMode === 'text' ? 'bg-indigo-600 text-white' : 'text-slate-500 hover:text-slate-300'
-                }`}
-              >
-                <ClipboardCheck size={10} /> 文本
-              </button>
-              <button
-                onClick={() => setQilInputMode('image')}
-                className={`flex-1 flex items-center justify-center gap-1 px-2 py-1 rounded text-[10px] transition-all ${
-                  qilInputMode === 'image' ? 'bg-indigo-600 text-white' : 'text-slate-500 hover:text-slate-300'
-                }`}
-              >
-                <Image size={10} /> 图片
-              </button>
-            </div>
-
-            {qilInputMode === 'text' ? (
-              <div className="flex-1 relative">
-                <textarea
-                  className="w-full h-full bg-slate-900 border border-slate-800 rounded p-2 text-[11px] text-slate-300 placeholder:text-slate-600 focus:outline-none focus:ring-1 focus:ring-indigo-500 resize-none font-mono"
-                  placeholder="粘贴 QIL 表格数据..."
-                  value={qilInputText}
-                  onChange={(e) => setQilInputText(e.target.value)}
-                />
-                <button
-                  onClick={() => handleParseSource(qilInputText)}
-                  disabled={!qilInputText.trim() || isProcessing}
-                  className="absolute bottom-2 right-2 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-[10px] px-2 py-1 rounded flex items-center gap-1"
-                >
-                  <Search size={10} /> 解析
-                </button>
-              </div>
-            ) : (
-              <div
-                ref={qilDropRef}
-                className="qil-input-area flex-1 bg-slate-900 border-2 border-dashed border-slate-700 rounded flex flex-col cursor-pointer hover:border-indigo-500/50 transition-colors relative overflow-hidden"
-                tabIndex={0}
-                onClick={() => {
-                  if (qilImages.length < 4) {
-                    const input = document.createElement('input');
-                    input.type = 'file';
-                    input.accept = 'image/*';
-                    input.onchange = (e) => {
-                      const file = (e.target as HTMLInputElement).files?.[0];
-                      if (file) handleQilImageFile(file);
-                    };
-                    input.click();
-                  }
-                }}
-                onDragOver={(e) => e.preventDefault()}
-                onDrop={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  const file = e.dataTransfer.files?.[0];
-                  if (file) handleQilImageFile(file);
-                }}
-              >
-                {qilImages.length > 0 ? (
-                  <div className="flex-1 p-2 overflow-auto">
-                    <div className="grid grid-cols-2 gap-2">
-                      {qilImages.map((qilImg) => (
-                        <div key={qilImg.id} className="relative group">
-                          <img src={qilImg.src} alt="QIL" className="w-full h-24 object-cover rounded border border-slate-700" />
-                          {qilImg.parsed && (
-                            <div className="absolute top-1 left-1 bg-emerald-500/80 text-white text-[8px] px-1 rounded">
-                              已解析
-                            </div>
-                          )}
-                          {parsingQilId === qilImg.id && (
-                            <div className="absolute inset-0 bg-slate-900/80 flex items-center justify-center rounded">
-                              <Loader2 size={16} className="animate-spin text-indigo-400" />
-                            </div>
-                          )}
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleRemoveQilImage(qilImg.id);
-                            }}
-                            className="absolute top-1 right-1 p-0.5 bg-red-500/80 rounded opacity-0 group-hover:opacity-100 transition-opacity"
-                          >
-                            <XCircle size={10} className="text-white" />
-                          </button>
-                        </div>
-                      ))}
-                      {qilImages.length < 4 && (
-                        <div className="h-24 border-2 border-dashed border-slate-700 rounded flex flex-col items-center justify-center text-slate-600 hover:border-indigo-500/50 hover:text-slate-500 transition-colors">
-                          <ImagePlus size={16} />
-                          <span className="text-[9px] mt-1">添加</span>
-                        </div>
-                      )}
-                    </div>
-                    {qilImages.some(img => !img.parsed) && (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleParseAllQilImages();
-                        }}
-                        disabled={isParsingQil}
-                        className="mt-2 w-full py-1.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white rounded text-[10px] flex items-center justify-center gap-1"
-                      >
-                        {isParsingQil ? <Loader2 size={10} className="animate-spin" /> : <Search size={10} />}
-                        {isParsingQil ? '解析中...' : `解析 ${qilImages.filter(img => !img.parsed).length} 张图片`}
-                      </button>
-                    )}
-                  </div>
-                ) : (
-                  <div className="flex-1 flex flex-col items-center justify-center">
-                    <Upload size={20} className="text-slate-600 mb-1" />
-                    <span className="text-[10px] text-slate-600">Ctrl+V 粘贴 QIL 截图</span>
-                    <span className="text-[9px] text-slate-700 mt-1">或点击/拖拽上传（最多4张）</span>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {manualSourceFields.length > 0 && (
-              <div className="mt-2 flex items-center gap-1 text-[10px] text-emerald-400">
-                <FileSpreadsheet size={10} />
-                已解析 {manualSourceFields.length} 个字段
-              </div>
-            )}
-          </div>
+          {/* QIL Input Panel */}
+          <QilPanel
+            ref={qilPanelRef}
+            manualSourceFields={manualSourceFields}
+            onFieldsUpdate={handleUpdateQilFields}
+            onError={setErrorMessage}
+            isProcessing={isProcessing}
+            onProcessingChange={setIsProcessing}
+          />
 
           {/* Specs Table */}
           <div className="flex-1 flex flex-col min-w-0">
