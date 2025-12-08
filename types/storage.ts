@@ -11,4 +11,10 @@ export interface StoredImageItem {
   issues: DiagnosisIssue[];
   deterministicIssues?: DeterministicCheck[];
   diffs: DiffResult[];
+  issuesByModel?: {
+    [modelId: string]: {
+      issues: DiagnosisIssue[];
+      deterministicIssues: DeterministicCheck[];
+    }
+  };
 }

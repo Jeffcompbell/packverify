@@ -87,10 +87,18 @@ export interface ImageItem {
   base64: string;
   file: File;
   description?: string; // 图片内容描述
-  ocrText?: string;     // OCR 提取的原文（新增）
-  specs: ImageSpec[];   // 图片提取的参数
-  issues: DiagnosisIssue[];
-  deterministicIssues?: DeterministicCheck[]; // 确定性问题（新增）
+  ocrText?: string;     // OCR 提取的原文（所有模型共用）
+  specs: ImageSpec[];   // 图片提取的参数（所有模型共用）
+  // 多模型支持：按模型 ID 存储检测结果
+  issuesByModel: {
+    [modelId: string]: {
+      issues: DiagnosisIssue[];
+      deterministicIssues: DeterministicCheck[];
+    }
+  };
+  // 向后兼容（可选）
+  issues?: DiagnosisIssue[];
+  deterministicIssues?: DeterministicCheck[];
   diffs: DiffResult[];
   industry?: IndustryType; // 行业类型
   rotation?: number; // 旋转角度

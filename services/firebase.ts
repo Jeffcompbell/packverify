@@ -283,6 +283,12 @@ export interface CloudImageData {
   issues: DiagnosisIssue[];
   deterministicIssues?: DeterministicCheck[];
   diffs: DiffResult[];
+  issuesByModel?: {
+    [modelId: string]: {
+      issues: DiagnosisIssue[];
+      deterministicIssues: DeterministicCheck[];
+    }
+  };
   createdAt: any;
   updatedAt: any;
 }
@@ -416,7 +422,7 @@ export const updateImageInCloud = async (
   uid: string,
   sessionId: string,
   imageId: string,
-  updates: Partial<Pick<ImageItem, 'description' | 'ocrText' | 'specs' | 'issues' | 'deterministicIssues' | 'diffs'>>
+  updates: Partial<Pick<ImageItem, 'description' | 'ocrText' | 'specs' | 'issues' | 'deterministicIssues' | 'diffs' | 'issuesByModel'>>
 ): Promise<void> => {
   try {
     const imageRef = doc(db, 'users', uid, 'sessions', sessionId, 'images', imageId);

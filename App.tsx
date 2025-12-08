@@ -108,7 +108,8 @@ const App: React.FC = () => {
           specs: item.specs || [],
           issues: item.issues || [],
           deterministicIssues: item.deterministicIssues || [],
-          diffs: item.diffs || []
+          diffs: item.diffs || [],
+          issuesByModel: item.issuesByModel || {}
         }));
 
         if (restoredImages.length > 0) {
@@ -140,7 +141,8 @@ const App: React.FC = () => {
         specs: img.specs,
         issues: img.issues,
         deterministicIssues: img.deterministicIssues,
-        diffs: img.diffs
+        diffs: img.diffs,
+        issuesByModel: img.issuesByModel
       }));
 
       const data = {
@@ -234,7 +236,8 @@ const App: React.FC = () => {
                   specs: cloudImg.specs || [],
                   issues: cloudImg.issues || [],
                   deterministicIssues: cloudImg.deterministicIssues || [],
-                  diffs: cloudImg.diffs || []
+                  diffs: cloudImg.diffs || [],
+                  issuesByModel: cloudImg.issuesByModel || {}
                 };
               })
             );
@@ -313,7 +316,8 @@ const App: React.FC = () => {
         file: file,
         specs: [],
         issues: [],
-        diffs: []
+        diffs: [],
+        issuesByModel: {}
       };
 
       setImages(prev => [...prev, newImage]);
@@ -335,6 +339,7 @@ const App: React.FC = () => {
         category: s.category
       }));
 
+      const usedModelId = getModelId();
       setImages(prev => prev.map(img =>
         img.id === newImageId ? {
           ...img,
@@ -342,7 +347,14 @@ const App: React.FC = () => {
           description: diagResult.description,
           ocrText: diagResult.ocrText,
           deterministicIssues: diagResult.deterministicIssues,
-          specs: imageSpecs
+          specs: imageSpecs,
+          issuesByModel: {
+            ...img.issuesByModel,
+            [usedModelId]: {
+              issues: diagResult.issues,
+              deterministicIssues: diagResult.deterministicIssues
+            }
+          }
         } : img
       ));
 
@@ -375,7 +387,8 @@ const App: React.FC = () => {
             specs: imageSpecs,
             issues: diagResult.issues,
             deterministicIssues: diagResult.deterministicIssues,
-            diffs: diffs
+            diffs: diffs,
+            issuesByModel: {}
           };
           await saveImageToCloud(user.uid, sessionId, finalImage);
           console.log('Image synced to cloud:', newImageId);
@@ -434,6 +447,7 @@ const App: React.FC = () => {
         diffs = localDiffSpecs(manualSourceFields, imageSpecs);
       }
 
+      const usedModelId = getModelId();
       setImages(prev => prev.map(img =>
         img.id === imageId ? {
           ...img,
@@ -442,7 +456,14 @@ const App: React.FC = () => {
           ocrText: diagResult.ocrText,
           deterministicIssues: diagResult.deterministicIssues,
           specs: imageSpecs,
-          diffs: diffs
+          diffs: diffs,
+          issuesByModel: {
+            ...img.issuesByModel,
+            [usedModelId]: {
+              issues: diagResult.issues,
+              deterministicIssues: diagResult.deterministicIssues
+            }
+          }
         } : img
       ));
 
@@ -454,13 +475,15 @@ const App: React.FC = () => {
       // 云同步 - 更新图片数据
       if (cloudSyncEnabled && sessionId) {
         try {
+          const updatedImage = images.find(img => img.id === imageId);
           await updateImageInCloud(user.uid, sessionId, imageId, {
             description: diagResult.description,
             ocrText: diagResult.ocrText,
             specs: imageSpecs,
             issues: diagResult.issues,
             deterministicIssues: diagResult.deterministicIssues,
-            diffs: diffs
+            diffs: diffs,
+            issuesByModel: updatedImage?.issuesByModel
           });
           console.log('Image updated in cloud:', imageId);
         } catch (syncError) {
@@ -475,6 +498,82 @@ const App: React.FC = () => {
       setProcessingImageId(null);
     }
   }, [user, images, manualSourceFields, cloudSyncEnabled, sessionId]);
+
+  // 添加新模型分析（将结果存储到 issuesByModel）
+  const handleAddModelAnalysis = useCallback(async (imageId: string, modelId: string) => {
+    if (!user) {
+      setShowLoginModal(true);
+      return;
+    }
+
+    const image = images.find(img => img.id === imageId);
+    if (!image) return;
+
+    if (user.used >= user.quota) {
+      setErrorMessage(`配额已用完（${user.used}/${user.quota}）`);
+      return;
+    }
+
+    // 立即创建新 tab（空数据，显示 loading）
+    setImages(prev => prev.map(img =>
+      img.id === imageId ? {
+        ...img,
+        issuesByModel: {
+          ...img.issuesByModel,
+          [modelId]: { issues: [], deterministicIssues: [] }
+        }
+      } : img
+    ));
+
+    try {
+      setIsProcessing(true);
+      setProcessingImageId(imageId);
+      setErrorMessage(null);
+
+      // 临时切换模型
+      const previousModel = getModelId();
+      setModelId(modelId);
+
+      const diagResult = await diagnoseImage(image.base64, image.file.type, (step) => {
+        setProcessingStep(step);
+      });
+
+      // 恢复之前的模型
+      setModelId(previousModel);
+
+      // 更新分析结果
+      const newIssuesByModel = {
+        ...image.issuesByModel,
+        [modelId]: {
+          issues: diagResult.issues,
+          deterministicIssues: diagResult.deterministicIssues
+        }
+      };
+      setImages(prev => prev.map(img =>
+        img.id === imageId ? { ...img, issuesByModel: newIssuesByModel } : img
+      ));
+
+      // 消耗配额
+      await useQuotaFirebase(user.uid, 1, image.file.name, 'analyze');
+      const updatedUser = await getUserData(user.uid);
+      if (updatedUser) setUser(updatedUser);
+
+      // 云同步
+      if (cloudSyncEnabled && sessionId) {
+        try {
+          await updateImageInCloud(user.uid, sessionId, imageId, { issuesByModel: newIssuesByModel });
+        } catch (syncError) {
+          console.error('Cloud sync failed:', syncError);
+        }
+      }
+
+    } catch (error: any) {
+      setErrorMessage(error.message || "模型分析失败");
+    } finally {
+      setIsProcessing(false);
+      setProcessingImageId(null);
+    }
+  }, [user, images, cloudSyncEnabled, sessionId]);
 
   const handleUpdateQilFields = useCallback(async (fields: SourceField[], rawText: string) => {
     setManualSourceFields(fields);
@@ -582,7 +681,8 @@ const App: React.FC = () => {
                 specs: cloudImg.specs || [],
                 issues: cloudImg.issues || [],
                 deterministicIssues: cloudImg.deterministicIssues || [],
-                diffs: cloudImg.diffs || []
+                diffs: cloudImg.diffs || [],
+                issuesByModel: cloudImg.issuesByModel || {}
               };
             })
           );
@@ -1253,14 +1353,31 @@ const App: React.FC = () => {
         {/* RIGHT: Issues Panel */}
         <IssuesPanel
           currentImage={currentImage}
+          images={images}
+          currentIndex={currentImageIndex}
+          onNavigate={setCurrentImageIndex}
           isCurrentProcessing={isCurrentProcessing}
-          onRetryAnalysis={() => currentImage && handleRetryAnalysis(currentImage.id)}
+          onRetryAnalysis={(modelId) => currentImage && handleRetryAnalysis(currentImage.id)}
           selectedIssueId={selectedIssueId}
           onSelectIssue={setSelectedIssueId}
           copiedId={copiedId}
           onCopy={handleCopy}
           mobileTab={mobileTab}
           issueListRef={issueListRef}
+          currentModelId={currentModel}
+          onAddModel={(modelId) => currentImage && handleAddModelAnalysis(currentImage.id, modelId)}
+          onRemoveModel={async (modelId) => {
+            if (!currentImage) return;
+            const { [modelId]: _, ...newIssuesByModel } = currentImage.issuesByModel || {};
+            setImages(prev => prev.map(img =>
+              img.id === currentImage.id ? { ...img, issuesByModel: newIssuesByModel } : img
+            ));
+            if (cloudSyncEnabled && sessionId && user) {
+              try {
+                await updateImageInCloud(user.uid, sessionId, currentImage.id, { issuesByModel: newIssuesByModel });
+              } catch (e) { console.error('Cloud sync failed:', e); }
+            }
+          }}
         />
       </div>
 
