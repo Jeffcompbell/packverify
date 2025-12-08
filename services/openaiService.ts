@@ -30,51 +30,63 @@ const getClient = () => {
     });
 };
 
-export const diagnoseImage = async (base64Image: string, mimeType: string): Promise<DiagnosisResult> => {
+// 从环境变量获取模型ID，默认为 gpt-5.1（最新最强模型）
+let currentModelId = import.meta.env.VITE_OPENAI_MODEL || "openai/gpt-5.1";
+
+export const getModelId = () => currentModelId;
+
+export const setModelId = (modelId: string) => {
+    currentModelId = modelId;
+    console.log("Model changed to:", currentModelId);
+};
+
+// 可用的模型列表 - zenmux.ai 代理已测试验证
+// 注意：模型ID需要使用 openai/ 前缀
+export const AVAILABLE_MODELS = [
+    // GPT-5.1 (2025年最新，已验证可用)
+    { id: "openai/gpt-5.1", name: "GPT-5.1", description: "最新旗舰模型（推荐）" },
+    // GPT-4.1 系列 (已验证可用)
+    { id: "openai/gpt-4.1", name: "GPT-4.1", description: "百万上下文，长文本专家" },
+    // GPT-4o 系列 (已验证可用)
+    { id: "openai/gpt-4o", name: "GPT-4o", description: "多模态模型，稳定可靠" },
+    { id: "openai/gpt-4o-mini", name: "GPT-4o Mini", description: "快速轻量版" },
+];
+
+// Step 1: Initial image analysis - GPT vision first pass
+export const initialImageAnalysis = async (base64Image: string, mimeType: string): Promise<{ description: string; initialIssues: any[]; observedText: string }> => {
     try {
         const client = getClient();
-        const modelId = "openai/gpt-4o";
+        const modelId = getModelId();
+        console.log("Step 1: Initial vision analysis with model:", modelId);
 
-        const prompt = `
-      角色：资深印前专家和包装QC专员。
-      任务：对这张包装设计图片进行严格的8点"印前飞行检查"。
+        const prompt = `你是资深印前QC专员，专门检查包装印刷品。请仔细分析这张包装设计图片。
 
-      **首先**：用一句话简洁描述这张图片的内容（如：这是一款xxx品牌的xxx产品包装，展示了xxx）。
+## 任务
+1. 描述图片内容
+2. 列出你看到的所有文字内容（包括产品名、品牌、成分、日期、条码等）
+3. 初步标记可能存在的问题
 
-      然后检查以下8个具体类别：
-      1. 文件设置：版面问题、视觉层级、潜在图层错误。
-      2. 字体/版权：识别看起来像系统字体（Arial/SimSun/宋体/黑体）可能未转曲的文本，或非常小（<5pt）可能印刷不清晰的文本。
-      3. 图像质量：寻找像素化、低分辨率位图或表示缺少嵌入的水印痕迹。
-      4. 颜色设置：关键 - 识别可能是"四色黑"（CMYK）而不是"单色黑"（K100）的小黑字。这会导致套准问题。
-      5. 出血/边距：检查文字/标志是否太靠近边缘（安全区域违规）或出血区域是否缺失。
-      6. 内容/校对：**重点检查以下常见印刷文字错误**：
-         - 错别字：形近字混淆（如"已/己/巳"、"戊/戌/戍"、"未/末"、"折/拆"）
-         - 同音字错误：如"这里/这理"、"以后/已后"、"做/作"、"的/地/得"
-         - 标点符号错误：中英文标点混用、缺少标点、标点位置错误
-         - 数字错误：日期、重量、价格等数字是否合理
-         - 拼写错误：英文单词拼写、品牌名拼写
-         - 重复文字：同一词语意外重复（如"的的"、"了了"）
-         - 漏字/多字：句子不完整、多余字符
-         - 断句问题：换行位置不当导致的阅读困难
-         - 空格问题：缺少空格、多余空格、中英文混排空格
-         - 大小写错误：专有名词首字母大小写
-         - 格式不一致：同类信息格式不统一（如日期格式）
-      7. 注释：刀模线（切割线）、折叠线或尺寸是否可见？是否有清晰标记？
-      8. 格式：一般输出格式问题。
+## 重点检查
+- 英文单词是否缺少空格（如"HelloWorld"应为"Hello World"）
+- 中文是否有错别字
+- 标点符号是否正确
+- 排版是否有问题
 
-      **重要：所有返回内容必须使用中文！**
+## 输出JSON
+{
+  "description": "一句话描述图片（产品类型、品牌）",
+  "observedText": "按位置顺序列出图片中所有可见文字，用换行分隔",
+  "initialIssues": [
+    {
+      "type": "content",
+      "text": "可能的问题描述",
+      "location": "问题在图片中的大致位置",
+      "confidence": "high/medium/low"
+    }
+  ]
+}
 
-      返回JSON格式：
-      {
-        "description": "图片内容的一句话描述",
-        "issues": [
-          { "type": "color", "text": "成分表文字", "suggestion": "检测到可能的四色黑...", "severity": "high", "box_2d": [400, 100, 450, 300] }
-        ]
-      }
-
-      type映射到：'file_setting', 'font', 'image_quality', 'color', 'bleed', 'content', 'annotation', 'format', 'compliance'
-      box_2d格式：[ymin, xmin, ymax, xmax]，0-1000比例
-    `;
+注意：这是第一轮分析，后续会用OCR复核。请尽可能准确识别文字和标记疑点。`;
 
         const response = await client.chat.completions.create({
             model: modelId,
@@ -97,10 +109,144 @@ export const diagnoseImage = async (base64Image: string, mimeType: string): Prom
         });
 
         const text = response.choices[0].message.content;
-        if (!text) return { description: '', issues: [] };
+        if (!text) return { description: '', initialIssues: [], observedText: '' };
 
         const parsed = JSON.parse(text);
-        const description = parsed.description || '';
+        return {
+            description: parsed.description || '',
+            initialIssues: parsed.initialIssues || [],
+            observedText: parsed.observedText || ''
+        };
+    } catch (error) {
+        console.error("Initial analysis failed:", error);
+        throw error;
+    }
+};
+
+// Step 2: OCR text extraction
+export const ocrExtractText = async (base64Image: string, mimeType: string): Promise<string> => {
+    try {
+        const client = getClient();
+        const modelId = getModelId();
+        console.log("Step 2: OCR text extraction with model:", modelId);
+
+        const prompt = `请作为OCR系统，精确提取这张图片中的所有文字。
+
+要求：
+1. 逐字逐词提取，保持原始格式
+2. 包括所有可见文字：标题、正文、小字、条形码数字
+3. 保留空格和标点符号的原始状态
+4. 如果看到"HelloWorld"没有空格，就输出"HelloWorld"（不要自动加空格）
+5. 按从上到下、从左到右的顺序输出
+
+只输出提取的文字，不要任何解释或标注。`;
+
+        const response = await client.chat.completions.create({
+            model: modelId,
+            messages: [
+                {
+                    role: "user",
+                    content: [
+                        { type: "text", text: prompt },
+                        {
+                            type: "image_url",
+                            image_url: {
+                                url: `data:${mimeType};base64,${base64Image}`,
+                                detail: "high"
+                            }
+                        }
+                    ]
+                }
+            ]
+        });
+
+        return response.choices[0].message.content || '';
+    } catch (error) {
+        console.error("OCR extraction failed:", error);
+        throw error;
+    }
+};
+
+// Step 3: Final verification - combine initial analysis + OCR for definitive conclusions
+export const finalVerification = async (
+    initialAnalysis: { description: string; initialIssues: any[]; observedText: string },
+    ocrText: string,
+    base64Image: string,
+    mimeType: string
+): Promise<DiagnosisResult> => {
+    try {
+        const client = getClient();
+        const modelId = getModelId();
+        console.log("Step 3: Final verification with model:", modelId);
+
+        const prompt = `你是资深印前QC终审专员。请基于两轮分析结果，给出最终结论。
+
+## 第一轮：视觉分析结果
+描述：${initialAnalysis.description}
+观察到的文字：
+${initialAnalysis.observedText}
+
+初步发现的问题：
+${JSON.stringify(initialAnalysis.initialIssues, null, 2)}
+
+## 第二轮：OCR精确提取的文字
+${ocrText}
+
+## 你的任务
+1. 对比两轮结果，确认哪些问题是真实存在的
+2. 检查OCR文字中是否有第一轮遗漏的问题
+3. 重点关注：
+   - 英文单词间缺少空格（如"HelloWorld"应为"Hello World"）
+   - 中文错别字
+   - 中英文标点混用
+   - 排版对齐问题
+
+## 输出最终确认的问题
+返回JSON格式：
+{
+  "description": "图片描述",
+  "issues": [
+    {
+      "type": "content",
+      "text": "确认的问题，引用原文",
+      "suggestion": "修改建议",
+      "severity": "high/medium/low",
+      "box_2d": [ymin, xmin, ymax, xmax]
+    }
+  ]
+}
+
+规则：
+- 只报告两轮分析都确认的问题，减少误报
+- text必须引用OCR提取的原文
+- 没有确认问题就返回空数组
+- severity: high=严重影响印刷质量, medium=建议修改, low=轻微问题`;
+
+        const response = await client.chat.completions.create({
+            model: modelId,
+            messages: [
+                {
+                    role: "user",
+                    content: [
+                        { type: "text", text: prompt },
+                        {
+                            type: "image_url",
+                            image_url: {
+                                url: `data:${mimeType};base64,${base64Image}`,
+                                detail: "high"
+                            }
+                        }
+                    ]
+                }
+            ],
+            response_format: { type: "json_object" }
+        });
+
+        const text = response.choices[0].message.content;
+        if (!text) return { description: initialAnalysis.description, issues: [] };
+
+        const parsed = JSON.parse(text);
+        const description = parsed.description || initialAnalysis.description;
         const data = parsed.issues || [];
 
         const issues = Array.isArray(data) ? data.map((item: any, idx: number) => ({
@@ -116,6 +262,31 @@ export const diagnoseImage = async (base64Image: string, mimeType: string): Prom
 
         return { description, issues };
     } catch (error) {
+        console.error("Final verification failed:", error);
+        throw error;
+    }
+};
+
+// Main diagnosis function - three-step process for maximum accuracy
+export const diagnoseImage = async (base64Image: string, mimeType: string): Promise<DiagnosisResult> => {
+    try {
+        console.log("Starting three-step analysis (Vision → OCR → Verification)...");
+
+        // Step 1: Initial vision analysis
+        const initialAnalysis = await initialImageAnalysis(base64Image, mimeType);
+        console.log("Step 1 complete. Description:", initialAnalysis.description);
+        console.log("Initial issues found:", initialAnalysis.initialIssues.length);
+
+        // Step 2: OCR text extraction
+        const ocrText = await ocrExtractText(base64Image, mimeType);
+        console.log("Step 2 complete. OCR text length:", ocrText.length);
+
+        // Step 3: Final verification combining both results
+        const result = await finalVerification(initialAnalysis, ocrText, base64Image, mimeType);
+        console.log("Step 3 complete. Final issues:", result.issues.length);
+
+        return result;
+    } catch (error) {
         console.error("Diagnosis failed:", error);
         throw error;
     }
@@ -124,7 +295,7 @@ export const diagnoseImage = async (base64Image: string, mimeType: string): Prom
 export const parseSourceText = async (sourceText: string): Promise<SourceField[]> => {
     try {
         const client = getClient();
-        const modelId = "openai/gpt-4o";
+        const modelId = getModelId();
 
         const prompt = `
       任务：将以下包装源文本解析为结构化的键值对。
@@ -161,7 +332,7 @@ export const parseSourceText = async (sourceText: string): Promise<SourceField[]
 export const extractProductSpecs = async (base64Image: string, mimeType: string): Promise<SourceField[]> => {
     try {
         const client = getClient();
-        const modelId = "openai/gpt-4o";
+        const modelId = getModelId();
 
         const prompt = `
       任务：从这张包装图片中提取所有可见的产品信息，生成产品规格表。
@@ -223,7 +394,7 @@ export const performSmartDiff = async (
 ): Promise<DiffResult[]> => {
     try {
         const client = getClient();
-        const modelId = "openai/gpt-4o";
+        const modelId = getModelId();
 
         const sourceJson = JSON.stringify(sourceFields);
 

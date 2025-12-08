@@ -1,6 +1,6 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { CanvasTransform, DiagnosisIssue, DiffResult, ViewLayers, BoundingBox, ImageItem } from '../types';
-import { AlertCircle, CheckCircle, Info, XCircle, ImagePlus, Loader2, Trash2, FileText, AlertTriangle, Package } from 'lucide-react';
+import { AlertCircle, CheckCircle, Info, XCircle, ImagePlus, Loader2, Trash2, FileText, AlertTriangle, RefreshCw, Copy, CheckCheck, Upload } from 'lucide-react';
 
 interface InfiniteCanvasProps {
   images: ImageItem[];
@@ -15,6 +15,7 @@ interface InfiniteCanvasProps {
   isProcessing: boolean;
   processingImageId: string | null;
   onRemoveImage: (id: string) => void;
+  onRetryAnalysis?: (imageId: string) => void;
 }
 
 export const InfiniteCanvas: React.FC<InfiniteCanvasProps> = ({
@@ -29,13 +30,25 @@ export const InfiniteCanvas: React.FC<InfiniteCanvasProps> = ({
   onUpload,
   isProcessing,
   processingImageId,
-  onRemoveImage
+  onRemoveImage,
+  onRetryAnalysis
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [lastMouse, setLastMouse] = useState({ x: 0, y: 0 });
   const [isDragOver, setIsDragOver] = useState(false);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  const handleCopy = async (text: string, id: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedId(id);
+      setTimeout(() => setCopiedId(null), 2000);
+    } catch (err) {
+      console.error('Failed to copy:', err);
+    }
+  };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -165,16 +178,27 @@ export const InfiniteCanvas: React.FC<InfiniteCanvasProps> = ({
                     draggable={false}
                   />
 
-                  {/* 悬停时显示文件名和删除按钮 */}
+                  {/* 悬停时显示文件名、重试和删除按钮 */}
                   <div className="absolute top-2 left-2 right-2 flex items-center justify-between opacity-0 group-hover:opacity-100 transition-opacity">
-                    <span className="text-[11px] text-white bg-black/70 backdrop-blur px-2.5 py-1.5 rounded truncate max-w-[280px]">{imgItem.file.name}</span>
-                    <button
-                      onClick={(e) => { e.stopPropagation(); onRemoveImage(imgItem.id); }}
-                      className="p-1.5 bg-red-500/80 hover:bg-red-500 text-white rounded-full transition-colors"
-                      title="删除"
-                    >
-                      <Trash2 size={12} />
-                    </button>
+                    <span className="text-[11px] text-white bg-black/70 backdrop-blur px-2.5 py-1.5 rounded truncate max-w-[220px]">{imgItem.file.name}</span>
+                    <div className="flex items-center gap-1.5">
+                      {onRetryAnalysis && !isThisProcessing && (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); onRetryAnalysis(imgItem.id); }}
+                          className="p-1.5 bg-indigo-500/80 hover:bg-indigo-500 text-white rounded-full transition-colors"
+                          title="重新分析 (切换模型后可重试)"
+                        >
+                          <RefreshCw size={12} />
+                        </button>
+                      )}
+                      <button
+                        onClick={(e) => { e.stopPropagation(); onRemoveImage(imgItem.id); }}
+                        className="p-1.5 bg-red-500/80 hover:bg-red-500 text-white rounded-full transition-colors"
+                        title="删除"
+                      >
+                        <Trash2 size={12} />
+                      </button>
+                    </div>
                   </div>
 
                   {/* 扫描动画 */}
@@ -248,8 +272,8 @@ export const InfiniteCanvas: React.FC<InfiniteCanvasProps> = ({
                   ))}
                 </div>
 
-                {/* 下部：分析结果区域 */}
-                <div className="flex-1 flex flex-col bg-slate-900/50 max-h-[350px] overflow-y-auto">
+                {/* 下部：分析结果区域 - 可滚动 */}
+                <div className="flex-1 flex flex-col bg-slate-900/50 overflow-y-auto" style={{ maxHeight: '400px' }}>
 
                   {/* 图片描述 */}
                   {imgItem.description && (
@@ -262,38 +286,9 @@ export const InfiniteCanvas: React.FC<InfiniteCanvasProps> = ({
                     </div>
                   )}
 
-                  {/* 参数表格 */}
-                  {imgItem.specs && imgItem.specs.length > 0 && (
-                    <div className="border-b border-slate-700/50">
-                      <div className="px-4 py-2 flex items-center gap-2 bg-slate-800/30">
-                        <Package size={12} className="text-emerald-400" />
-                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">提取参数</span>
-                        <span className="text-[9px] text-slate-500 ml-auto">{imgItem.specs.length} 项</span>
-                      </div>
-                      <table className="w-full text-[11px]">
-                        <thead className="bg-slate-800/50">
-                          <tr>
-                            <th className="px-3 py-1.5 text-left text-slate-500 font-medium w-24">分类</th>
-                            <th className="px-3 py-1.5 text-left text-slate-500 font-medium w-28">项目</th>
-                            <th className="px-3 py-1.5 text-left text-slate-500 font-medium">值</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-800/30">
-                          {imgItem.specs.map((spec, idx) => (
-                            <tr key={idx} className="hover:bg-slate-800/30">
-                              <td className="px-3 py-1.5 text-slate-500 font-mono text-[10px]">{spec.category}</td>
-                              <td className="px-3 py-1.5 text-slate-300">{spec.key}</td>
-                              <td className="px-3 py-1.5 text-slate-400 font-mono">{spec.value}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
-
-                  {/* 问题表格 */}
+                  {/* 检测问题 - List 形式 */}
                   <div className="flex-1">
-                    <div className="px-4 py-2 flex items-center gap-2 bg-slate-800/30">
+                    <div className="px-4 py-2 flex items-center gap-2 bg-slate-800/30 border-b border-slate-700/50">
                       <AlertTriangle size={12} className="text-amber-400" />
                       <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">检测问题</span>
                       {imgItem.issues.length > 0 ? (
@@ -304,55 +299,65 @@ export const InfiniteCanvas: React.FC<InfiniteCanvasProps> = ({
                     </div>
 
                     {isThisProcessing ? (
-                      <div className="flex items-center justify-center py-6 text-slate-500">
+                      <div className="flex items-center justify-center py-8 text-slate-500">
                         <div className="flex items-center gap-2">
-                          <div className="w-3 h-3 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
-                          <span className="text-[11px]">分析中...</span>
+                          <div className="w-4 h-4 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
+                          <span className="text-xs">AI 正在分析...</span>
                         </div>
                       </div>
                     ) : imgItem.issues.length === 0 ? (
-                      <div className="flex items-center justify-center py-4 text-slate-600">
-                        <CheckCircle size={14} className="mr-1.5 text-emerald-500/50" />
-                        <span className="text-[11px]">未检测到问题</span>
+                      <div className="flex items-center justify-center py-6 text-slate-600">
+                        <CheckCircle size={16} className="mr-2 text-emerald-500/50" />
+                        <span className="text-xs">未检测到问题</span>
                       </div>
                     ) : (
-                      <table className="w-full text-[11px]">
-                        <thead className="bg-slate-800/50">
-                          <tr>
-                            <th className="px-3 py-1.5 text-left text-slate-500 font-medium w-16">级别</th>
-                            <th className="px-3 py-1.5 text-left text-slate-500 font-medium w-20">类型</th>
-                            <th className="px-3 py-1.5 text-left text-slate-500 font-medium">问题描述</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-800/30">
-                          {imgItem.issues.map((issue) => (
-                            <tr
-                              key={issue.id}
-                              onClick={() => onSelect(issue.id)}
-                              className={`cursor-pointer transition-colors ${selectedId === issue.id ? 'bg-indigo-500/20' : 'hover:bg-slate-800/30'}`}
-                            >
-                              <td className="px-3 py-1.5">
-                                <span className={`inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded ${
-                                  issue.severity === 'high'
-                                    ? 'bg-red-500/20 text-red-400'
-                                    : issue.severity === 'medium'
-                                      ? 'bg-amber-500/20 text-amber-400'
-                                      : 'bg-slate-500/20 text-slate-400'
-                                }`}>
-                                  {issue.severity === 'high' ? '紧急' : issue.severity === 'medium' ? '警告' : '提示'}
-                                </span>
-                              </td>
-                              <td className="px-3 py-1.5 text-slate-400 font-mono text-[10px]">{issue.type}</td>
-                              <td className="px-3 py-1.5">
-                                <p className="text-slate-300 truncate max-w-[200px]" title={issue.text}>{issue.text}</p>
-                                {issue.suggestion && (
-                                  <p className="text-[10px] text-slate-500 truncate max-w-[200px]" title={issue.suggestion}>{issue.suggestion}</p>
+                      <div className="p-3 space-y-2">
+                        {imgItem.issues.map((issue) => (
+                          <div
+                            key={issue.id}
+                            onClick={() => onSelect(issue.id)}
+                            className={`p-3 rounded-lg cursor-pointer transition-all group/issue ${
+                              selectedId === issue.id
+                                ? 'bg-indigo-500/20 border border-indigo-500/50'
+                                : 'bg-slate-800/50 border border-transparent hover:bg-slate-800 hover:border-slate-700'
+                            }`}
+                          >
+                            <div className="flex items-center gap-2 mb-1.5">
+                              <span className={`w-2 h-2 rounded-full shrink-0 ${
+                                issue.severity === 'high' ? 'bg-red-500' : issue.severity === 'medium' ? 'bg-amber-500' : 'bg-slate-500'
+                              }`}></span>
+                              <span className={`text-[9px] font-bold uppercase px-1.5 py-0.5 rounded ${
+                                issue.severity === 'high'
+                                  ? 'bg-red-500/20 text-red-400'
+                                  : issue.severity === 'medium'
+                                    ? 'bg-amber-500/20 text-amber-400'
+                                    : 'bg-slate-500/20 text-slate-400'
+                              }`}>
+                                {issue.severity === 'high' ? '紧急' : issue.severity === 'medium' ? '警告' : '提示'}
+                              </span>
+                              <span className="text-[9px] text-slate-500 font-mono">{issue.type}</span>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleCopy(`[${issue.severity === 'high' ? '紧急' : issue.severity === 'medium' ? '警告' : '提示'}] ${issue.text}${issue.suggestion ? `\n建议: ${issue.suggestion}` : ''}`, issue.id);
+                                }}
+                                className="ml-auto p-1 rounded hover:bg-slate-700 transition-colors opacity-0 group-hover/issue:opacity-100"
+                                title="复制问题"
+                              >
+                                {copiedId === issue.id ? (
+                                  <CheckCheck size={12} className="text-emerald-400" />
+                                ) : (
+                                  <Copy size={12} className="text-slate-500" />
                                 )}
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
+                              </button>
+                            </div>
+                            <p className="text-xs text-slate-200 leading-relaxed mb-1">{issue.text}</p>
+                            {issue.suggestion && (
+                              <p className="text-[11px] text-slate-500 leading-relaxed">💡 {issue.suggestion}</p>
+                            )}
+                          </div>
+                        ))}
+                      </div>
                     )}
                   </div>
                 </div>
@@ -360,18 +365,24 @@ export const InfiniteCanvas: React.FC<InfiniteCanvasProps> = ({
             );
           })}
 
-          {/* 添加新图片的空白卡片 */}
+          {/* 添加新图片的空白卡片 - 默认粘贴，点击按钮上传 */}
           {images.length < 8 && (
             <div
-              onClick={() => fileInputRef.current?.click()}
-              className="w-[420px] min-h-[500px] bg-slate-800/20 hover:bg-slate-800/40 transition-all flex flex-col items-center justify-center border-2 border-slate-700/50 border-dashed rounded-xl cursor-pointer group shrink-0 hover:border-indigo-500/50"
+              className="w-[420px] min-h-[500px] bg-slate-800/20 transition-all flex flex-col items-center justify-center border-2 border-slate-700/50 border-dashed rounded-xl group shrink-0 hover:border-indigo-500/50 hover:bg-slate-800/30"
             >
-              <div className="p-5 bg-slate-800/50 rounded-full mb-4 group-hover:scale-110 group-hover:bg-indigo-600/30 transition-all">
-                <ImagePlus className="text-slate-400 group-hover:text-indigo-400" size={40} />
+              <div className="p-5 bg-slate-800/50 rounded-full mb-4 group-hover:scale-105 transition-all">
+                <ImagePlus className="text-slate-400" size={40} />
               </div>
-              <p className="text-slate-400 font-medium text-base group-hover:text-slate-300">点击添加图片</p>
-              <p className="text-slate-600 text-sm mt-2">或拖拽/粘贴上传</p>
-              <p className="text-slate-700 text-xs mt-6">{images.length}/8 张</p>
+              <p className="text-slate-400 font-medium text-base">Ctrl+V 粘贴图片</p>
+              <p className="text-slate-600 text-sm mt-2">或拖拽图片到任意位置</p>
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                className="mt-6 px-4 py-2 bg-indigo-600/80 hover:bg-indigo-600 text-white text-sm font-medium rounded-lg transition-colors flex items-center gap-2"
+              >
+                <Upload size={16} />
+                选择文件上传
+              </button>
+              <p className="text-slate-700 text-xs mt-4">{images.length}/8 张</p>
             </div>
           )}
         </div>
