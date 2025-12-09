@@ -106,34 +106,34 @@ export const AVAILABLE_MODELS: ModelConfig[] = [
     {
         id: "gemini-3-pro-preview",
         name: "Gemini 3 Pro",
-        description: "PackyAPI 代理（默认）",
+        description: "最新版本（推荐）",
         baseURL: "https://api-slb.packyapi.com/v1",
         apiKeyEnv: "VITE_GEMINI_API_KEY"
     },
     // Zenmux Gemini 系列（备选）
     {
         id: "google/gemini-3-pro-preview",
-        name: "Gemini 3 Pro (Zen)",
-        description: "Zenmux 代理",
+        name: "Gemini 3 Pro",
+        description: "备用线路",
         baseURL: "https://zenmux.ai/api/v1"
     },
     {
         id: "google/gemini-2.5-pro",
         name: "Gemini 2.5 Pro",
-        description: "稳定版",
+        description: "稳定版本",
         baseURL: "https://zenmux.ai/api/v1"
     },
     {
         id: "google/gemini-2.5-flash",
         name: "Gemini 2.5 Flash",
-        description: "快速版",
+        description: "快速版本",
         baseURL: "https://zenmux.ai/api/v1"
     },
     // OpenAI 系列（备选）
     {
         id: "openai/gpt-4o",
         name: "GPT-4o",
-        description: "OpenAI 多模态",
+        description: "多模态模型",
         baseURL: "https://zenmux.ai/api/v1"
     },
 ];
