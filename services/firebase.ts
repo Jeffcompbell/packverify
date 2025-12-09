@@ -48,8 +48,9 @@ export const signInWithGoogle = async (): Promise<UserData | null> => {
     const result = await signInWithPopup(auth, googleProvider);
     const user = result.user;
 
-    // 获取或创建用户数据
-    const userData = await getOrCreateUser(user);
+    // 动态导入 cloudflare.ts 的 getOrCreateUser 避免循环依赖
+    const { getOrCreateUser: getOrCreateUserFromCloudflare } = await import('./cloudflare');
+    const userData = await getOrCreateUserFromCloudflare(user);
     return userData;
   } catch (error: any) {
     console.error('Google sign in error:', error);
