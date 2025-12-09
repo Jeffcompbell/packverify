@@ -531,6 +531,8 @@ ${checkItemsList}
 
         // ✅ 检测是否被截断
         const finishReason = response.choices[0].finish_reason;
+        console.log(`🏁 Finish reason: ${finishReason}`);
+
         if (finishReason === 'length') {
             console.error('⚠️  Output truncated! Response reached max_tokens limit.');
             console.error(`   Max tokens: ${includeOcr ? 4500 : 2000}, Used: ${response.usage?.completion_tokens || 0}`);
@@ -555,9 +557,15 @@ ${checkItemsList}
         // 4. 解析响应
         const parseStart = Date.now();
         const text = response.choices[0].message.content;
+
+        // ✅ 详细日志
+        console.log(`📝 Response content type: ${typeof text}`);
+        console.log(`📝 Response content length: ${text?.length || 0}`);
+
         if (!text) {
-            console.warn('⚠️  No response text');
-            return { description: '', ocrText: '', issues: [], specs: [], tokenUsage };
+            console.error('❌ No response text!');
+            console.error('Full response:', JSON.stringify(response, null, 2));
+            throw new Error(`API 返回空内容（finish_reason: ${finishReason}）。可能是 API 错误或模型问题。`);
         }
 
         let parsed;
