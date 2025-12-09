@@ -81,6 +81,9 @@ export interface ImageSpec {
 
 export type IndustryType = 'cosmetics' | 'food' | 'pharma' | 'general';
 
+// 图片分析状态
+export type ImageStatus = 'pending' | 'analyzing' | 'completed' | 'failed';
+
 export interface ImageItem {
   id: string;
   src: string;
@@ -102,6 +105,9 @@ export interface ImageItem {
   diffs: DiffResult[];
   industry?: IndustryType; // 行业类型
   rotation?: number; // 旋转角度
+  status?: ImageStatus; // 分析状态
+  analyzingStartedAt?: number; // 分析开始时间戳（毫秒）
+  errorMessage?: string; // 错误信息
 }
 
 // Token 使用统计

@@ -304,6 +304,9 @@ export interface CloudImageData {
       deterministicIssues: DeterministicCheck[];
     }
   };
+  status?: 'pending' | 'analyzing' | 'completed' | 'failed'; // 分析状态
+  analyzingStartedAt?: number; // 分析开始时间戳
+  errorMessage?: string; // 错误信息
   createdAt: any;
   updatedAt: any;
 }
@@ -416,6 +419,9 @@ export const saveImageToCloud = async (
       issues: image.issues || [],
       deterministicIssues: image.deterministicIssues || [],
       diffs: image.diffs || [],
+      status: image.status || 'pending',
+      analyzingStartedAt: image.analyzingStartedAt || null,
+      errorMessage: image.errorMessage || null,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp()
     });
@@ -437,7 +443,7 @@ export const updateImageInCloud = async (
   uid: string,
   sessionId: string,
   imageId: string,
-  updates: Partial<Pick<ImageItem, 'description' | 'ocrText' | 'specs' | 'issues' | 'deterministicIssues' | 'diffs' | 'issuesByModel'>>
+  updates: Partial<Pick<ImageItem, 'description' | 'ocrText' | 'specs' | 'issues' | 'deterministicIssues' | 'diffs' | 'issuesByModel' | 'status' | 'analyzingStartedAt' | 'errorMessage'>>
 ): Promise<void> => {
   try {
     const imageRef = doc(db, 'users', uid, 'sessions', sessionId, 'images', imageId);
@@ -448,6 +454,24 @@ export const updateImageInCloud = async (
   } catch (error) {
     console.error('Update image in cloud error:', error);
   }
+};
+
+// 更新图片状态（快捷函数）
+export const updateImageStatusInCloud = async (
+  uid: string,
+  sessionId: string,
+  imageId: string,
+  status: 'pending' | 'analyzing' | 'completed' | 'failed',
+  errorMessage?: string
+): Promise<void> => {
+  const updates: any = { status };
+  if (status === 'analyzing') {
+    updates.analyzingStartedAt = Date.now();
+  }
+  if (errorMessage) {
+    updates.errorMessage = errorMessage;
+  }
+  await updateImageInCloud(uid, sessionId, imageId, updates);
 };
 
 // 删除云端图片
@@ -540,6 +564,10 @@ export const loadSessionFromCloud = async (
         issues: data.issues || [],
         deterministicIssues: data.deterministicIssues || [],
         diffs: data.diffs || [],
+        issuesByModel: data.issuesByModel || {},
+        status: data.status || 'pending',
+        analyzingStartedAt: data.analyzingStartedAt,
+        errorMessage: data.errorMessage,
         createdAt: data.createdAt,
         updatedAt: data.updatedAt
       };

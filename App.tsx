@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { diagnoseImage, fileToGenerativePart, parseSourceText, AVAILABLE_MODELS, getModelId, setModelId, parseQILImage, localDiffSpecs, quickCheckImage } from './services/openaiService';
+import { diagnoseImage, fileToGenerativePart, parseSourceText, AVAILABLE_MODELS, getModelId, setModelId, parseQILImage, localDiffSpecs } from './services/openaiService';
 import {
   signInWithGoogle, signOutUser, onAuthChange, getOrCreateUser, getUserData, useQuotaFirebase, UserData,
   getOrCreateSession, saveImageToCloud, updateImageInCloud, deleteImageFromCloud, saveQilToCloud,
   loadSessionFromCloud, clearSessionInCloud, CloudImageData, CloudSession,
-  getUserSessions, createNewSession, updateSessionProductName, getQuotaUsageHistory, QuotaUsageRecord
+  getUserSessions, createNewSession, updateSessionProductName, getQuotaUsageHistory, QuotaUsageRecord,
+  updateImageStatusInCloud
 } from './services/firebase';
 import { DiagnosisIssue, SourceField, DiffResult, ImageItem, ImageSpec, BoundingBox, DeterministicCheck, IndustryType } from './types';
 import {
@@ -338,41 +339,41 @@ const App: React.FC = () => {
       setProcessingImageId(newImageId);
       setErrorMessage(null);
 
-      // 快速预检：判断是否为包装设计图片
-      console.log('Quick checking image type...');
-      const quickCheck = await quickCheckImage(base64, file.type);
-      console.log('Quick check result:', quickCheck);
+      // 直接进行完整分析（已移除预检）
+      console.log('Starting full analysis...');
 
-      // 如果不是包装设计，只显示描述，不进行完整分析
-      if (!quickCheck.isPackaging) {
-        console.log('Not a packaging image, skipping full analysis');
-        setImages(prev => prev.map(img =>
-          img.id === newImageId ? {
-            ...img,
-            description: `⚠️ 非包装图片：${quickCheck.description}`,
-            ocrText: `这不是商品包装设计图片。\n\n检测到的内容：${quickCheck.description}\n\n提示：请上传商品包装、标签、说明书等包装设计相关的图片。`,
-            issues: [],
-            deterministicIssues: [],
-            specs: [],
-            issuesByModel: {
-              [getModelId()]: {
-                issues: [],
-                deterministicIssues: []
-              }
-            }
-          } : img
-        ));
-        setIsProcessing(false);
-        setProcessingImageId(null);
-        return;
+      // 添加超时机制：60秒超时，自动重试一次
+      let diagResult;
+      let retryCount = 0;
+      const maxRetries = 1;
+      const timeoutMs = 60000; // 60秒超时
+
+      while (retryCount <= maxRetries) {
+        try {
+          // 使用 Promise.race 实现超时
+          diagResult = await Promise.race([
+            diagnoseImage(base64, file.type, (step) => {
+              setProcessingStep(step);
+            }, industry),
+            new Promise<never>((_, reject) =>
+              setTimeout(() => reject(new Error('分析超时')), timeoutMs)
+            )
+          ]);
+          break; // 成功，跳出循环
+        } catch (error: any) {
+          retryCount++;
+          if (error.message === '分析超时' && retryCount <= maxRetries) {
+            console.log(`Analysis timeout, retrying (${retryCount}/${maxRetries})...`);
+            continue; // 重试
+          }
+          // 超时且重试次数用完，或其他错误
+          throw error;
+        }
       }
 
-      // 是包装设计，继续完整分析
-      console.log('Packaging image detected, proceeding with full analysis');
-      // 单次 AI 调用完成：OCR + 问题检测 + 规格提取
-      const diagResult = await diagnoseImage(base64, file.type, (step) => {
-        setProcessingStep(step);
-      }, industry);
+      if (!diagResult) {
+        throw new Error('分析失败');
+      }
 
       // 转换 specs 格式
       const imageSpecs: ImageSpec[] = diagResult.specs.map(s => ({
@@ -409,7 +410,7 @@ const App: React.FC = () => {
         ));
       }
 
-      // 消耗配额（包含 token 使用统计）
+      // ✅ 只有成功完成分析，才消耗配额
       const tokenUsage = diagResult.tokenUsage ? {
         promptTokens: diagResult.tokenUsage.promptTokens,
         completionTokens: diagResult.tokenUsage.completionTokens,
@@ -420,41 +421,61 @@ const App: React.FC = () => {
       const updatedUser = await getUserData(user.uid);
       if (updatedUser) setUser(updatedUser);
 
-      // 云同步 - 保存到 Firebase
+      // ✅ 异步云同步 - 分析完成后在后台上传，不阻塞用户
       if (cloudSyncEnabled && sessionId) {
-        setIsSyncing(true);
-        try {
-          // 获取最新的图片数据
-          const finalImage: ImageItem = {
-            id: newImageId,
-            src: url,
-            base64,
-            file,
-            description: diagResult.description,
-            ocrText: diagResult.ocrText,
-            specs: imageSpecs,
-            issues: diagResult.issues,
-            deterministicIssues: diagResult.deterministicIssues,
-            diffs: diffs,
-            issuesByModel: {}
-          };
-          await saveImageToCloud(user.uid, sessionId, finalImage);
-          console.log('Image synced to cloud:', newImageId);
-        } catch (syncError) {
-          console.error('Cloud sync failed:', syncError);
-        } finally {
-          setIsSyncing(false);
-        }
+        const finalImage: ImageItem = {
+          id: newImageId,
+          src: url,
+          base64,
+          file,
+          description: diagResult.description,
+          ocrText: diagResult.ocrText,
+          specs: imageSpecs,
+          issues: diagResult.issues,
+          deterministicIssues: diagResult.deterministicIssues,
+          diffs: diffs,
+          issuesByModel: {}
+        };
+
+        // 🚀 异步上传，不等待完成
+        (async () => {
+          try {
+            setIsSyncing(true);
+            await saveImageToCloud(user.uid, sessionId, finalImage);
+            console.log('✓ Image synced to cloud:', newImageId);
+          } catch (syncError) {
+            console.error('✗ Cloud sync failed:', syncError);
+          } finally {
+            setIsSyncing(false);
+          }
+        })();
       }
 
     } catch (error: any) {
       console.error("Processing failed:", error);
-      setErrorMessage(error.message || "图片处理失败");
+
+      // 🔴 超时错误特殊处理 - 不消耗配额
+      if (error.message === '分析超时') {
+        setErrorMessage("⏱️ 检测超时（已重试）。请点击图片上的重试按钮再次分析，不会消耗额度。");
+        setImages(prev => prev.map(img =>
+          img.id === newImageId ? {
+            ...img,
+            description: '⏱️ 检测超时',
+            ocrText: '分析超时，请重试。提示：如果多次超时，可能是网络问题或图片过大。',
+            issues: [],
+            deterministicIssues: [],
+            specs: [],
+            issuesByModel: {}
+          } : img
+        ));
+      } else {
+        setErrorMessage(error.message || "图片处理失败");
+      }
     } finally {
       setIsProcessing(false);
       setProcessingImageId(null);
     }
-  }, [user, images.length, manualSourceFields, cloudSyncEnabled, sessionId]);
+  }, [user, images.length, manualSourceFields, cloudSyncEnabled, sessionId, industry]);
 
   const handleRetryAnalysis = useCallback(async (imageId: string) => {
     // 未登录时弹出登录框
@@ -477,10 +498,36 @@ const App: React.FC = () => {
       setProcessingImageId(imageId);
       setErrorMessage(null);
 
-      // 单次 AI 调用完成：OCR + 问题检测 + 规格提取
-      const diagResult = await diagnoseImage(image.base64, image.file.type, (step) => {
-        setProcessingStep(step);
-      });
+      // 添加超时机制：60秒超时，自动重试一次
+      let diagResult;
+      let retryCount = 0;
+      const maxRetries = 1;
+      const timeoutMs = 60000;
+
+      while (retryCount <= maxRetries) {
+        try {
+          diagResult = await Promise.race([
+            diagnoseImage(image.base64, image.file.type, (step) => {
+              setProcessingStep(step);
+            }, industry),
+            new Promise<never>((_, reject) =>
+              setTimeout(() => reject(new Error('分析超时')), timeoutMs)
+            )
+          ]);
+          break;
+        } catch (error: any) {
+          retryCount++;
+          if (error.message === '分析超时' && retryCount <= maxRetries) {
+            console.log(`Retry timeout, retrying (${retryCount}/${maxRetries})...`);
+            continue;
+          }
+          throw error;
+        }
+      }
+
+      if (!diagResult) {
+        throw new Error('重新分析失败');
+      }
 
       // 转换 specs 格式
       const imageSpecs: ImageSpec[] = diagResult.specs.map(s => ({
@@ -515,7 +562,7 @@ const App: React.FC = () => {
         } : img
       ));
 
-      // 消耗配额（包含 token 使用统计）
+      // ✅ 只有成功完成，才消耗配额
       const tokenUsage = diagResult.tokenUsage ? {
         promptTokens: diagResult.tokenUsage.promptTokens,
         completionTokens: diagResult.tokenUsage.completionTokens,
@@ -526,39 +573,57 @@ const App: React.FC = () => {
       const updatedUser = await getUserData(user.uid);
       if (updatedUser) setUser(updatedUser);
 
-      // 云同步 - 更新图片数据
+      // ✅ 异步云同步 - 分析完成后在后台更新
       if (cloudSyncEnabled && sessionId) {
-        try {
-          const existingImage = images.find(img => img.id === imageId);
-          const newIssuesByModel = {
-            ...existingImage?.issuesByModel,
-            [usedModelId]: {
-              issues: diagResult.issues,
-              deterministicIssues: diagResult.deterministicIssues
-            }
-          };
-          await updateImageInCloud(user.uid, sessionId, imageId, {
-            description: diagResult.description,
-            ocrText: diagResult.ocrText,
-            specs: imageSpecs,
+        const existingImage = images.find(img => img.id === imageId);
+        const newIssuesByModel = {
+          ...existingImage?.issuesByModel,
+          [usedModelId]: {
             issues: diagResult.issues,
-            deterministicIssues: diagResult.deterministicIssues,
-            diffs: diffs,
-            issuesByModel: newIssuesByModel
-          });
-          console.log('Image updated in cloud:', imageId);
-        } catch (syncError) {
-          console.error('Cloud sync failed:', syncError);
-        }
+            deterministicIssues: diagResult.deterministicIssues
+          }
+        };
+
+        // 🚀 异步更新，不等待
+        (async () => {
+          try {
+            await updateImageInCloud(user.uid, sessionId, imageId, {
+              description: diagResult.description,
+              ocrText: diagResult.ocrText,
+              specs: imageSpecs,
+              issues: diagResult.issues,
+              deterministicIssues: diagResult.deterministicIssues,
+              diffs: diffs,
+              issuesByModel: newIssuesByModel
+            });
+            console.log('✓ Image updated in cloud:', imageId);
+          } catch (syncError) {
+            console.error('✗ Cloud sync failed:', syncError);
+          }
+        })();
       }
 
     } catch (error: any) {
-      setErrorMessage(error.message || "重新分析失败");
+      console.error("Retry failed:", error);
+
+      // 🔴 超时错误特殊处理
+      if (error.message === '分析超时') {
+        setErrorMessage("⏱️ 检测超时（已重试）。请稍后再试，不会消耗额度。");
+        setImages(prev => prev.map(img =>
+          img.id === imageId ? {
+            ...img,
+            description: '⏱️ 检测超时',
+            ocrText: '分析超时，请重试。'
+          } : img
+        ));
+      } else {
+        setErrorMessage(error.message || "重新分析失败");
+      }
     } finally {
       setIsProcessing(false);
       setProcessingImageId(null);
     }
-  }, [user, images, manualSourceFields, cloudSyncEnabled, sessionId]);
+  }, [user, images, manualSourceFields, cloudSyncEnabled, sessionId, industry]);
 
   // 添加新模型分析（将结果存储到 issuesByModel）
   const handleAddModelAnalysis = useCallback(async (imageId: string, modelId: string) => {
