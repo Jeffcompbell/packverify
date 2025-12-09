@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { diagnoseImage, fileToGenerativePart, parseSourceText, AVAILABLE_MODELS, getModelId, setModelId, parseQILImage, localDiffSpecs, extractOcrOnly } from './services/openaiService';
+import { signInWithGoogle, signOutUser, onAuthChange } from './services/firebase';
 import {
-  signInWithGoogle, signOutUser, onAuthChange, getOrCreateUser, getUserData, useQuotaFirebase, UserData,
+  getOrCreateUser, getUserData, useQuotaFirebase, UserData,
   getOrCreateSession, saveImageToCloud, updateImageInCloud, deleteImageFromCloud, saveQilToCloud,
   loadSessionFromCloud, clearSessionInCloud, CloudImageData, CloudSession,
   getUserSessions, createNewSession, updateSessionProductName, getQuotaUsageHistory, QuotaUsageRecord,
   updateImageStatusInCloud
-} from './services/firebase';
+} from './services/cloudflare';
 import { DiagnosisIssue, SourceField, DiffResult, ImageItem, ImageSpec, BoundingBox, DeterministicCheck, IndustryType } from './types';
 import {
   Table, Zap, AlertCircle, XCircle, ChevronDown, ChevronLeft, ChevronRight,
