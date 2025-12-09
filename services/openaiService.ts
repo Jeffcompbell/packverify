@@ -391,34 +391,21 @@ export const analyzeImageSinglePass = async (
         const examplesList = rules.examples.map(ex => `   - ${ex}`).join('\n');
 
         const prompt = `分析${rules.name}包装图片，返回JSON：
-
 {
   "description": "一句话描述",
   "ocrText": "提取所有文字，换行分隔",
-  "issues": [{"original": "含错误的原文用**标记**", "problem": "问题", "suggestion": "建议", "severity": "high/medium/low", "box_2d": [ymin,xmin,ymax,xmax]}],
+  "issues": [{"original": "错误原文", "problem": "问题", "suggestion": "建议", "severity": "high/medium/low", "box_2d": [ymin,xmin,ymax,xmax]}],
   "specs": [{"key": "项目名", "value": "值", "category": "content/compliance/specs"}]
 }
 
-**坐标系统说明（重要）：**
-- box_2d 格式：[ymin, xmin, ymax, xmax]
-- 坐标范围：0-1000（归一化坐标，1000 = 100%）
-- 原点：图片左上角 (0,0)
-- x 轴：从左到右（0=最左，1000=最右）
-- y 轴：从上到下（0=最顶，1000=最底）
-- 示例：图片中心的文字 → [400, 400, 600, 600]
-- 示例：左上角的文字 → [50, 50, 150, 300]
-
 要求：
-1. OCR提取所有文字，保持原样
-2. **issues必须检查以下${rules.name}行业错误（100%确定才报告）：**
+1. OCR提取所有文字
+2. 检查${rules.name}行业错误（100%确定才报告）：
 ${checkItemsList}
-
-   常见错误示例：
-${examplesList}
-
-   **如无错误，返回空数组[]，但必须认真检查**
-3. specs提取：品名、成分、警告、净含量、条码等
-4. **box_2d 必须准确标注错误文字的位置，使用 0-1000 归一化坐标**`;
+示例：${examplesList}
+如无错误返回空数组[]
+3. 提取specs：品名、成分、警告、净含量等
+4. box_2d坐标：[ymin,xmin,ymax,xmax]，范围0-1000，原点左上角(0,0)`;
 
         perfLog['1_prompt_preparation'] = Date.now() - promptStart;
         console.log(`⏱️  Prompt preparation: ${perfLog['1_prompt_preparation']}ms`);
@@ -437,12 +424,14 @@ ${examplesList}
                             type: "image_url",
                             image_url: {
                                 url: `data:${mimeType};base64,${base64Image}`,
-                                detail: "auto"
+                                detail: "high"  // ✅ 优化3: 固定使用 high，避免 auto 判断耗时
                             }
                         }
                     ]
                 }
             ],
+            max_tokens: 2000,      // ✅ 优化1: 限制输出长度，加快生成速度
+            temperature: 0.1,      // ✅ 优化2: 降低随机性，OCR任务更快更准确
         });
         perfLog['2_api_call'] = Date.now() - apiStart;
         console.log(`⏱️  API call: ${perfLog['2_api_call']}ms`);
