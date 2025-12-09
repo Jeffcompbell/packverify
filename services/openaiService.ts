@@ -368,7 +368,8 @@ export const runDeterministicChecks = (text: string): DeterministicCheck[] => {
 export const analyzeImageSinglePass = async (
     base64Image: string,
     mimeType: string,
-    industry: string = 'general'
+    industry: string = 'general',
+    includeOcr: boolean = false  // 是否包含 OCR 原文
 ): Promise<{ description: string; ocrText: string; issues: DiagnosisIssue[]; specs: SourceField[]; tokenUsage?: TokenUsage }> => {
     // 性能埋点
     const perfLog: { [key: string]: number } = {};
@@ -390,7 +391,8 @@ export const analyzeImageSinglePass = async (
         const checkItemsList = rules.checkItems.map((item, idx) => `   ${idx + 1}. ${item}`).join('\n');
         const examplesList = rules.examples.map(ex => `   - ${ex}`).join('\n');
 
-        const prompt = `分析${rules.name}包装图片，返回JSON：
+        const prompt = includeOcr
+            ? `分析${rules.name}包装图片，返回JSON：
 {
   "description": "一句话描述",
   "ocrText": "提取所有文字，换行分隔",
@@ -405,7 +407,21 @@ ${checkItemsList}
 示例：${examplesList}
 如无错误返回空数组[]
 3. 提取specs：品名、成分、警告、净含量等
-4. box_2d坐标：[ymin,xmin,ymax,xmax]，范围0-1000，原点左上角(0,0)`;
+4. box_2d坐标：[ymin,xmin,ymax,xmax]，范围0-1000，原点左上角(0,0)`
+            : `分析${rules.name}包装图片，返回JSON（无需OCR原文）：
+{
+  "description": "一句话描述",
+  "issues": [{"original": "错误原文", "problem": "问题", "suggestion": "建议", "severity": "high/medium/low", "box_2d": [ymin,xmin,ymax,xmax]}],
+  "specs": [{"key": "项目名", "value": "值", "category": "content/compliance/specs"}]
+}
+
+要求：
+1. 检查${rules.name}行业错误（100%确定才报告）：
+${checkItemsList}
+示例：${examplesList}
+如无错误返回空数组[]
+2. 提取specs：品名、成分、警告、净含量等
+3. box_2d坐标：[ymin,xmin,ymax,xmax]，范围0-1000，原点左上角(0,0)`;
 
         perfLog['1_prompt_preparation'] = Date.now() - promptStart;
         console.log(`⏱️  Prompt preparation: ${perfLog['1_prompt_preparation']}ms`);
@@ -424,14 +440,14 @@ ${checkItemsList}
                             type: "image_url",
                             image_url: {
                                 url: `data:${mimeType};base64,${base64Image}`,
-                                detail: "high"  // ✅ 优化3: 固定使用 high，避免 auto 判断耗时
+                                detail: "high"
                             }
                         }
                     ]
                 }
             ],
-            max_tokens: 3000,      // ✅ 优化1: 限制输出长度（3000足够完整返回）
-            temperature: 0.1,      // ✅ 优化2: 降低随机性，OCR任务更快更准确
+            max_tokens: includeOcr ? 4500 : 2500,  // OCR模式需要更多tokens
+            temperature: 0.1,
         });
         perfLog['2_api_call'] = Date.now() - apiStart;
         console.log(`⏱️  API call: ${perfLog['2_api_call']}ms`);
@@ -527,14 +543,15 @@ export const diagnoseImage = async (
     base64Image: string,
     mimeType: string,
     onStepChange?: (step: number) => void,
-    industry: string = 'general'
+    industry: string = 'general',
+    includeOcr: boolean = false  // 是否包含 OCR 原文
 ): Promise<DiagnosisResult> => {
     try {
         console.log("Starting analysis (AI → Rules)...");
 
         // Step 1: AI 单步分析（OCR + 问题检测 + 规格提取，一次 API 调用）
         onStepChange?.(1);
-        const aiResult = await analyzeImageSinglePass(base64Image, mimeType, industry);
+        const aiResult = await analyzeImageSinglePass(base64Image, mimeType, industry, includeOcr);
         console.log("AI analysis complete. Description:", aiResult.description);
         console.log("OCR text length:", aiResult.ocrText.length);
         console.log("AI issues found:", aiResult.issues.length);

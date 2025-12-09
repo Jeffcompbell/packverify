@@ -354,7 +354,7 @@ const App: React.FC = () => {
           diagResult = await Promise.race([
             diagnoseImage(base64, file.type, (step) => {
               setProcessingStep(step);
-            }, industry),
+            }, industry, false),  // ✅ 默认不包含 OCR（快速模式）
             new Promise<never>((_, reject) =>
               setTimeout(() => reject(new Error('分析超时')), timeoutMs)
             )
@@ -509,7 +509,7 @@ const App: React.FC = () => {
           diagResult = await Promise.race([
             diagnoseImage(image.base64, image.file.type, (step) => {
               setProcessingStep(step);
-            }, industry),
+            }, industry, manualSourceFields.length > 0),  // 有 QIL 时包含 OCR
             new Promise<never>((_, reject) =>
               setTimeout(() => reject(new Error('分析超时')), timeoutMs)
             )
@@ -662,7 +662,7 @@ const App: React.FC = () => {
 
       const diagResult = await diagnoseImage(image.base64, image.file.type, (step) => {
         setProcessingStep(step);
-      });
+      }, industry, manualSourceFields.length > 0);  // 有 QIL 时包含 OCR
 
       // 恢复之前的模型
       setModelId(previousModel);
@@ -719,6 +719,62 @@ const App: React.FC = () => {
       ));
     }
 
+    // ✅ 新增：如果有图片但没有 OCR，触发重新分析
+    if (images.length > 0 && !isProcessing) {
+      const imagesNeedOcr = images.filter(img => img.description && !img.ocrText);
+      if (imagesNeedOcr.length > 0) {
+        console.log(`[QIL] Detected ${imagesNeedOcr.length} images need OCR, re-analyzing...`);
+
+        // 重新分析所有需要 OCR 的图片
+        for (const img of imagesNeedOcr) {
+          try {
+            setIsProcessing(true);
+            setProcessingImageId(img.id);
+
+            const diagResult = await diagnoseImage(
+              img.base64,
+              img.file.type,
+              (step) => setProcessingStep(step),
+              industry,
+              true  // ✅ 包含 OCR
+            );
+
+            // 更新图片数据
+            setImages(prev => prev.map(image =>
+              image.id === img.id ? {
+                ...image,
+                ocrText: diagResult.ocrText,
+                // 其他字段保持不变，因为已经分析过了
+              } : image
+            ));
+
+            // 消耗配额
+            if (user) {
+              const tokenUsage = diagResult.tokenUsage ? {
+                promptTokens: diagResult.tokenUsage.promptTokens,
+                completionTokens: diagResult.tokenUsage.completionTokens,
+                totalTokens: diagResult.tokenUsage.totalTokens,
+                model: diagResult.tokenUsage.model
+              } : undefined;
+              await useQuotaFirebase(user.uid, 1, img.file.name, 'ocr', tokenUsage);
+              const updatedUser = await getUserData(user.uid);
+              if (updatedUser) setUser(updatedUser);
+            }
+
+            // 云同步
+            if (cloudSyncEnabled && sessionId && user) {
+              await updateImageInCloud(user.uid, sessionId, img.id, { ocrText: diagResult.ocrText });
+            }
+          } catch (error) {
+            console.error(`Failed to re-analyze image ${img.id}:`, error);
+          } finally {
+            setIsProcessing(false);
+            setProcessingImageId(null);
+          }
+        }
+      }
+    }
+
     // 云同步 - 保存 QIL 数据
     if (cloudSyncEnabled && sessionId && user) {
       try {
@@ -728,7 +784,7 @@ const App: React.FC = () => {
         console.error('Failed to sync QIL to cloud:', error);
       }
     }
-  }, [currentImage, cloudSyncEnabled, sessionId, user]);
+  }, [currentImage, cloudSyncEnabled, sessionId, user, images, isProcessing, industry]);
 
   const handleModelChange = useCallback((modelId: string) => {
     setModelId(modelId);
