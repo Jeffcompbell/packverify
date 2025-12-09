@@ -363,6 +363,76 @@ export const runDeterministicChecks = (text: string): DeterministicCheck[] => {
 };
 
 // ============================================
+// 轻量级 OCR：仅提取文字（用于 QIL 对比）
+// ============================================
+export const extractOcrOnly = async (
+    base64Image: string,
+    mimeType: string
+): Promise<{ ocrText: string; tokenUsage?: TokenUsage }> => {
+    try {
+        const client = getClient();
+        const modelId = getModelId();
+        console.log(`[OCR-Only] Starting lightweight OCR with model: ${modelId}`);
+
+        const prompt = `提取图片中的所有文字，按原样输出，保持换行。
+返回JSON格式：
+{
+  "text": "提取的文字内容"
+}`;
+
+        const response = await client.chat.completions.create({
+            model: modelId,
+            messages: [
+                {
+                    role: "user",
+                    content: [
+                        { type: "text", text: prompt },
+                        {
+                            type: "image_url",
+                            image_url: {
+                                url: `data:${mimeType};base64,${base64Image}`,
+                                detail: "high"
+                            }
+                        }
+                    ]
+                }
+            ],
+            max_tokens: 2000,  // OCR 只需要文字，不需要太多
+            temperature: 0.1,
+        });
+
+        const text = response.choices[0].message.content;
+        if (!text) {
+            console.warn('[OCR-Only] No response text');
+            return { ocrText: '' };
+        }
+
+        const parsed = parseJSON(text);
+
+        // 提取 token 使用信息
+        let tokenUsage: TokenUsage | undefined;
+        if (response.usage) {
+            tokenUsage = {
+                promptTokens: response.usage.prompt_tokens || 0,
+                completionTokens: response.usage.completion_tokens || 0,
+                totalTokens: response.usage.total_tokens || 0,
+                model: modelId,
+                timestamp: new Date()
+            };
+            console.log('[OCR-Only] Token usage:', tokenUsage);
+        }
+
+        return {
+            ocrText: parsed.text || '',
+            tokenUsage
+        };
+    } catch (error) {
+        console.error("[OCR-Only] Failed:", error);
+        throw error;
+    }
+};
+
+// ============================================
 // 单步分析：OCR + 问题检测 + 规格提取（一次调用完成）
 // ============================================
 export const analyzeImageSinglePass = async (

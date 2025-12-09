@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { diagnoseImage, fileToGenerativePart, parseSourceText, AVAILABLE_MODELS, getModelId, setModelId, parseQILImage, localDiffSpecs } from './services/openaiService';
+import { diagnoseImage, fileToGenerativePart, parseSourceText, AVAILABLE_MODELS, getModelId, setModelId, parseQILImage, localDiffSpecs, extractOcrOnly } from './services/openaiService';
 import {
   signInWithGoogle, signOutUser, onAuthChange, getOrCreateUser, getUserData, useQuotaFirebase, UserData,
   getOrCreateSession, saveImageToCloud, updateImageInCloud, deleteImageFromCloud, saveQilToCloud,
@@ -719,42 +719,36 @@ const App: React.FC = () => {
       ));
     }
 
-    // ✅ 新增：如果有图片但没有 OCR，触发重新分析
+    // ✅ 新增：如果有图片但没有 OCR，触发轻量级 OCR 提取
     if (images.length > 0 && !isProcessing) {
       const imagesNeedOcr = images.filter(img => img.description && !img.ocrText);
       if (imagesNeedOcr.length > 0) {
-        console.log(`[QIL] Detected ${imagesNeedOcr.length} images need OCR, re-analyzing...`);
+        console.log(`[QIL] Detected ${imagesNeedOcr.length} images need OCR, extracting...`);
 
-        // 重新分析所有需要 OCR 的图片
+        // 轻量级 OCR 提取（只提取文字，不重复分析）
         for (const img of imagesNeedOcr) {
           try {
             setIsProcessing(true);
             setProcessingImageId(img.id);
 
-            const diagResult = await diagnoseImage(
-              img.base64,
-              img.file.type,
-              (step) => setProcessingStep(step),
-              industry,
-              true  // ✅ 包含 OCR
-            );
+            // ✅ 使用轻量级 OCR（5-10秒，~500-1000 tokens）
+            const ocrResult = await extractOcrOnly(img.base64, img.file.type);
 
-            // 更新图片数据
+            // 更新图片数据（只更新 ocrText）
             setImages(prev => prev.map(image =>
               image.id === img.id ? {
                 ...image,
-                ocrText: diagResult.ocrText,
-                // 其他字段保持不变，因为已经分析过了
+                ocrText: ocrResult.ocrText,
               } : image
             ));
 
-            // 消耗配额
+            // 消耗配额（OCR 操作）
             if (user) {
-              const tokenUsage = diagResult.tokenUsage ? {
-                promptTokens: diagResult.tokenUsage.promptTokens,
-                completionTokens: diagResult.tokenUsage.completionTokens,
-                totalTokens: diagResult.tokenUsage.totalTokens,
-                model: diagResult.tokenUsage.model
+              const tokenUsage = ocrResult.tokenUsage ? {
+                promptTokens: ocrResult.tokenUsage.promptTokens,
+                completionTokens: ocrResult.tokenUsage.completionTokens,
+                totalTokens: ocrResult.tokenUsage.totalTokens,
+                model: ocrResult.tokenUsage.model
               } : undefined;
               await useQuotaFirebase(user.uid, 1, img.file.name, 'ocr', tokenUsage);
               const updatedUser = await getUserData(user.uid);
@@ -763,10 +757,10 @@ const App: React.FC = () => {
 
             // 云同步
             if (cloudSyncEnabled && sessionId && user) {
-              await updateImageInCloud(user.uid, sessionId, img.id, { ocrText: diagResult.ocrText });
+              await updateImageInCloud(user.uid, sessionId, img.id, { ocrText: ocrResult.ocrText });
             }
           } catch (error) {
-            console.error(`Failed to re-analyze image ${img.id}:`, error);
+            console.error(`Failed to extract OCR for image ${img.id}:`, error);
           } finally {
             setIsProcessing(false);
             setProcessingImageId(null);
