@@ -896,8 +896,18 @@ const App: React.FC = () => {
     setUser(null);
   }, []);
 
-  const handleLogin = useCallback((loggedInUser: UserData) => {
-    setUser(loggedInUser);
+  const handleLogin = useCallback(async () => {
+    try {
+      const loggedInUser = await signInWithGoogle();
+      if (loggedInUser) {
+        const userData = await getOrCreateUser(loggedInUser);
+        setUser(userData);
+        console.log('Login successful:', userData);
+      }
+    } catch (error) {
+      console.error('Login failed:', error);
+      throw error;
+    }
   }, []);
 
   const isCurrentProcessing = currentImage && processingImageId === currentImage.id;
