@@ -201,23 +201,29 @@ export const quickCheckImage = async (
     base64Image: string,
     mimeType: string
 ): Promise<{ isPackaging: boolean; description: string; confidence: 'high' | 'medium' | 'low' }> => {
+    const startTime = Date.now();
     try {
         const client = getClient();
         const modelId = getModelId();
+        console.log(`[QuickCheck] Starting with model: ${modelId}`);
 
-        const prompt = `请快速判断这张图片是否是商品包装设计图片。
+        const prompt = `请快速判断这张图片是否是商品包装设计相关图片。
 
-**包装设计包括：**
+**包装设计相关内容（返回 true）：**
 - 产品包装盒、瓶子、罐子、袋子
 - 标签、贴纸、吊牌
-- 说明书、插页
+- 说明书、插页、使用说明
 - 包装袋、纸箱、展示盒
+- **包装上的成分表、配料表、营养成分表**
+- **包装上的文字信息（产品名称、警告语、说明文字等）**
+- **任何印刷在包装上的文字内容**
 
-**不包括：**
+**非包装内容（返回 false）：**
 - 风景、人物、动物照片
 - 建筑、街景、室内装修
 - 艺术作品、插画（非包装用途）
-- 截图、表格、文档
+- 纯文档、Word/PDF 截图
+- 网页截图、聊天记录
 
 返回 JSON：
 {
@@ -227,9 +233,9 @@ export const quickCheckImage = async (
 }
 
 **重要：**
-- 如果是包装设计，isPackaging 必须为 true
-- 如果不确定，confidence 设为 medium 或 low
-- description 简短清晰（15字内）`;
+- 只要是包装相关的文字、标签、成分表等，都返回 true
+- 如果看到成分、配料、Ingredients、Directions 等字样，必定是包装
+- 不确定时优先返回 true（宁可漏判，不可误判）`;
 
         const response = await client.chat.completions.create({
             model: modelId,
@@ -248,22 +254,31 @@ export const quickCheckImage = async (
                     ]
                 }
             ],
-            max_tokens: 100 // 限制 token 数量，节省成本
+            max_tokens: 100, // 限制 token 数量，节省成本
+            timeout: 15000 // 15秒超时
         });
+
+        const elapsed = Date.now() - startTime;
+        console.log(`[QuickCheck] Completed in ${elapsed}ms`);
 
         const text = response.choices[0].message.content;
         if (!text) {
+            console.warn('[QuickCheck] No response text, defaulting to packaging');
             return { isPackaging: true, description: '无法识别', confidence: 'low' };
         }
 
         const parsed = parseJSON(text);
-        return {
+        const result = {
             isPackaging: parsed.isPackaging !== false, // 默认当作包装（避免误判）
             description: parsed.description || '图片内容',
             confidence: parsed.confidence || 'medium'
         };
+
+        console.log('[QuickCheck] Result:', result);
+        return result;
     } catch (error) {
-        console.error("Quick check failed:", error);
+        const elapsed = Date.now() - startTime;
+        console.error(`[QuickCheck] Failed after ${elapsed}ms:`, error);
         // 出错时默认当作包装，继续分析
         return { isPackaging: true, description: '预检失败', confidence: 'low' };
     }
