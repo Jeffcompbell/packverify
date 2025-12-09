@@ -370,18 +370,26 @@ export const analyzeImageSinglePass = async (
     mimeType: string,
     industry: string = 'general'
 ): Promise<{ description: string; ocrText: string; issues: DiagnosisIssue[]; specs: SourceField[]; tokenUsage?: TokenUsage }> => {
+    // 性能埋点
+    const perfLog: { [key: string]: number } = {};
+    const overallStart = Date.now();
+
     try {
         const client = getClient();
         const modelId = getModelId();
-        console.log("Single-pass analysis with model:", modelId, "industry:", industry);
-        const startTime = Date.now();
+        console.log("╔══════════════════════════════════════════════════════════╗");
+        console.log("║  [Performance Analysis] Single-pass Image Analysis       ║");
+        console.log("╚══════════════════════════════════════════════════════════╝");
+        console.log(`📊 Model: ${modelId}`);
+        console.log(`🏭 Industry: ${industry}`);
+        console.log(`📷 Image size: ${(base64Image.length / 1024).toFixed(2)} KB`);
 
-        // 获取行业规则
+        // 1. 准备 prompt
+        const promptStart = Date.now();
         const rules = INDUSTRY_RULES[industry] || INDUSTRY_RULES.general;
         const checkItemsList = rules.checkItems.map((item, idx) => `   ${idx + 1}. ${item}`).join('\n');
         const examplesList = rules.examples.map(ex => `   - ${ex}`).join('\n');
 
-        // 精简 prompt，一次调用完成所有任务
         const prompt = `分析${rules.name}包装图片，返回JSON：
 
 {
@@ -412,6 +420,12 @@ ${examplesList}
 3. specs提取：品名、成分、警告、净含量、条码等
 4. **box_2d 必须准确标注错误文字的位置，使用 0-1000 归一化坐标**`;
 
+        perfLog['1_prompt_preparation'] = Date.now() - promptStart;
+        console.log(`⏱️  Prompt preparation: ${perfLog['1_prompt_preparation']}ms`);
+
+        // 2. API 调用
+        const apiStart = Date.now();
+        console.log(`🚀 Calling API...`);
         const response = await client.chat.completions.create({
             model: modelId,
             messages: [
@@ -430,10 +444,11 @@ ${examplesList}
                 }
             ],
         });
+        perfLog['2_api_call'] = Date.now() - apiStart;
+        console.log(`⏱️  API call: ${perfLog['2_api_call']}ms`);
 
-        console.log(`API response time: ${Date.now() - startTime}ms`);
-
-        // 提取 token 使用信息
+        // 3. 提取 token 使用信息
+        const tokenStart = Date.now();
         let tokenUsage: TokenUsage | undefined;
         if (response.usage) {
             tokenUsage = {
@@ -443,17 +458,24 @@ ${examplesList}
                 model: modelId,
                 timestamp: new Date()
             };
-            console.log('Token usage:', tokenUsage);
+            console.log('💰 Token usage:', tokenUsage);
         }
+        perfLog['3_token_extraction'] = Date.now() - tokenStart;
 
+        // 4. 解析响应
+        const parseStart = Date.now();
         const text = response.choices[0].message.content;
         if (!text) {
+            console.warn('⚠️  No response text');
             return { description: '', ocrText: '', issues: [], specs: [], tokenUsage };
         }
 
         const parsed = parseJSON(text);
+        perfLog['4_json_parsing'] = Date.now() - parseStart;
+        console.log(`⏱️  JSON parsing: ${perfLog['4_json_parsing']}ms`);
 
-        // 处理 issues，添加 id 和格式化 box_2d
+        // 5. 处理 issues
+        const issuesStart = Date.now();
         const issues: DiagnosisIssue[] = Array.isArray(parsed.issues)
             ? parsed.issues.map((item: any, idx: number) => ({
                 id: `issue-${idx}-${Date.now()}`,
@@ -471,8 +493,10 @@ ${examplesList}
                 } : undefined
             }))
             : [];
+        perfLog['5_issues_processing'] = Date.now() - issuesStart;
 
-        // 处理 specs
+        // 6. 处理 specs
+        const specsStart = Date.now();
         const specs: SourceField[] = Array.isArray(parsed.specs)
             ? parsed.specs.map((item: any) => ({
                 key: item.key || '',
@@ -480,6 +504,21 @@ ${examplesList}
                 category: item.category || 'content'
             }))
             : [];
+        perfLog['6_specs_processing'] = Date.now() - specsStart;
+
+        // 总耗时
+        const totalTime = Date.now() - overallStart;
+        perfLog['TOTAL'] = totalTime;
+
+        // 输出性能报告
+        console.log("\n╔══════════════════════════════════════════════════════════╗");
+        console.log("║              Performance Report                           ║");
+        console.log("╠══════════════════════════════════════════════════════════╣");
+        Object.entries(perfLog).forEach(([step, time]) => {
+            const percentage = ((time / totalTime) * 100).toFixed(1);
+            console.log(`║  ${step.padEnd(25)} ${String(time).padStart(6)}ms (${percentage.padStart(5)}%)  ║`);
+        });
+        console.log("╚══════════════════════════════════════════════════════════╝\n");
 
         return {
             description: parsed.description || '',
