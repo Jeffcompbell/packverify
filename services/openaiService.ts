@@ -473,7 +473,7 @@ export const analyzeImageSinglePass = async (
 {
   "description": "一句话描述",
   "ocrText": "提取所有文字，换行分隔",
-  "issues": [{"original": "错误原文", "problem": "问题", "suggestion": "建议", "severity": "high/medium/low", "box_2d": [ymin,xmin,ymax,xmax]}],
+  "issues": [{"original": "错误原文", "problem": "问题", "suggestion": "建议", "severity": "high/medium/low"}],
   "specs": [{"key": "项目名", "value": "值", "category": "content/compliance/specs"}]
 }
 
@@ -483,12 +483,11 @@ export const analyzeImageSinglePass = async (
 ${checkItemsList}
 示例：${examplesList}
 如无错误返回空数组[]
-3. 提取specs：品名、成分、警告、净含量等
-4. box_2d坐标：[ymin,xmin,ymax,xmax]，范围0-1000，原点左上角(0,0)`
+3. 提取specs：品名、成分、警告、净含量等`
             : `分析${rules.name}包装图片，返回JSON（无需OCR原文）：
 {
   "description": "一句话描述",
-  "issues": [{"original": "错误原文", "problem": "问题", "suggestion": "建议", "severity": "high/medium/low", "box_2d": [ymin,xmin,ymax,xmax]}],
+  "issues": [{"original": "错误原文", "problem": "问题", "suggestion": "建议", "severity": "high/medium/low"}],
   "specs": [{"key": "项目名", "value": "值", "category": "content/compliance/specs"}]
 }
 
@@ -497,8 +496,7 @@ ${checkItemsList}
 ${checkItemsList}
 示例：${examplesList}
 如无错误返回空数组[]
-2. 提取specs：品名、成分、警告、净含量等
-3. box_2d坐标：[ymin,xmin,ymax,xmax]，范围0-1000，原点左上角(0,0)`;
+2. 提取specs：品名、成分、警告、净含量等`;
 
         perfLog['1_prompt_preparation'] = Date.now() - promptStart;
         console.log(`⏱️  Prompt preparation: ${perfLog['1_prompt_preparation']}ms`);
@@ -523,7 +521,7 @@ ${checkItemsList}
                     ]
                 }
             ],
-            max_tokens: includeOcr ? 4500 : 3000,  // 无OCR: 3000, 有OCR: 4500
+            max_tokens: includeOcr ? 4500 : 4000,  // 无OCR: 4000, 有OCR: 4500
             temperature: 0.1,
         });
         perfLog['2_api_call'] = Date.now() - apiStart;
@@ -535,8 +533,8 @@ ${checkItemsList}
 
         if (finishReason === 'length') {
             console.error('⚠️  Output truncated! Response reached max_tokens limit.');
-            console.error(`   Max tokens: ${includeOcr ? 4500 : 3000}, Used: ${response.usage?.completion_tokens || 0}`);
-            throw new Error(`输出被截断：达到 token 上限 (${includeOcr ? 4500 : 3000})。请联系开发者增加限制。`);
+            console.error(`   Max tokens: ${includeOcr ? 4500 : 4000}, Used: ${response.usage?.completion_tokens || 0}`);
+            throw new Error(`输出被截断：达到 token 上限 (${includeOcr ? 4500 : 4000})。请联系开发者增加限制。`);
         }
 
         // 3. 提取 token 使用信息
