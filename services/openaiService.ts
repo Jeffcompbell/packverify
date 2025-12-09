@@ -103,8 +103,8 @@ interface ModelConfig {
 // 可用的模型列表
 export const AVAILABLE_MODELS: ModelConfig[] = [
     {
-        id: "gemini-3-pro-preview",
-        name: "Gemini 3 Pro",
+        id: "gemini-2.0-flash-exp",
+        name: "Gemini 2.0 Flash",
         description: "最新版本（推荐）",
         baseURL: "https://api-slb.packyapi.com/v1",
         apiKeyEnv: "VITE_PACKY_API_KEY"
@@ -118,8 +118,8 @@ export const AVAILABLE_MODELS: ModelConfig[] = [
     },
 ];
 
-// 默认使用 PackyAPI Gemini 3 Pro
-let currentModelId = import.meta.env.VITE_OPENAI_MODEL || "gemini-3-pro-preview";
+// 默认使用 PackyAPI Gemini 2.0 Flash
+let currentModelId = import.meta.env.VITE_OPENAI_MODEL || "gemini-2.0-flash-exp";
 
 export const getModelId = () => currentModelId;
 
