@@ -102,39 +102,19 @@ interface ModelConfig {
 
 // 可用的模型列表
 export const AVAILABLE_MODELS: ModelConfig[] = [
-    // PackyAPI Gemini（默认，使用新代理）
     {
         id: "gemini-3-pro-preview",
         name: "Gemini 3 Pro",
         description: "最新版本（推荐）",
         baseURL: "https://api-slb.packyapi.com/v1",
-        apiKeyEnv: "VITE_GEMINI_API_KEY"
+        apiKeyEnv: "VITE_PACKY_API_KEY"
     },
-    // Zenmux Gemini 系列（备选）
-    {
-        id: "google/gemini-3-pro-preview",
-        name: "Gemini 3 Pro",
-        description: "备用线路",
-        baseURL: "https://zenmux.ai/api/v1"
-    },
-    {
-        id: "google/gemini-2.5-pro",
-        name: "Gemini 2.5 Pro",
-        description: "稳定版本",
-        baseURL: "https://zenmux.ai/api/v1"
-    },
-    {
-        id: "google/gemini-2.5-flash",
-        name: "Gemini 2.5 Flash",
-        description: "快速版本",
-        baseURL: "https://zenmux.ai/api/v1"
-    },
-    // OpenAI 系列（备选）
     {
         id: "openai/gpt-4o",
         name: "GPT-4o",
         description: "多模态模型",
-        baseURL: "https://zenmux.ai/api/v1"
+        baseURL: "https://api-slb.packyapi.com/v1",
+        apiKeyEnv: "VITE_PACKY_API_KEY"
     },
 ];
 
@@ -149,28 +129,29 @@ export const setModelId = (modelId: string) => {
 };
 
 // 根据模型 ID 获取对应的 client
-const getClient = () => {
+const getClient = (useBackup = false) => {
     const modelConfig = AVAILABLE_MODELS.find(m => m.id === currentModelId);
-    const baseURL = modelConfig?.baseURL || "https://api-slb.packyapi.com/v1";
 
-    // 根据模型配置选择 API Key
-    let apiKey: string;
-    if (modelConfig?.apiKeyEnv === "VITE_GEMINI_API_KEY") {
-        apiKey = import.meta.env.VITE_GEMINI_API_KEY;
-    } else {
-        apiKey = import.meta.env.VITE_OPENAI_API_KEY;
-    }
+    // 如果使用备用，切换到 Zenmux
+    const baseURL = useBackup
+        ? import.meta.env.VITE_ZENMUX_BASE_URL
+        : (modelConfig?.baseURL || import.meta.env.VITE_PACKY_BASE_URL);
+
+    const apiKey = useBackup
+        ? import.meta.env.VITE_ZENMUX_API_KEY
+        : import.meta.env.VITE_PACKY_API_KEY;
 
     if (!apiKey) {
         console.error("API Key not found");
     }
 
-    console.log(`Using model: ${currentModelId}, baseURL: ${baseURL}`);
+    console.log(`Using model: ${currentModelId}, baseURL: ${baseURL}, backup: ${useBackup}`);
 
     return new OpenAI({
         apiKey: apiKey || 'dummy',
         baseURL,
-        dangerouslyAllowBrowser: true
+        dangerouslyAllowBrowser: true,
+        timeout: 30000, // 30秒超时
     });
 };
 
@@ -501,31 +482,62 @@ ${checkItemsList}
         perfLog['1_prompt_preparation'] = Date.now() - promptStart;
         console.log(`⏱️  Prompt preparation: ${perfLog['1_prompt_preparation']}ms`);
 
-        // 2. API 调用
+        // 2. API 调用（带重试逻辑）
         const apiStart = Date.now();
         console.log(`🚀 Calling API...`);
-        const response = await client.chat.completions.create({
-            model: modelId,
-            messages: [
-                {
-                    role: "user",
-                    content: [
-                        { type: "text", text: prompt },
-                        {
-                            type: "image_url",
-                            image_url: {
-                                url: `data:${mimeType};base64,${base64Image}`,
-                                detail: "high"
+
+        let response;
+        let usedBackup = false;
+
+        try {
+            response = await client.chat.completions.create({
+                model: modelId,
+                messages: [
+                    {
+                        role: "user",
+                        content: [
+                            { type: "text", text: prompt },
+                            {
+                                type: "image_url",
+                                image_url: {
+                                    url: `data:${mimeType};base64,${base64Image}`,
+                                    detail: "high"
+                                }
                             }
-                        }
-                    ]
-                }
-            ],
-            max_tokens: includeOcr ? 4500 : 4000,  // 无OCR: 4000, 有OCR: 4500
-            temperature: 0.1,
-        });
+                        ]
+                    }
+                ],
+                max_tokens: includeOcr ? 4500 : 4000,
+                temperature: 0.1,
+            });
+        } catch (primaryError) {
+            console.warn(`⚠️  PackyAPI failed, trying Zenmux backup...`, primaryError);
+            usedBackup = true;
+            const backupClient = getClient(true);
+            response = await backupClient.chat.completions.create({
+                model: modelId,
+                messages: [
+                    {
+                        role: "user",
+                        content: [
+                            { type: "text", text: prompt },
+                            {
+                                type: "image_url",
+                                image_url: {
+                                    url: `data:${mimeType};base64,${base64Image}`,
+                                    detail: "high"
+                                }
+                            }
+                        ]
+                    }
+                ],
+                max_tokens: includeOcr ? 4500 : 4000,
+                temperature: 0.1,
+            });
+        }
+
         perfLog['2_api_call'] = Date.now() - apiStart;
-        console.log(`⏱️  API call: ${perfLog['2_api_call']}ms`);
+        console.log(`⏱️  API call: ${perfLog['2_api_call']}ms ${usedBackup ? '(Zenmux backup)' : '(PackyAPI)'}`);
 
         // ✅ 检测是否被截断
         const finishReason = response.choices[0].finish_reason;

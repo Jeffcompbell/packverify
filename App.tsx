@@ -275,8 +275,8 @@ const App: React.FC = () => {
 
   // Check for API Key on mount
   useEffect(() => {
-    if (!import.meta.env.VITE_OPENAI_API_KEY) {
-      setErrorMessage("Missing VITE_OPENAI_API_KEY in .env.local");
+    if (!import.meta.env.VITE_PACKY_API_KEY) {
+      setErrorMessage("Missing VITE_PACKY_API_KEY in .env.local");
     }
   }, []);
 
