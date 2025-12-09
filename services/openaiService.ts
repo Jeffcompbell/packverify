@@ -195,6 +195,81 @@ const parseJSON = (text: string): any => {
 };
 
 // ============================================
+// 快速预检：判断是否为包装设计图片
+// ============================================
+export const quickCheckImage = async (
+    base64Image: string,
+    mimeType: string
+): Promise<{ isPackaging: boolean; description: string; confidence: 'high' | 'medium' | 'low' }> => {
+    try {
+        const client = getClient();
+        const modelId = getModelId();
+
+        const prompt = `请快速判断这张图片是否是商品包装设计图片。
+
+**包装设计包括：**
+- 产品包装盒、瓶子、罐子、袋子
+- 标签、贴纸、吊牌
+- 说明书、插页
+- 包装袋、纸箱、展示盒
+
+**不包括：**
+- 风景、人物、动物照片
+- 建筑、街景、室内装修
+- 艺术作品、插画（非包装用途）
+- 截图、表格、文档
+
+返回 JSON：
+{
+  "isPackaging": true/false,
+  "description": "一句话描述图片内容",
+  "confidence": "high/medium/low"
+}
+
+**重要：**
+- 如果是包装设计，isPackaging 必须为 true
+- 如果不确定，confidence 设为 medium 或 low
+- description 简短清晰（15字内）`;
+
+        const response = await client.chat.completions.create({
+            model: modelId,
+            messages: [
+                {
+                    role: "user",
+                    content: [
+                        { type: "text", text: prompt },
+                        {
+                            type: "image_url",
+                            image_url: {
+                                url: `data:${mimeType};base64,${base64Image}`,
+                                detail: "low" // 使用低精度，加快速度
+                            }
+                        }
+                    ]
+                }
+            ],
+            max_tokens: 100 // 限制 token 数量，节省成本
+        });
+
+        const text = response.choices[0].message.content;
+        if (!text) {
+            return { isPackaging: true, description: '无法识别', confidence: 'low' };
+        }
+
+        const parsed = parseJSON(text);
+        return {
+            isPackaging: parsed.isPackaging !== false, // 默认当作包装（避免误判）
+            description: parsed.description || '图片内容',
+            confidence: parsed.confidence || 'medium'
+        };
+    } catch (error) {
+        console.error("Quick check failed:", error);
+        // 出错时默认当作包装，继续分析
+        return { isPackaging: true, description: '预检失败', confidence: 'low' };
+    }
+};
+
+// ============================================
 // 确定性规则检查（不依赖 GPT，100% 准确）
 // ============================================
 export const runDeterministicChecks = (text: string): DeterministicCheck[] => {

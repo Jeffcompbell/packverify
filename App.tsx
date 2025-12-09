@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { diagnoseImage, fileToGenerativePart, parseSourceText, AVAILABLE_MODELS, getModelId, setModelId, parseQILImage, localDiffSpecs } from './services/openaiService';
+import { diagnoseImage, fileToGenerativePart, parseSourceText, AVAILABLE_MODELS, getModelId, setModelId, parseQILImage, localDiffSpecs, quickCheckImage } from './services/openaiService';
 import {
   signInWithGoogle, signOutUser, onAuthChange, getOrCreateUser, getUserData, useQuotaFirebase, UserData,
   getOrCreateSession, saveImageToCloud, updateImageInCloud, deleteImageFromCloud, saveQilToCloud,
@@ -338,10 +338,41 @@ const App: React.FC = () => {
       setProcessingImageId(newImageId);
       setErrorMessage(null);
 
+      // 快速预检：判断是否为包装设计图片
+      console.log('Quick checking image type...');
+      const quickCheck = await quickCheckImage(base64, file.type);
+      console.log('Quick check result:', quickCheck);
+
+      // 如果不是包装设计，只显示描述，不进行完整分析
+      if (!quickCheck.isPackaging) {
+        console.log('Not a packaging image, skipping full analysis');
+        setImages(prev => prev.map(img =>
+          img.id === newImageId ? {
+            ...img,
+            description: `⚠️ 非包装图片：${quickCheck.description}`,
+            ocrText: `这不是商品包装设计图片。\n\n检测到的内容：${quickCheck.description}\n\n提示：请上传商品包装、标签、说明书等包装设计相关的图片。`,
+            issues: [],
+            deterministicIssues: [],
+            specs: [],
+            issuesByModel: {
+              [getModelId()]: {
+                issues: [],
+                deterministicIssues: []
+              }
+            }
+          } : img
+        ));
+        setIsProcessing(false);
+        setProcessingImageId(null);
+        return;
+      }
+
+      // 是包装设计，继续完整分析
+      console.log('Packaging image detected, proceeding with full analysis');
       // 单次 AI 调用完成：OCR + 问题检测 + 规格提取
       const diagResult = await diagnoseImage(base64, file.type, (step) => {
         setProcessingStep(step);
-      });
+      }, industry);
 
       // 转换 specs 格式
       const imageSpecs: ImageSpec[] = diagResult.specs.map(s => ({
