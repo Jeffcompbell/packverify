@@ -1,5 +1,4 @@
 import OpenAI from 'openai';
-import { GoogleGenAI } from '@google/genai';
 import { DiagnosisIssue, DiffResult, SourceField, DiagnosisResult, DeterministicCheck, TokenUsage } from "../types";
 
 // Helper to convert file to base64
@@ -162,42 +161,14 @@ const getClient = (useBackup = false) => {
     });
 };
 
-// Zenmux Vertex AI 客户端（使用 Google SDK）
+// Zenmux 客户端（使用 OpenAI SDK）
 const getZenmuxClient = () => {
-    return new GoogleGenAI({
-        apiKey: import.meta.env.VITE_ZENMUX_API_KEY || '',
-        vertexai: true,
-        httpOptions: {
-            baseUrl: 'https://zenmux.ai/api/vertex-ai',
-            apiVersion: 'v1'
-        }
+    return new OpenAI({
+        apiKey: import.meta.env.VITE_ZENMUX_API_KEY || 'dummy',
+        baseURL: 'https://zenmux.ai/api/v1',
+        dangerouslyAllowBrowser: true,
+        timeout: 30000,
     });
-};
-
-// 使用 Zenmux 调用（转换格式）
-const callZenmuxVision = async (prompt: string, base64Image: string, mimeType: string): Promise<string> => {
-    const client = getZenmuxClient();
-
-    // 转换为 Google 格式
-    const response = await client.models.generateContent({
-        model: 'google/gemini-2.5-pro',
-        contents: [
-            {
-                role: 'user',
-                parts: [
-                    { text: prompt },
-                    {
-                        inlineData: {
-                            mimeType: mimeType,
-                            data: base64Image
-                        }
-                    }
-                ]
-            }
-        ]
-    });
-
-    return response.text || '';
 };
 
 // 解析 JSON，处理 Gemini 返回的 markdown 包裹格式
@@ -556,25 +527,31 @@ ${checkItemsList}
                 temperature: 0.1,
             });
         } catch (primaryError) {
-            console.warn(`⚠️  PackyAPI failed, trying Zenmux Vertex AI backup...`, primaryError);
+            console.warn(`⚠️  PackyAPI failed, trying Zenmux backup...`, primaryError);
             usedBackup = true;
 
-            // 使用 Zenmux Vertex AI（Google SDK）
-            const zenmuxResponse = await callZenmuxVision(prompt, base64Image, mimeType);
-
-            // 转换为 OpenAI 格式的响应
-            response = {
-                choices: [{
-                    message: {
-                        content: zenmuxResponse
+            // 使用 Zenmux（OpenAI SDK）
+            const zenmuxClient = getZenmuxClient();
+            response = await zenmuxClient.chat.completions.create({
+                model: 'google/gemini-2.5-pro',
+                messages: [
+                    {
+                        role: 'user',
+                        content: [
+                            { type: 'text', text: prompt },
+                            {
+                                type: 'image_url',
+                                image_url: {
+                                    url: `data:${mimeType};base64,${base64Image}`,
+                                    detail: 'high'
+                                }
+                            }
+                        ]
                     }
-                }],
-                usage: {
-                    prompt_tokens: 0,
-                    completion_tokens: 0,
-                    total_tokens: 0
-                }
-            } as any;
+                ],
+                max_tokens: includeOcr ? 4500 : 4000,
+                temperature: 0.1,
+            });
         }
 
         perfLog['2_api_call'] = Date.now() - apiStart;
