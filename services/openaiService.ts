@@ -523,7 +523,7 @@ ${checkItemsList}
                     ]
                 }
             ],
-            max_tokens: includeOcr ? 4500 : 2000,  // 无OCR: 2000, 有OCR: 4500
+            max_tokens: includeOcr ? 4500 : 3000,  // 无OCR: 3000, 有OCR: 4500
             temperature: 0.1,
         });
         perfLog['2_api_call'] = Date.now() - apiStart;
@@ -535,8 +535,8 @@ ${checkItemsList}
 
         if (finishReason === 'length') {
             console.error('⚠️  Output truncated! Response reached max_tokens limit.');
-            console.error(`   Max tokens: ${includeOcr ? 4500 : 2000}, Used: ${response.usage?.completion_tokens || 0}`);
-            throw new Error(`输出被截断：达到 token 上限 (${includeOcr ? 4500 : 2000})。请联系开发者增加限制。`);
+            console.error(`   Max tokens: ${includeOcr ? 4500 : 3000}, Used: ${response.usage?.completion_tokens || 0}`);
+            throw new Error(`输出被截断：达到 token 上限 (${includeOcr ? 4500 : 3000})。请联系开发者增加限制。`);
         }
 
         // 3. 提取 token 使用信息
