@@ -1,13 +1,334 @@
 <!DOCTYPE html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>PackVerify Pro</title>
-    <link rel="stylesheet" href="/index.css">
-  </head>
-  <body>
-    <div id="root"></div>
-  <script type="module" src="/index.tsx"></script>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PackVerify Pro - AI包装质检工具</title>
+  <meta name="description" content="使用AI技术自动检测包装设计中的错误，提高质检效率。">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+    * {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    }
+
+    body {
+      background: linear-gradient(180deg, #fafafa 0%, #ffffff 100%);
+    }
+
+    .hero-glow {
+      position: absolute;
+      width: 600px;
+      height: 600px;
+      background: radial-gradient(circle, rgba(139, 92, 246, 0.1) 0%, transparent 70%);
+      filter: blur(60px);
+      pointer-events: none;
+    }
+
+    .card-hover {
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .card-hover:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.08);
+    }
+
+    .gradient-text {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+        transform: translateY(20px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .fade-in {
+      animation: fadeIn 0.6s ease-out forwards;
+    }
+  </style>
+</head>
+<body>
+  <!-- Navigation -->
+  <nav class="fixed top-0 w-full bg-white/60 backdrop-blur-xl z-50 border-b border-gray-100">
+    <div class="max-w-6xl mx-auto px-6 lg:px-8">
+      <div class="flex justify-between items-center h-16">
+        <div class="flex items-center space-x-2">
+          <div class="w-8 h-8 bg-gradient-to-br from-purple-500 to-purple-700 rounded-lg flex items-center justify-center">
+            <svg class="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 20 20">
+              <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
+            </svg>
+          </div>
+          <span class="text-lg font-semibold text-gray-900">PackVerify Pro</span>
+        </div>
+        <div class="hidden md:flex items-center space-x-8">
+          <a href="#features" class="text-sm text-gray-600 hover:text-gray-900 transition">功能</a>
+          <a href="#pricing" class="text-sm text-gray-600 hover:text-gray-900 transition">定价</a>
+          <a href="/help.html" class="text-sm text-gray-600 hover:text-gray-900 transition">帮助</a>
+          <a href="/app.html" class="bg-gray-900 text-white text-sm px-5 py-2 rounded-full hover:bg-gray-800 transition">
+            开始使用
+          </a>
+        </div>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Hero Section -->
+  <section class="relative pt-32 pb-24 px-6 overflow-hidden">
+    <div class="hero-glow" style="top: -200px; left: 50%; transform: translateX(-50%);"></div>
+
+    <div class="max-w-4xl mx-auto text-center relative z-10 fade-in">
+      <h1 class="text-6xl md:text-7xl font-bold text-gray-900 mb-6 tracking-tight">
+        AI驱动的<br>
+        <span class="gradient-text">包装质检</span>
+      </h1>
+      <p class="text-xl text-gray-600 mb-12 max-w-2xl mx-auto leading-relaxed">
+        自动检测包装设计中的文字错误、排版问题、合规性缺陷
+      </p>
+      <div class="flex flex-col sm:flex-row gap-4 justify-center items-center">
+        <a href="/app.html" class="bg-gray-900 text-white px-8 py-3 rounded-full text-base font-medium hover:bg-gray-800 transition">
+          免费开始
+        </a>
+        <a href="#features" class="text-gray-700 px-8 py-3 rounded-full text-base font-medium hover:bg-gray-100 transition">
+          了解更多
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- Features Section -->
+  <section id="features" class="py-24 px-6">
+    <div class="max-w-6xl mx-auto">
+      <div class="text-center mb-16">
+        <h2 class="text-4xl font-bold text-gray-900 mb-4">核心功能</h2>
+        <p class="text-lg text-gray-600 max-w-2xl mx-auto">
+          结合AI视觉识别和规则引擎，提供全方位的质检方案
+        </p>
+      </div>
+
+      <div class="grid md:grid-cols-3 gap-8">
+        <div class="card-hover bg-white rounded-2xl p-8 border border-gray-100">
+          <div class="w-12 h-12 bg-purple-50 rounded-xl flex items-center justify-center mb-6">
+            <svg class="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+            </svg>
+          </div>
+          <h3 class="text-xl font-semibold text-gray-900 mb-3">AI智能识别</h3>
+          <p class="text-gray-600 leading-relaxed">
+            多模态AI模型自动识别文字内容，检测错字、漏字、标点错误
+          </p>
+        </div>
+
+        <div class="card-hover bg-white rounded-2xl p-8 border border-gray-100">
+          <div class="w-12 h-12 bg-blue-50 rounded-xl flex items-center justify-center mb-6">
+            <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z"/>
+            </svg>
+          </div>
+          <h3 class="text-xl font-semibold text-gray-900 mb-3">排版检查</h3>
+          <p class="text-gray-600 leading-relaxed">
+            检测多余空格、中英文混排、标点使用不当等排版问题
+          </p>
+        </div>
+
+        <div class="card-hover bg-white rounded-2xl p-8 border border-gray-100">
+          <div class="w-12 h-12 bg-green-50 rounded-xl flex items-center justify-center mb-6">
+            <svg class="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+            </svg>
+          </div>
+          <h3 class="text-xl font-semibold text-gray-900 mb-3">QIL对比</h3>
+          <p class="text-gray-600 leading-relaxed">
+            支持文本和图片QIL输入，自动提取规格信息并对比
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Pricing Preview -->
+  <section id="pricing" class="py-24 px-6 bg-white">
+    <div class="max-w-6xl mx-auto">
+      <div class="text-center mb-16">
+        <h2 class="text-4xl font-bold text-gray-900 mb-4">简单透明的定价</h2>
+        <p class="text-lg text-gray-600">
+          从个人到企业，总有适合您的方案
+        </p>
+      </div>
+
+      <div class="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
+        <!-- Free -->
+        <div class="card-hover bg-white rounded-2xl p-8 border border-gray-200">
+          <h3 class="text-xl font-semibold text-gray-900 mb-2">免费版</h3>
+          <div class="mb-6">
+            <span class="text-4xl font-bold text-gray-900">¥0</span>
+            <span class="text-gray-600">/月</span>
+          </div>
+          <ul class="space-y-3 mb-8 text-sm">
+            <li class="flex items-center text-gray-700">
+              <svg class="w-5 h-5 text-green-500 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
+              </svg>
+              10次/月 AI分析
+            </li>
+            <li class="flex items-center text-gray-700">
+              <svg class="w-5 h-5 text-green-500 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
+              </svg>
+              基础AI模型
+            </li>
+            <li class="flex items-center text-gray-700">
+              <svg class="w-5 h-5 text-green-500 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
+              </svg>
+              本地存储
+            </li>
+          </ul>
+          <a href="/app.html" class="block w-full bg-gray-100 text-gray-900 py-3 rounded-xl font-medium text-center hover:bg-gray-200 transition">
+            开始使用
+          </a>
+        </div>
+
+        <!-- Pro (Highlighted) -->
+        <div class="card-hover bg-gray-900 rounded-2xl p-8 relative transform scale-105 shadow-xl">
+          <div class="absolute -top-3 left-1/2 transform -translate-x-1/2">
+            <span class="bg-gradient-to-r from-purple-500 to-purple-700 text-white px-4 py-1 rounded-full text-xs font-semibold">
+              推荐
+            </span>
+          </div>
+          <h3 class="text-xl font-semibold text-white mb-2">专业版</h3>
+          <div class="mb-6">
+            <span class="text-4xl font-bold text-white">¥199</span>
+            <span class="text-gray-400">/月</span>
+          </div>
+          <ul class="space-y-3 mb-8 text-sm">
+            <li class="flex items-center text-gray-200">
+              <svg class="w-5 h-5 text-purple-400 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
+              </svg>
+              500次/月 AI分析
+            </li>
+            <li class="flex items-center text-gray-200">
+              <svg class="w-5 h-5 text-purple-400 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
+              </svg>
+              全部AI模型
+            </li>
+            <li class="flex items-center text-gray-200">
+              <svg class="w-5 h-5 text-purple-400 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
+              </svg>
+              云端同步
+            </li>
+            <li class="flex items-center text-gray-200">
+              <svg class="w-5 h-5 text-purple-400 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
+              </svg>
+              优先支持
+            </li>
+          </ul>
+          <a href="/pricing.html" class="block w-full bg-white text-gray-900 py-3 rounded-xl font-medium text-center hover:bg-gray-100 transition">
+            立即订阅
+          </a>
+        </div>
+
+        <!-- Enterprise -->
+        <div class="card-hover bg-white rounded-2xl p-8 border border-gray-200">
+          <h3 class="text-xl font-semibold text-gray-900 mb-2">企业版</h3>
+          <div class="mb-6">
+            <span class="text-4xl font-bold text-gray-900">定制</span>
+          </div>
+          <ul class="space-y-3 mb-8 text-sm">
+            <li class="flex items-center text-gray-700">
+              <svg class="w-5 h-5 text-green-500 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
+              </svg>
+              无限次数
+            </li>
+            <li class="flex items-center text-gray-700">
+              <svg class="w-5 h-5 text-green-500 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
+              </svg>
+              私有化部署
+            </li>
+            <li class="flex items-center text-gray-700">
+              <svg class="w-5 h-5 text-green-500 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
+              </svg>
+              专属客服
+            </li>
+          </ul>
+          <a href="mailto:sales@packverify.com" class="block w-full bg-gray-100 text-gray-900 py-3 rounded-xl font-medium text-center hover:bg-gray-200 transition">
+            联系我们
+          </a>
+        </div>
+      </div>
+
+      <div class="text-center mt-12">
+        <a href="/pricing.html" class="text-purple-600 hover:text-purple-700 font-medium">
+          查看完整定价 →
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- CTA -->
+  <section class="py-24 px-6">
+    <div class="max-w-4xl mx-auto text-center">
+      <h2 class="text-4xl font-bold text-gray-900 mb-6">准备开始了吗？</h2>
+      <p class="text-xl text-gray-600 mb-12">
+        立即免费试用，体验AI驱动的包装质检
+      </p>
+      <a href="/app.html" class="inline-block bg-gray-900 text-white px-8 py-3 rounded-full text-base font-medium hover:bg-gray-800 transition">
+        免费开始
+      </a>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer class="py-12 px-6 border-t border-gray-100">
+    <div class="max-w-6xl mx-auto">
+      <div class="flex flex-col md:flex-row justify-between items-center gap-6">
+        <div class="flex items-center space-x-2">
+          <div class="w-8 h-8 bg-gradient-to-br from-purple-500 to-purple-700 rounded-lg flex items-center justify-center">
+            <svg class="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 20 20">
+              <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
+            </svg>
+          </div>
+          <span class="text-sm font-semibold text-gray-900">PackVerify Pro</span>
+        </div>
+        <div class="flex items-center gap-8 text-sm text-gray-600">
+          <a href="/pricing.html" class="hover:text-gray-900 transition">定价</a>
+          <a href="/help.html" class="hover:text-gray-900 transition">帮助</a>
+          <a href="mailto:contact@packverify.com" class="hover:text-gray-900 transition">联系我们</a>
+        </div>
+      </div>
+      <div class="mt-8 text-center text-sm text-gray-500">
+        © 2025 PackVerify Pro. All rights reserved.
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+      anchor.addEventListener('click', function (e) {
+        e.preventDefault();
+        const target = document.querySelector(this.getAttribute('href'));
+        if (target) {
+          target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      });
+    });
+  </script>
 </body>
 </html>

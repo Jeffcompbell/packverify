@@ -1,4 +1,4 @@
-# CLAUDE.md
+、# CLAUDE.md
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
@@ -12,7 +12,7 @@ PackVerify Pro is a React-based packaging design QA tool that uses AI vision mod
 npm install        # Install dependencies
 npm run dev        # Start dev server at http://localhost:3000
 npm run build      # Production build
-npm run preview    # Preview production build
+npm run preview    # Pre找一个地方放我们的帮助手册系统公告以及价格吧，然后我们还需要有一个首页介绍我们产品的功能以及产品的案例修view production build
 ```
 
 ## Environment Setup

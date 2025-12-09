@@ -104,6 +104,15 @@ export interface ImageItem {
   rotation?: number; // 旋转角度
 }
 
+// Token 使用统计
+export interface TokenUsage {
+  promptTokens: number;
+  completionTokens: number;
+  totalTokens: number;
+  model: string;
+  timestamp: Date;
+}
+
 // 诊断结果包含描述
 export interface DiagnosisResult {
   description: string;
@@ -111,4 +120,5 @@ export interface DiagnosisResult {
   issues: DiagnosisIssue[];
   deterministicIssues: DeterministicCheck[]; // 确定性问题
   specs: SourceField[]; // 产品规格（从单次 AI 调用中提取）
+  tokenUsage?: TokenUsage; // Token 使用统计
 }

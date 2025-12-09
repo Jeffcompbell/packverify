@@ -1,0 +1,650 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>定价方案 - PackVerify Pro</title>
+  <meta name="description" content="选择适合您的PackVerify Pro定价方案，从免费版到企业版，满足不同规模的需求。">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://js.stripe.com/v3/"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+    * {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    }
+
+    .gradient-bg {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    }
+
+    .pricing-card {
+      transition: transform 0.3s ease, box-shadow 0.3s ease;
+    }
+
+    .pricing-card:hover {
+      transform: translateY(-8px);
+      box-shadow: 0 20px 60px rgba(102, 126, 234, 0.3);
+    }
+
+    .feature-check {
+      flex-shrink: 0;
+      margin-top: 0.25rem;
+    }
+  </style>
+</head>
+<body class="bg-gray-50">
+  <!-- Navigation -->
+  <nav class="fixed top-0 w-full bg-white/80 backdrop-blur-md z-50 border-b border-gray-200">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex justify-between items-center h-16">
+        <a href="/" class="flex items-center space-x-2">
+          <svg class="w-8 h-8 text-purple-600" fill="currentColor" viewBox="0 0 24 24">
+            <path d="M12 2L2 7v10c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-10-5zm0 18c-3.86-.91-7-5.19-7-9V8.3l7-3.11 7 3.11V11c0 3.81-3.14 8.09-7 9zm-1-13h2v6h-2V7zm0 8h2v2h-2v-2z"/>
+          </svg>
+          <span class="text-xl font-bold text-gray-900">PackVerify Pro</span>
+        </a>
+        <div class="hidden md:flex items-center space-x-8">
+          <a href="./index.html#features" class="text-gray-700 hover:text-purple-600 transition">功能特性</a>
+          <a href="./index.html#cases" class="text-gray-700 hover:text-purple-600 transition">案例展示</a>
+          <a href="/pricing.html" class="text-purple-600 font-semibold">定价</a>
+          <a href="/help.html" class="text-gray-700 hover:text-purple-600 transition">帮助文档</a>
+          <a href="/app.html" class="bg-purple-600 text-white px-6 py-2 rounded-lg hover:bg-purple-700 transition">开始使用</a>
+        </div>
+        <button class="md:hidden p-2" onclick="toggleMobileMenu()">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+    <div id="mobileMenu" class="hidden md:hidden bg-white border-t border-gray-200">
+      <div class="px-4 py-3 space-y-3">
+        <a href="./index.html#features" class="block text-gray-700">功能特性</a>
+        <a href="./index.html#cases" class="block text-gray-700">案例展示</a>
+        <a href="/pricing.html" class="block text-purple-600 font-semibold">定价</a>
+        <a href="/help.html" class="block text-gray-700">帮助文档</a>
+        <a href="/app.html" class="block bg-purple-600 text-white px-6 py-2 rounded-lg text-center">开始使用</a>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Hero Section -->
+  <section class="pt-32 pb-12 gradient-bg text-white">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+      <h1 class="text-5xl font-bold mb-6">选择适合您的方案</h1>
+      <p class="text-xl text-purple-100 max-w-2xl mx-auto">
+        灵活的定价，透明的收费，无隐藏费用
+      </p>
+
+      <!-- Billing Toggle -->
+      <div class="mt-8 inline-flex items-center bg-white/10 backdrop-blur-sm rounded-lg p-1">
+        <button id="monthlyBtn" class="px-6 py-2 rounded-md text-white font-medium transition bg-white/20" onclick="toggleBilling('monthly')">
+          月付
+        </button>
+        <button id="yearlyBtn" class="px-6 py-2 rounded-md text-white font-medium transition" onclick="toggleBilling('yearly')">
+          年付
+          <span class="ml-2 text-xs bg-green-500 text-white px-2 py-1 rounded-full">省20%</span>
+        </button>
+      </div>
+    </div>
+  </section>
+
+  <!-- Pricing Cards -->
+  <section class="py-20 bg-gray-50">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="grid md:grid-cols-3 gap-8">
+
+        <!-- Free Plan -->
+        <div class="pricing-card bg-white rounded-2xl p-8 border-2 border-gray-200">
+          <div class="text-center mb-8">
+            <h3 class="text-2xl font-bold text-gray-900 mb-2">免费版</h3>
+            <p class="text-gray-600 mb-6">适合个人用户体验</p>
+            <div class="mb-6">
+              <span class="text-5xl font-bold text-gray-900">¥0</span>
+              <span class="text-gray-600">/月</span>
+            </div>
+            <button onclick="startFreeTrial()" class="w-full bg-gray-100 text-gray-900 py-3 rounded-lg font-semibold hover:bg-gray-200 transition">
+              开始使用
+            </button>
+          </div>
+
+          <div class="space-y-4">
+            <h4 class="font-semibold text-gray-900 text-sm uppercase tracking-wide">功能包含：</h4>
+            <div class="space-y-3">
+              <div class="flex items-start">
+                <svg class="feature-check w-5 h-5 text-green-500 mr-3" fill="currentColor" viewBox="0 0 20 20">
+                  <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
+                </svg>
+                <div>
+                  <p class="text-gray-900 font-medium">10次/月 AI分析</p>
+                  <p class="text-sm text-gray-500">每月重置</p>
+                </div>
+              </div>
+              <div class="flex items-start">
+                <svg class="feature-check w-5 h-5 text-green-500 mr-3" fill="currentColor" viewBox="0 0 20 20">
+                  <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
+                </svg>
+                <div>
+                  <p class="text-gray-900 font-medium">基础AI模型</p>
+                  <p class="text-sm text-gray-500">GPT-4o Mini, Gemini 2.5 Flash</p>
+                </div>
+              </div>
+              <div class="flex items-start">
+                <svg class="feature-check w-5 h-5 text-green-500 mr-3" fill="currentColor" viewBox="0 0 20 20">
+                  <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
+                </svg>
+                <div>
+                  <p class="text-gray-900 font-medium">本地存储</p>
+                  <p class="text-sm text-gray-500">浏览器本地缓存</p>
+                </div>
+              </div>
+              <div class="flex items-start">
+                <svg class="feature-check w-5 h-5 text-green-500 mr-3" fill="currentColor" viewBox="0 0 20 20">
+                  <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
+                </svg>
+                <div>
+                  <p class="text-gray-900 font-medium">基础功能</p>
+                  <p class="text-sm text-gray-500">OCR、问题检测、QIL对比</p>
+                </div>
+              </div>
+              <div class="flex items-start">
+                <svg class="feature-check w-5 h-5 text-gray-300 mr-3" fill="currentColor" viewBox="0 0 20 20">
+                  <path fill-rule="evenodd" d="M3 10a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clip-rule="evenodd"/>
+                </svg>
+                <div>
+                  <p class="text-gray-400 font-medium">云端同步</p>
+                </div>
+              </div>
+              <div class="flex items-start">
+                <svg class="feature-check w-5 h-5 text-gray-300 mr-3" fill="currentColor" viewBox="0 0 20 20">
+                  <path fill-rule="evenodd" d="M3 10a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clip-rule="evenodd"/>
+                </svg>
+                <div>
+                  <p class="text-gray-400 font-medium">高级AI模型</p>
+                </div>
+              </div>
+              <div class="flex items-start">
+                <svg class="feature-check w-5 h-5 text-gray-300 mr-3" fill="currentColor" viewBox="0 0 20 20">
+                  <path fill-rule="evenodd" d="M3 10a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clip-rule="evenodd"/>
+                </svg>
+                <div>
+                  <p class="text-gray-400 font-medium">API访问</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Pro Plan (Highlighted) -->
+        <div class="pricing-card bg-gradient-to-br from-purple-600 to-purple-700 rounded-2xl p-8 border-2 border-purple-600 shadow-2xl relative transform scale-105">
+          <div class="absolute -top-4 left-1/2 transform -translate-x-1/2">
+            <span class="bg-gradient-to-r from-yellow-400 to-orange-500 text-white px-4 py-1 rounded-full text-sm font-semibold shadow-lg">
+              最受欢迎
+            </span>
+          </div>
+
+          <div class="text-center mb-8">
+            <h3 class="text-2xl font-bold text-white mb-2">专业版</h3>
+            <p class="text-purple-100 mb-6">适合专业设计师和小团队</p>
+            <div class="mb-6">
+              <span class="text-5xl font-bold text-white monthly-price">¥199</span>
+              <span class="text-5xl font-bold text-white yearly-price hidden">¥159</span>
+              <span class="text-purple-200">/月</span>
+              <p class="text-sm text-purple-200 mt-2 yearly-save hidden">年付可节省 ¥480</p>
+            </div>
+            <button onclick="subscribePro()" class="w-full bg-white text-purple-600 py-3 rounded-lg font-semibold hover:bg-gray-100 transition shadow-lg">
+              立即订阅
+            </button>
+          </div>
+
+          <div class="space-y-4">
+            <h4 class="font-semibold text-white text-sm uppercase tracking-wide">全部免费版功能，plus：</h4>
+            <div class="space-y-3">
+              <div class="flex items-start">
+                <svg class="feature-check w-5 h-5 text-white mr-3" fill="currentColor" viewBox="0 0 20 20">
+                  <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
+                </svg>
+                <div>
+                  <p class="text-white font-medium">500次/月 AI分析</p>
+                  <p class="text-sm text-purple-200">每月重置，超出可按需购买</p>
+                </div>
+              </div>
+              <div class="flex items-start">
+                <svg class="feature-check w-5 h-5 text-white mr-3" fill="currentColor" viewBox="0 0 20 20">
+                  <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
+                </svg>
+                <div>
+                  <p class="text-white font-medium">全部AI模型</p>
+                  <p class="text-sm text-purple-200">GPT-5.1, GPT-4o, Gemini 3 Pro等</p>
+                </div>
+              </div>
+              <div class="flex items-start">
+                <svg class="feature-check w-5 h-5 text-white mr-3" fill="currentColor" viewBox="0 0 20 20">
+                  <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
+                </svg>
+                <div>
+                  <p class="text-white font-medium">云端同步</p>
+                  <p class="text-sm text-purple-200">数据自动备份，多设备访问</p>
+                </div>
+              </div>
+              <div class="flex items-start">
+                <svg class="feature-check w-5 h-5 text-white mr-3" fill="currentColor" viewBox="0 0 20 20">
+                  <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
+                </svg>
+                <div>
+                  <p class="text-white font-medium">批量处理</p>
+                  <p class="text-sm text-purple-200">一次上传20张图片</p>
+                </div>
+              </div>
+              <div class="flex items-start">
+                <svg class="feature-check w-5 h-5 text-white mr-3" fill="currentColor" viewBox="0 0 20 20">
+                  <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
+                </svg>
+                <div>
+                  <p class="text-white font-medium">导出报告</p>
+                  <p class="text-sm text-purple-200">PDF/Excel格式</p>
+                </div>
+              </div>
+              <div class="flex items-start">
+                <svg class="feature-check w-5 h-5 text-white mr-3" fill="currentColor" viewBox="0 0 20 20">
+                  <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
+                </svg>
+                <div>
+                  <p class="text-white font-medium">优先支持</p>
+                  <p class="text-sm text-purple-200">邮件24小时响应</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Enterprise Plan -->
+        <div class="pricing-card bg-white rounded-2xl p-8 border-2 border-gray-200">
+          <div class="text-center mb-8">
+            <h3 class="text-2xl font-bold text-gray-900 mb-2">企业版</h3>
+            <p class="text-gray-600 mb-6">适合大型团队和企业</p>
+            <div class="mb-6">
+              <span class="text-5xl font-bold text-gray-900">定制</span>
+            </div>
+            <button onclick="contactSales()" class="w-full bg-gray-900 text-white py-3 rounded-lg font-semibold hover:bg-gray-800 transition">
+              联系销售
+            </button>
+          </div>
+
+          <div class="space-y-4">
+            <h4 class="font-semibold text-gray-900 text-sm uppercase tracking-wide">全部专业版功能，plus：</h4>
+            <div class="space-y-3">
+              <div class="flex items-start">
+                <svg class="feature-check w-5 h-5 text-green-500 mr-3" fill="currentColor" viewBox="0 0 20 20">
+                  <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
+                </svg>
+                <div>
+                  <p class="text-gray-900 font-medium">无限次数</p>
+                  <p class="text-sm text-gray-500">不限分析次数</p>
+                </div>
+              </div>
+              <div class="flex items-start">
+                <svg class="feature-check w-5 h-5 text-green-500 mr-3" fill="currentColor" viewBox="0 0 20 20">
+                  <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
+                </svg>
+                <div>
+                  <p class="text-gray-900 font-medium">私有化部署</p>
+                  <p class="text-sm text-gray-500">本地部署，数据完全掌控</p>
+                </div>
+              </div>
+              <div class="flex items-start">
+                <svg class="feature-check w-5 h-5 text-green-500 mr-3" fill="currentColor" viewBox="0 0 20 20">
+                  <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
+                </svg>
+                <div>
+                  <p class="text-gray-900 font-medium">定制开发</p>
+                  <p class="text-sm text-gray-500">定制行业规则和工作流程</p>
+                </div>
+              </div>
+              <div class="flex items-start">
+                <svg class="feature-check w-5 h-5 text-green-500 mr-3" fill="currentColor" viewBox="0 0 20 20">
+                  <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
+                </svg>
+                <div>
+                  <p class="text-gray-900 font-medium">API访问</p>
+                  <p class="text-sm text-gray-500">完整的API接口和文档</p>
+                </div>
+              </div>
+              <div class="flex items-start">
+                <svg class="feature-check w-5 h-5 text-green-500 mr-3" fill="currentColor" viewBox="0 0 20 20">
+                  <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
+                </svg>
+                <div>
+                  <p class="text-gray-900 font-medium">团队管理</p>
+                  <p class="text-sm text-gray-500">用户权限、角色管理</p>
+                </div>
+              </div>
+              <div class="flex items-start">
+                <svg class="feature-check w-5 h-5 text-green-500 mr-3" fill="currentColor" viewBox="0 0 20 20">
+                  <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
+                </svg>
+                <div>
+                  <p class="text-gray-900 font-medium">专属客服</p>
+                  <p class="text-sm text-gray-500">7x24小时技术支持</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Feature Comparison Table -->
+  <section class="py-20 bg-white">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <h2 class="text-3xl font-bold text-gray-900 text-center mb-12">功能对比</h2>
+
+      <div class="overflow-x-auto">
+        <table class="w-full">
+          <thead>
+            <tr class="border-b-2 border-gray-200">
+              <th class="text-left py-4 px-4 font-semibold text-gray-900">功能</th>
+              <th class="text-center py-4 px-4 font-semibold text-gray-900">免费版</th>
+              <th class="text-center py-4 px-4 font-semibold text-purple-600">专业版</th>
+              <th class="text-center py-4 px-4 font-semibold text-gray-900">企业版</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-gray-200">
+            <tr>
+              <td class="py-4 px-4 text-gray-900">AI分析次数/月</td>
+              <td class="py-4 px-4 text-center text-gray-600">10次</td>
+              <td class="py-4 px-4 text-center text-gray-900 font-semibold">500次</td>
+              <td class="py-4 px-4 text-center text-gray-900 font-semibold">无限</td>
+            </tr>
+            <tr>
+              <td class="py-4 px-4 text-gray-900">AI模型</td>
+              <td class="py-4 px-4 text-center text-gray-600">基础模型</td>
+              <td class="py-4 px-4 text-center text-gray-900 font-semibold">全部模型</td>
+              <td class="py-4 px-4 text-center text-gray-900 font-semibold">全部模型</td>
+            </tr>
+            <tr>
+              <td class="py-4 px-4 text-gray-900">云端同步</td>
+              <td class="py-4 px-4 text-center">
+                <svg class="w-5 h-5 text-gray-300 mx-auto" fill="currentColor" viewBox="0 0 20 20">
+                  <path fill-rule="evenodd" d="M3 10a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clip-rule="evenodd"/>
+                </svg>
+              </td>
+              <td class="py-4 px-4 text-center">
+                <svg class="w-5 h-5 text-green-500 mx-auto" fill="currentColor" viewBox="0 0 20 20">
+                  <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
+                </svg>
+              </td>
+              <td class="py-4 px-4 text-center">
+                <svg class="w-5 h-5 text-green-500 mx-auto" fill="currentColor" viewBox="0 0 20 20">
+                  <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
+                </svg>
+              </td>
+            </tr>
+            <tr>
+              <td class="py-4 px-4 text-gray-900">批量上传</td>
+              <td class="py-4 px-4 text-center text-gray-600">5张</td>
+              <td class="py-4 px-4 text-center text-gray-900 font-semibold">20张</td>
+              <td class="py-4 px-4 text-center text-gray-900 font-semibold">无限</td>
+            </tr>
+            <tr>
+              <td class="py-4 px-4 text-gray-900">导出报告</td>
+              <td class="py-4 px-4 text-center">
+                <svg class="w-5 h-5 text-gray-300 mx-auto" fill="currentColor" viewBox="0 0 20 20">
+                  <path fill-rule="evenodd" d="M3 10a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clip-rule="evenodd"/>
+                </svg>
+              </td>
+              <td class="py-4 px-4 text-center">
+                <svg class="w-5 h-5 text-green-500 mx-auto" fill="currentColor" viewBox="0 0 20 20">
+                  <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
+                </svg>
+              </td>
+              <td class="py-4 px-4 text-center">
+                <svg class="w-5 h-5 text-green-500 mx-auto" fill="currentColor" viewBox="0 0 20 20">
+                  <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
+                </svg>
+              </td>
+            </tr>
+            <tr>
+              <td class="py-4 px-4 text-gray-900">API访问</td>
+              <td class="py-4 px-4 text-center">
+                <svg class="w-5 h-5 text-gray-300 mx-auto" fill="currentColor" viewBox="0 0 20 20">
+                  <path fill-rule="evenodd" d="M3 10a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clip-rule="evenodd"/>
+                </svg>
+              </td>
+              <td class="py-4 px-4 text-center">
+                <svg class="w-5 h-5 text-gray-300 mx-auto" fill="currentColor" viewBox="0 0 20 20">
+                  <path fill-rule="evenodd" d="M3 10a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clip-rule="evenodd"/>
+                </svg>
+              </td>
+              <td class="py-4 px-4 text-center">
+                <svg class="w-5 h-5 text-green-500 mx-auto" fill="currentColor" viewBox="0 0 20 20">
+                  <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
+                </svg>
+              </td>
+            </tr>
+            <tr>
+              <td class="py-4 px-4 text-gray-900">私有化部署</td>
+              <td class="py-4 px-4 text-center">
+                <svg class="w-5 h-5 text-gray-300 mx-auto" fill="currentColor" viewBox="0 0 20 20">
+                  <path fill-rule="evenodd" d="M3 10a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clip-rule="evenodd"/>
+                </svg>
+              </td>
+              <td class="py-4 px-4 text-center">
+                <svg class="w-5 h-5 text-gray-300 mx-auto" fill="currentColor" viewBox="0 0 20 20">
+                  <path fill-rule="evenodd" d="M3 10a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clip-rule="evenodd"/>
+                </svg>
+              </td>
+              <td class="py-4 px-4 text-center">
+                <svg class="w-5 h-5 text-green-500 mx-auto" fill="currentColor" viewBox="0 0 20 20">
+                  <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
+                </svg>
+              </td>
+            </tr>
+            <tr>
+              <td class="py-4 px-4 text-gray-900">技术支持</td>
+              <td class="py-4 px-4 text-center text-gray-600">文档</td>
+              <td class="py-4 px-4 text-center text-gray-900">邮件优先</td>
+              <td class="py-4 px-4 text-center text-gray-900 font-semibold">7x24专属</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- FAQ -->
+  <section class="py-20 bg-gray-50">
+    <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+      <h2 class="text-3xl font-bold text-gray-900 text-center mb-12">定价常见问题</h2>
+
+      <div class="space-y-6">
+        <div class="bg-white rounded-xl p-6 shadow-sm">
+          <h3 class="text-lg font-semibold text-gray-900 mb-2">如何计费？</h3>
+          <p class="text-gray-600">
+            免费版永久免费，每月提供10次分析额度。专业版采用订阅制，按月或按年付费，年付可享受20%折扣。企业版根据需求定制报价。
+          </p>
+        </div>
+
+        <div class="bg-white rounded-xl p-6 shadow-sm">
+          <h3 class="text-lg font-semibold text-gray-900 mb-2">超出配额怎么办？</h3>
+          <p class="text-gray-600">
+            专业版用户超出月度配额后，可以按需购买额外配额包（100次/¥99）。企业版用户无限制使用。
+          </p>
+        </div>
+
+        <div class="bg-white rounded-xl p-6 shadow-sm">
+          <h3 class="text-lg font-semibold text-gray-900 mb-2">支持哪些支付方式？</h3>
+          <p class="text-gray-600">
+            支持信用卡/借记卡支付（通过Stripe），支持支付宝、微信支付。企业版支持对公转账和发票开具。
+          </p>
+        </div>
+
+        <div class="bg-white rounded-xl p-6 shadow-sm">
+          <h3 class="text-lg font-semibold text-gray-900 mb-2">可以随时取消订阅吗？</h3>
+          <p class="text-gray-600">
+            可以。您可以随时在账户设置中取消订阅，取消后将在当前计费周期结束时生效，期间仍可正常使用付费功能。
+          </p>
+        </div>
+
+        <div class="bg-white rounded-xl p-6 shadow-sm">
+          <h3 class="text-lg font-semibold text-gray-900 mb-2">是否提供退款？</h3>
+          <p class="text-gray-600">
+            我们提供7天无理由退款保证。如果您在购买后7天内不满意，可以申请全额退款。
+          </p>
+        </div>
+
+        <div class="bg-white rounded-xl p-6 shadow-sm">
+          <h3 class="text-lg font-semibold text-gray-900 mb-2">企业版如何询价？</h3>
+          <p class="text-gray-600">
+            请通过<a href="mailto:sales@packverify.com" class="text-purple-600 hover:underline">sales@packverify.com</a>联系我们的销售团队，或填写<a href="#contact" class="text-purple-600 hover:underline">企业咨询表单</a>，我们将在24小时内与您联系。
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CTA -->
+  <section class="py-20 gradient-bg text-white">
+    <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+      <h2 class="text-4xl font-bold mb-6">准备开始了吗？</h2>
+      <p class="text-xl text-purple-100 mb-8">
+        选择适合您的方案，立即提升包装质检效率
+      </p>
+      <div class="flex flex-col sm:flex-row gap-4 justify-center">
+        <button onclick="startFreeTrial()" class="bg-white text-purple-600 px-8 py-4 rounded-lg text-lg font-semibold hover:bg-gray-100 transition">
+          免费试用
+        </button>
+        <button onclick="subscribePro()" class="bg-purple-800 text-white px-8 py-4 rounded-lg text-lg font-semibold hover:bg-purple-900 transition">
+          订阅专业版
+        </button>
+      </div>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer class="bg-gray-900 text-gray-300 py-12">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="grid md:grid-cols-4 gap-8">
+        <div>
+          <div class="flex items-center space-x-2 mb-4">
+            <svg class="w-8 h-8 text-purple-500" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M12 2L2 7v10c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-10-5zm0 18c-3.86-.91-7-5.19-7-9V8.3l7-3.11 7 3.11V11c0 3.81-3.14 8.09-7 9zm-1-13h2v6h-2V7zm0 8h2v2h-2v-2z"/>
+            </svg>
+            <span class="text-xl font-bold text-white">PackVerify Pro</span>
+          </div>
+          <p class="text-sm">
+            AI驱动的包装设计质检工具
+          </p>
+        </div>
+        <div>
+          <h4 class="text-white font-semibold mb-4">产品</h4>
+          <ul class="space-y-2 text-sm">
+            <li><a href="./index.html#features" class="hover:text-white transition">功能特性</a></li>
+            <li><a href="./index.html#cases" class="hover:text-white transition">案例展示</a></li>
+            <li><a href="/pricing.html" class="hover:text-white transition">定价方案</a></li>
+          </ul>
+        </div>
+        <div>
+          <h4 class="text-white font-semibold mb-4">资源</h4>
+          <ul class="space-y-2 text-sm">
+            <li><a href="/help.html" class="hover:text-white transition">帮助文档</a></li>
+            <li><a href="./help.html#api" class="hover:text-white transition">API文档</a></li>
+          </ul>
+        </div>
+        <div>
+          <h4 class="text-white font-semibold mb-4">联系我们</h4>
+          <ul class="space-y-2 text-sm">
+            <li><a href="mailto:contact@packverify.com" class="hover:text-white transition">邮箱支持</a></li>
+            <li><a href="mailto:sales@packverify.com" class="hover:text-white transition">企业咨询</a></li>
+          </ul>
+        </div>
+      </div>
+      <div class="border-t border-gray-800 mt-12 pt-8 text-sm text-center">
+        <p>&copy; 2025 PackVerify Pro. All rights reserved.</p>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    // Initialize Stripe (replace with your publishable key)
+    const stripe = Stripe('pk_test_YOUR_PUBLISHABLE_KEY_HERE');
+
+    let billingCycle = 'monthly';
+
+    function toggleMobileMenu() {
+      const menu = document.getElementById('mobileMenu');
+      menu.classList.toggle('hidden');
+    }
+
+    function toggleBilling(cycle) {
+      billingCycle = cycle;
+
+      const monthlyBtn = document.getElementById('monthlyBtn');
+      const yearlyBtn = document.getElementById('yearlyBtn');
+      const monthlyPrices = document.querySelectorAll('.monthly-price');
+      const yearlyPrices = document.querySelectorAll('.yearly-price');
+      const yearlySaves = document.querySelectorAll('.yearly-save');
+
+      if (cycle === 'monthly') {
+        monthlyBtn.classList.add('bg-white/20');
+        yearlyBtn.classList.remove('bg-white/20');
+        monthlyPrices.forEach(el => el.classList.remove('hidden'));
+        yearlyPrices.forEach(el => el.classList.add('hidden'));
+        yearlySaves.forEach(el => el.classList.add('hidden'));
+      } else {
+        yearlyBtn.classList.add('bg-white/20');
+        monthlyBtn.classList.remove('bg-white/20');
+        monthlyPrices.forEach(el => el.classList.add('hidden'));
+        yearlyPrices.forEach(el => el.classList.remove('hidden'));
+        yearlySaves.forEach(el => el.classList.remove('hidden'));
+      }
+    }
+
+    function startFreeTrial() {
+      window.location.href = '/app';
+    }
+
+    async function subscribePro() {
+      try {
+        // TODO: Replace with your actual Stripe price IDs
+        const priceId = billingCycle === 'monthly'
+          ? 'price_monthly_pro_id'
+          : 'price_yearly_pro_id';
+
+        // Redirect to Stripe Checkout
+        const { error } = await stripe.redirectToCheckout({
+          lineItems: [{ price: priceId, quantity: 1 }],
+          mode: 'subscription',
+          successUrl: window.location.origin + '/app?payment=success',
+          cancelUrl: window.location.origin + '/pricing.html?payment=cancelled',
+        });
+
+        if (error) {
+          console.error('Stripe checkout error:', error);
+          alert('支付出现问题，请稍后重试或联系客服');
+        }
+      } catch (err) {
+        console.error('Subscribe error:', err);
+        alert('支付出现问题，请稍后重试或联系客服');
+      }
+    }
+
+    function contactSales() {
+      window.location.href = 'mailto:sales@packverify.com?subject=企业版咨询&body=您好，我对PackVerify Pro企业版感兴趣，希望了解更多信息。';
+    }
+
+    // Smooth scroll
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+      anchor.addEventListener('click', function (e) {
+        e.preventDefault();
+        const target = document.querySelector(this.getAttribute('href'));
+        if (target) {
+          target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      });
+    });
+  </script>
+</body>
+</html>

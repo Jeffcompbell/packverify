@@ -1,3 +1,6 @@
+import { clsx, type ClassValue } from "clsx"
+import { twMerge } from "tailwind-merge"
+
 export const base64ToBlobUrl = (base64: string, mimeType: string): string => {
   const byteString = atob(base64);
   const ab = new ArrayBuffer(byteString.length);
@@ -29,3 +32,8 @@ export const generateProductName = () => {
 };
 
 export const STORAGE_KEY = 'packverify_data';
+
+// Tailwind merge utility (for shadcn components)
+export function cn(...inputs: ClassValue[]) {
+  return twMerge(clsx(inputs))
+}

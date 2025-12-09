@@ -20,6 +20,8 @@ import { QuotaModal } from './components/QuotaModal';
 import { AllProductsPage } from './components/AllProductsPage';
 import { IssuesPanel } from './components/IssuesPanel';
 import { QilPanel, QilPanelRef } from './components/QilPanel';
+import { AnnouncementBanner, AnnouncementModal } from './components/AnnouncementBanner';
+import { UpgradeModal } from './components/UpgradeModal';
 import { base64ToBlobUrl, createVirtualFile, generateProductName, STORAGE_KEY } from './utils/helpers';
 import { StoredImageItem } from './types/storage';
 
@@ -29,6 +31,7 @@ const App: React.FC = () => {
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [showQuotaModal, setShowQuotaModal] = useState(false);
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [quotaUsageHistory, setQuotaUsageHistory] = useState<QuotaUsageRecord[]>([]);
   const [isLoadingQuotaHistory, setIsLoadingQuotaHistory] = useState(false);
   const [hasMoreQuotaHistory, setHasMoreQuotaHistory] = useState(false);
@@ -65,6 +68,10 @@ const App: React.FC = () => {
   const [industry, setIndustry] = useState<IndustryType>('general');
   const [showIndustryMenu, setShowIndustryMenu] = useState(false);
   const [showAllProducts, setShowAllProducts] = useState(false);
+
+  // Refs for click-outside detection
+  const productMenuRef = useRef<HTMLDivElement>(null);
+  const industryMenuRef = useRef<HTMLDivElement>(null);
   const [activeModelTab, setActiveModelTab] = useState<string>(currentModel);
   const [imageScale, setImageScale] = useState(1);
   const [showOverlay, setShowOverlay] = useState(true);
@@ -371,8 +378,14 @@ const App: React.FC = () => {
         ));
       }
 
-      // 消耗配额
-      await useQuotaFirebase(user.uid, 1, file.name);
+      // 消耗配额（包含 token 使用统计）
+      const tokenUsage = diagResult.tokenUsage ? {
+        promptTokens: diagResult.tokenUsage.promptTokens,
+        completionTokens: diagResult.tokenUsage.completionTokens,
+        totalTokens: diagResult.tokenUsage.totalTokens,
+        model: diagResult.tokenUsage.model
+      } : undefined;
+      await useQuotaFirebase(user.uid, 1, file.name, 'analyze', tokenUsage);
       const updatedUser = await getUserData(user.uid);
       if (updatedUser) setUser(updatedUser);
 
@@ -471,8 +484,14 @@ const App: React.FC = () => {
         } : img
       ));
 
-      // 消耗配额
-      await useQuotaFirebase(user.uid, 1, image.file.name, 'retry');
+      // 消耗配额（包含 token 使用统计）
+      const tokenUsage = diagResult.tokenUsage ? {
+        promptTokens: diagResult.tokenUsage.promptTokens,
+        completionTokens: diagResult.tokenUsage.completionTokens,
+        totalTokens: diagResult.tokenUsage.totalTokens,
+        model: diagResult.tokenUsage.model
+      } : undefined;
+      await useQuotaFirebase(user.uid, 1, image.file.name, 'retry', tokenUsage);
       const updatedUser = await getUserData(user.uid);
       if (updatedUser) setUser(updatedUser);
 
@@ -564,8 +583,14 @@ const App: React.FC = () => {
         img.id === imageId ? { ...img, issuesByModel: newIssuesByModel } : img
       ));
 
-      // 消耗配额
-      await useQuotaFirebase(user.uid, 1, image.file.name, 'analyze');
+      // 消耗配额（包含 token 使用统计）
+      const tokenUsage = diagResult.tokenUsage ? {
+        promptTokens: diagResult.tokenUsage.promptTokens,
+        completionTokens: diagResult.tokenUsage.completionTokens,
+        totalTokens: diagResult.tokenUsage.totalTokens,
+        model: diagResult.tokenUsage.model
+      } : undefined;
+      await useQuotaFirebase(user.uid, 1, image.file.name, 'analyze', tokenUsage);
       const updatedUser = await getUserData(user.uid);
       if (updatedUser) setUser(updatedUser);
 
@@ -786,6 +811,21 @@ const App: React.FC = () => {
     }
   }, [user, quotaUsageHistory, isLoadingMoreQuotaHistory]);
 
+  // Click outside to close dropdowns
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (productMenuRef.current && !productMenuRef.current.contains(event.target as Node)) {
+        setShowProductList(false);
+      }
+      if (industryMenuRef.current && !industryMenuRef.current.contains(event.target as Node)) {
+        setShowIndustryMenu(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
   // Global Paste Handler
   useEffect(() => {
     const handlePaste = (e: ClipboardEvent) => {
@@ -901,6 +941,15 @@ const App: React.FC = () => {
         />
       )}
 
+      {/* 升级订阅弹窗 */}
+      <UpgradeModal
+        isOpen={showUpgradeModal}
+        onClose={() => setShowUpgradeModal(false)}
+        currentPlan={user?.plan || 'free'}
+        quotaUsed={user?.used || 0}
+        quotaTotal={user?.quota || 10}
+      />
+
       {/* 全部产品页面 */}
       {user && (
         <AllProductsPage
@@ -912,117 +961,26 @@ const App: React.FC = () => {
         />
       )}
 
-      {/* TOP BAR */}
-      <div className="h-12 border-b border-border bg-white flex items-center justify-between px-2 md:px-4 shrink-0">
-        {/* Left: Product Name */}
-        <div className="flex items-center gap-2 md:gap-3 min-w-0 flex-1">
-          {/* 产品名称 - 可编辑 */}
-          <div className="flex items-center gap-1 md:gap-2 min-w-0">
-            {isEditingProductName ? (
-              <input
-                type="text"
-                value={productName}
-                onChange={(e) => setProductName(e.target.value)}
-                onBlur={() => {
-                  setIsEditingProductName(false);
-                  handleProductNameChange(productName);
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    setIsEditingProductName(false);
-                    handleProductNameChange(productName);
-                  }
-                }}
-                className="bg-surface-100 border border-border-hover rounded px-2 py-1 text-sm text-text-primary w-28 md:w-40 focus:outline-none focus:border-slate-500"
-                autoFocus
-              />
-            ) : (
-              <button
-                onClick={() => user && setIsEditingProductName(true)}
-                className="text-xs md:text-sm font-medium text-text-primary hover:text-text-secondary transition-colors flex items-center gap-1 truncate max-w-[100px] md:max-w-none"
-                title="点击编辑产品名称"
-              >
-                {productName}
-                {user && <span className="text-slate-600 text-xs hidden md:inline">✎</span>}
-              </button>
-            )}
+      {/* 系统公告 */}
+      <AnnouncementBanner />
 
-            {/* 产品切换下拉 */}
-            {user && (
-              <div className="relative">
-                <button
-                  onClick={() => setShowProductList(!showProductList)}
-                  className="p-1 text-text-muted hover:text-text-secondary hover:bg-surface-100 rounded transition-colors"
-                  title="切换产品"
-                >
-                  <ChevronDown size={14} className={`transition-transform ${showProductList ? 'rotate-180' : ''}`} />
-                </button>
-
-                {showProductList && (
-                  <div className="absolute top-full left-0 mt-1 w-64 bg-surface-100 border border-border rounded-lg shadow-xl z-50 max-h-80 overflow-hidden">
-                    {/* 新建产品 */}
-                    <div className="p-2 border-b border-border">
-                      <button
-                        onClick={handleCreateNewProduct}
-                        className="w-full px-3 py-2 text-xs text-text-secondary hover:bg-surface-200 rounded flex items-center gap-2"
-                      >
-                        <ImagePlus size={12} />
-                        新建产品
-                      </button>
-                    </div>
-
-                    {/* 历史产品列表 */}
-                    <div className="max-h-60 overflow-y-auto">
-                      {historySessions.length === 0 ? (
-                        <div className="p-3 text-[10px] text-text-muted text-center">
-                          暂无历史产品
-                        </div>
-                      ) : (
-                        historySessions.map((s) => (
-                          <button
-                            key={s.id}
-                            onClick={() => handleSwitchSession(s)}
-                            className={`w-full px-3 py-2 text-left hover:bg-surface-200 transition-colors flex items-center justify-between ${
-                              s.id === sessionId ? 'bg-surface-200/50' : ''
-                            }`}
-                          >
-                            <div className="flex-1 min-w-0">
-                              <div className={`text-xs font-medium truncate ${s.id === sessionId ? 'text-text-primary' : 'text-text-secondary'}`}>
-                                {s.productName}
-                              </div>
-                              <div className="text-[10px] text-text-muted flex items-center gap-2">
-                                <span>{s.imageCount} 张图片</span>
-                                {s.updatedAt?.toDate && (
-                                  <span>{s.updatedAt.toDate().toLocaleDateString()}</span>
-                                )}
-                              </div>
-                            </div>
-                            {s.id === sessionId && <div className="w-1.5 h-1.5 bg-emerald-400 rounded-full shrink-0 ml-2"></div>}
-                          </button>
-                        ))
-                      )}
-                    </div>
-
-                    {/* 查看全部 */}
-                    {historySessions.length > 0 && (
-                      <div className="p-2 border-t border-border">
-                        <button
-                          onClick={() => { setShowProductList(false); setShowAllProducts(true); }}
-                          className="w-full px-3 py-1.5 text-xs text-text-muted hover:text-text-primary hover:bg-surface-100 rounded flex items-center justify-center gap-1"
-                        >
-                          <List size={12} />
-                          查看全部
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* 分隔线 - 桌面端 */}
-          <div className="h-5 w-px bg-surface-200 hidden md:block" />
+      {/* TOP BAR - 重新设计 */}
+      <div className="h-14 border-b border-gray-100 bg-white/80 backdrop-blur-xl flex items-center px-4 md:px-6 shrink-0 gap-6 relative z-50">
+        {/* Left: Logo */}
+        <div className="flex items-center gap-3 min-w-0">
+          {/* Logo & Brand - 点击返回首页 */}
+          <a
+            href="/"
+            className="flex items-center gap-2 hover:opacity-80 transition-opacity flex-shrink-0"
+            title="返回首页"
+          >
+            <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-purple-700 rounded-xl flex items-center justify-center shadow-sm">
+              <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"/>
+              </svg>
+            </div>
+            <span className="hidden lg:block text-sm font-semibold text-gray-900">PackVerify</span>
+          </a>
 
           {/* 云同步状态 - 桌面端 */}
           {user && (
@@ -1039,92 +997,196 @@ const App: React.FC = () => {
           )}
         </div>
 
-        {/* Center: Image Tools - 桌面端显示 */}
-        <div className="hidden md:flex items-center gap-2">
-          {/* 行业选择 */}
-          <div className="relative">
+        {/* Center: 图片工具 */}
+        <div className="absolute left-1/2 -translate-x-1/2 flex items-center gap-3">
+          {/* 图片工具 - 仅在有图片时显示 */}
+          {currentImage && (
+            <div className="hidden md:flex items-center gap-1.5 px-3 py-1.5 bg-gray-50 rounded-lg">
+              <button
+                onClick={() => setShowOverlay(!showOverlay)}
+                className={`p-1 rounded hover:bg-white transition-colors ${showOverlay ? 'text-purple-600' : 'text-gray-400'}`}
+                title="标注"
+              >
+                {showOverlay ? <Eye size={16} /> : <EyeOff size={16} />}
+              </button>
+
+              <button
+                onClick={() => setImageScale(s => Math.max(0.3, s / 1.2))}
+                className="p-1 text-gray-600 hover:text-gray-900 hover:bg-white rounded transition-colors"
+                title="缩小"
+              >
+                <ZoomOut size={16} />
+              </button>
+              <span className="text-xs text-gray-600 font-medium min-w-[42px] text-center">
+                {Math.round(imageScale * 100)}%
+              </span>
+              <button
+                onClick={() => setImageScale(s => Math.min(3, s * 1.2))}
+                className="p-1 text-gray-600 hover:text-gray-900 hover:bg-white rounded transition-colors"
+                title="放大"
+              >
+                <ZoomIn size={16} />
+              </button>
+
+              <button
+                onClick={() => setImages(imgs => imgs.map((img, i) => i === currentImageIndex ? { ...img, rotation: (img.rotation || 0) - 90 } : img))}
+                className="p-1 text-gray-600 hover:text-gray-900 hover:bg-white rounded transition-colors"
+                title="逆时针"
+              >
+                <RotateCcw size={16} />
+              </button>
+              <button
+                onClick={() => setImages(imgs => imgs.map((img, i) => i === currentImageIndex ? { ...img, rotation: (img.rotation || 0) + 90 } : img))}
+                className="p-1 text-gray-600 hover:text-gray-900 hover:bg-white rounded transition-colors"
+                title="顺时针"
+              >
+                <RotateCw size={16} />
+              </button>
+
+              <button
+                onClick={() => {
+                  setImageScale(1);
+                  setImages(imgs => imgs.map((img, i) => i === currentImageIndex ? { ...img, rotation: 0 } : img));
+                }}
+                className="p-1 text-gray-600 hover:text-gray-900 hover:bg-white rounded transition-colors"
+                title="重置"
+              >
+                <Maximize2 size={16} />
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* Right: Product + Industry + Quota + User */}
+        <div className="ml-auto flex items-center gap-2 md:gap-3">
+          {/* 当前产品 */}
+          <div ref={productMenuRef} className="hidden md:flex items-center gap-1.5 px-2.5 py-1.5 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors group relative">
+            {isEditingProductName ? (
+              <input
+                type="text"
+                value={productName}
+                onChange={(e) => setProductName(e.target.value)}
+                onBlur={() => {
+                  setIsEditingProductName(false);
+                  handleProductNameChange(productName);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    setIsEditingProductName(false);
+                    handleProductNameChange(productName);
+                  }
+                }}
+                className="bg-white border border-gray-300 rounded px-2 py-1 text-sm text-gray-900 w-40 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500"
+                autoFocus
+              />
+            ) : (
+              <>
+                <button
+                  onClick={() => user && setIsEditingProductName(true)}
+                  className="text-sm font-medium text-gray-700 group-hover:text-gray-900 transition-colors truncate max-w-[150px]"
+                  title="点击编辑产品名称"
+                >
+                  {productName}
+                </button>
+                {user && (
+                  <button
+                    onClick={() => setShowProductList(!showProductList)}
+                    className="text-gray-400 hover:text-gray-600 transition-colors"
+                    title="切换产品"
+                  >
+                    <ChevronDown size={14} className={`transition-transform ${showProductList ? 'rotate-180' : ''}`} />
+                  </button>
+                )}
+              </>
+            )}
+
+            {/* 产品切换下拉 */}
+            {user && showProductList && (
+              <div className="absolute top-full right-0 mt-1 w-64 bg-white border border-gray-200 rounded-lg shadow-xl z-[100] max-h-80 overflow-hidden">
+                {/* 新建产品 */}
+                <div className="p-2 border-b border-gray-200 bg-gray-50">
+                  <button
+                    onClick={handleCreateNewProduct}
+                    className="w-full px-3 py-2 text-xs text-gray-700 hover:bg-white rounded flex items-center gap-2 font-medium"
+                  >
+                    <ImagePlus size={12} />
+                    新建产品
+                  </button>
+                </div>
+
+                {/* 历史产品列表 */}
+                <div className="max-h-60 overflow-y-auto bg-white">
+                  {historySessions.length === 0 ? (
+                    <div className="p-3 text-[10px] text-gray-500 text-center">
+                      暂无历史产品
+                    </div>
+                  ) : (
+                    historySessions.map((s) => (
+                      <button
+                        key={s.id}
+                        onClick={() => handleSwitchSession(s)}
+                        className={`w-full px-3 py-2 text-left hover:bg-gray-50 transition-colors flex items-center justify-between ${
+                          s.id === sessionId ? 'bg-purple-50' : ''
+                        }`}
+                      >
+                        <div className="flex-1 min-w-0">
+                          <div className={`text-xs font-medium truncate ${s.id === sessionId ? 'text-purple-700' : 'text-gray-700'}`}>
+                            {s.productName}
+                          </div>
+                          <div className="text-[10px] text-gray-500 flex items-center gap-2">
+                            <span>{s.imageCount} 张图片</span>
+                            {s.updatedAt?.toDate && (
+                              <span>{s.updatedAt.toDate().toLocaleDateString()}</span>
+                            )}
+                          </div>
+                        </div>
+                        {s.id === sessionId && <div className="w-1.5 h-1.5 bg-purple-600 rounded-full shrink-0 ml-2"></div>}
+                      </button>
+                    ))
+                  )}
+                </div>
+
+                {/* 查看全部 */}
+                {historySessions.length > 0 && (
+                  <div className="p-2 border-t border-gray-200 bg-gray-50">
+                    <button
+                      onClick={() => { setShowProductList(false); setShowAllProducts(true); }}
+                      className="w-full px-3 py-1.5 text-xs text-gray-600 hover:text-gray-900 hover:bg-white rounded flex items-center justify-center gap-1"
+                    >
+                      <List size={12} />
+                      查看全部
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* 行业选择（通用场景） */}
+          <div ref={industryMenuRef} className="relative">
             <button
               onClick={() => setShowIndustryMenu(!showIndustryMenu)}
-              className="flex items-center gap-1 px-2 py-1 bg-surface-100 hover:bg-surface-200 text-text-secondary text-[10px] rounded transition-colors"
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-50 hover:bg-gray-100 text-gray-700 text-sm rounded-lg transition-colors"
             >
-              <Package size={12} />
-              <span>{{ cosmetics: '化妆品', food: '食品', pharma: '药品', general: '通用' }[industry]}</span>
-              <ChevronDown size={10} className={`transition-transform ${showIndustryMenu ? 'rotate-180' : ''}`} />
+              <Package size={14} />
+              <span>{{ cosmetics: '化妆品场景', food: '食品场景', pharma: '药品场景', general: '通用场景' }[industry]}</span>
+              <ChevronDown size={12} className={`transition-transform ${showIndustryMenu ? 'rotate-180' : ''}`} />
             </button>
             {showIndustryMenu && (
-              <div className="absolute top-full left-0 mt-1 bg-white border border-border rounded-lg shadow-lg overflow-hidden z-50">
+              <div className="absolute top-full right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-xl overflow-hidden z-[100]">
                 {(['cosmetics', 'food', 'pharma', 'general'] as IndustryType[]).map((ind) => (
                   <button
                     key={ind}
                     onClick={() => { setIndustry(ind); setShowIndustryMenu(false); }}
-                    className={`w-full px-3 py-1.5 text-left text-[10px] transition-colors ${industry === ind ? 'bg-primary-50 text-primary-600' : 'text-text-secondary hover:bg-surface-50'}`}
+                    className={`w-full px-4 py-2 text-left text-sm transition-colors ${industry === ind ? 'bg-purple-50 text-purple-700 font-medium' : 'text-gray-700 hover:bg-gray-50'}`}
                   >
-                    {{ cosmetics: '化妆品', food: '食品', pharma: '药品', general: '通用' }[ind]}
+                    {{ cosmetics: '化妆品场景', food: '食品场景', pharma: '药品场景', general: '通用场景' }[ind]}
                   </button>
                 ))}
               </div>
             )}
           </div>
 
-          {/* 添加图片 */}
-          <label className="flex items-center gap-1 px-2 py-1 bg-surface-100 hover:bg-surface-200 text-text-secondary text-[10px] rounded cursor-pointer transition-colors">
-            <ImagePlus size={12} />
-            <span>添加图片</span>
-            <input type="file" accept="image/*" className="hidden" onChange={(e) => e.target.files?.[0] && processFile(e.target.files[0])} />
-          </label>
-
-          {/* 分隔线 */}
-          {currentImage && <div className="h-5 w-px bg-surface-200" />}
-
-          {/* 图片查看工具 */}
-          {currentImage && (
-            <>
-              <button
-                onClick={() => setShowOverlay(!showOverlay)}
-                className={`p-1.5 rounded transition-colors ${showOverlay ? 'bg-surface-100 text-text-primary' : 'text-text-muted hover:bg-surface-100'}`}
-                title="显示/隐藏标注"
-              >
-                {showOverlay ? <Eye size={14} /> : <EyeOff size={14} />}
-              </button>
-              <button onClick={() => setImageScale(s => Math.min(3, s * 1.2))} className="p-1.5 text-text-muted hover:bg-surface-100 hover:text-text-primary rounded transition-colors" title="放大">
-                <ZoomIn size={14} />
-              </button>
-              <button onClick={() => setImageScale(s => Math.max(0.3, s / 1.2))} className="p-1.5 text-text-muted hover:bg-surface-100 hover:text-text-primary rounded transition-colors" title="缩小">
-                <ZoomOut size={14} />
-              </button>
-              <span className="text-[10px] text-text-muted px-1 min-w-[36px] text-center">{Math.round(imageScale * 100)}%</span>
-              <button onClick={() => {
-                setImageScale(1);
-                setImages(imgs => imgs.map((img, i) => i === currentImageIndex ? { ...img, rotation: 0 } : img));
-              }} className="p-1.5 text-text-muted hover:bg-surface-100 hover:text-text-primary rounded transition-colors" title="重置">
-                <Maximize2 size={14} />
-              </button>
-              <button onClick={() => setImages(imgs => imgs.map((img, i) => i === currentImageIndex ? { ...img, rotation: (img.rotation || 0) - 90 } : img))} className="p-1.5 text-text-muted hover:bg-surface-100 hover:text-text-primary rounded transition-colors" title="逆时针旋转">
-                <RotateCcw size={14} />
-              </button>
-              <button onClick={() => setImages(imgs => imgs.map((img, i) => i === currentImageIndex ? { ...img, rotation: (img.rotation || 0) + 90 } : img))} className="p-1.5 text-text-muted hover:bg-surface-100 hover:text-text-primary rounded transition-colors" title="顺时针旋转">
-                <RotateCw size={14} />
-              </button>
-            </>
-          )}
-
-          {/* 清空 */}
-          {images.length > 0 && (
-            <>
-              <div className="h-5 w-px bg-surface-200" />
-              <button
-                onClick={handleReset}
-                className="p-1.5 text-text-muted hover:text-text-primary hover:bg-surface-100 rounded transition-colors"
-                title="清空全部"
-              >
-                <Trash2 size={14} />
-              </button>
-            </>
-          )}
-        </div>
-
-        {/* Right: User & Settings */}
-        <div className="flex items-center gap-2 md:gap-3">
           {user ? (
             <>
               {/* 配额 */}
@@ -1153,14 +1215,42 @@ const App: React.FC = () => {
                 </button>
 
                 {/* 下拉菜单 */}
-                <div className="absolute top-full right-0 mt-1 w-44 py-1 bg-surface-100 border border-border rounded-lg shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50">
-                  <div className="px-3 py-2 border-b border-border">
-                    <div className="text-xs font-medium text-text-secondary truncate">{user.displayName || '用户'}</div>
-                    <div className="text-[10px] text-text-muted truncate">{user.email}</div>
+                <div className="absolute top-full right-0 mt-1 w-44 py-1 bg-white border border-gray-200 rounded-lg shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-[100]">
+                  <div className="px-3 py-2 border-b border-gray-200">
+                    <div className="text-xs font-medium text-gray-900 truncate">{user.displayName || '用户'}</div>
+                    <div className="text-[10px] text-gray-500 truncate">{user.email}</div>
                   </div>
+                  {user.plan === 'free' && (
+                    <button
+                      onClick={() => setShowUpgradeModal(true)}
+                      className="w-full px-3 py-2 text-left text-xs text-purple-600 hover:bg-gray-50 transition-colors flex items-center gap-2 font-medium"
+                    >
+                      <Zap size={12} />
+                      升级订阅
+                    </button>
+                  )}
+                  <a
+                    href="/help.html"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="w-full px-3 py-2 text-left text-xs text-gray-600 hover:text-gray-900 hover:bg-gray-50 transition-colors flex items-center gap-2"
+                  >
+                    <FileText size={12} />
+                    帮助文档
+                  </a>
+                  <a
+                    href="/pricing.html"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="w-full px-3 py-2 text-left text-xs text-gray-600 hover:text-gray-900 hover:bg-gray-50 transition-colors flex items-center gap-2"
+                  >
+                    <Package size={12} />
+                    查看定价
+                  </a>
+                  <div className="border-t border-gray-200 my-1" />
                   <button
                     onClick={handleLogout}
-                    className="w-full px-3 py-2 text-left text-xs text-text-muted hover:text-text-primary hover:bg-surface-200 transition-colors flex items-center gap-2"
+                    className="w-full px-3 py-2 text-left text-xs text-gray-600 hover:text-gray-900 hover:bg-gray-50 transition-colors flex items-center gap-2"
                   >
                     <LogOut size={12} />
                     退出登录
@@ -1236,11 +1326,17 @@ const App: React.FC = () => {
             {images.length === 0 && (
               <div className="col-span-3 p-4 border-2 border-dashed border-border rounded-lg text-center">
                 <ImagePlus size={20} className="mx-auto text-slate-700 mb-1" />
-                <span className="text-[9px] text-slate-600 hidden md:block">点击顶部按钮添加</span>
-                <span className="text-[9px] text-slate-600 md:hidden">点击上方按钮添加图片</span>
+                <span className="text-[9px] text-slate-600">点击下方按钮添加图片</span>
               </div>
             )}
           </div>
+
+          {/* 添加图片按钮 - 桌面端底部 */}
+          <label className="hidden md:flex items-center justify-center gap-2 px-3 py-2 mt-2 bg-primary-600 hover:bg-primary-500 text-white text-xs font-medium rounded-lg cursor-pointer transition-colors">
+            <ImagePlus size={14} />
+            <span>添加图片</span>
+            <input type="file" accept="image/*" className="hidden" onChange={(e) => e.target.files?.[0] && processFile(e.target.files[0])} />
+          </label>
         </div>
 
         {/* CENTER: Image Viewer */}
@@ -1329,6 +1425,24 @@ const App: React.FC = () => {
               </div>
 
               {/* 左右切换按钮 */}
+              {images.length > 1 && (
+                <>
+                  <button
+                    onClick={() => setCurrentImageIndex(i => Math.max(0, i - 1))}
+                    disabled={currentImageIndex === 0}
+                    className="absolute left-4 top-1/2 -translate-y-1/2 p-2 bg-white/80 rounded-full disabled:opacity-30 hover:bg-surface-100 transition-all opacity-0 group-hover/canvas:opacity-100 shadow-sm border border-border"
+                  >
+                    <ChevronLeft size={20} className="text-text-secondary" />
+                  </button>
+                  <button
+                    onClick={() => setCurrentImageIndex(i => Math.min(images.length - 1, i + 1))}
+                    disabled={currentImageIndex === images.length - 1}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 p-2 bg-white/80 rounded-full disabled:opacity-30 hover:bg-surface-100 transition-all opacity-0 group-hover/canvas:opacity-100 shadow-sm border border-border"
+                  >
+                    <ChevronRight size={20} className="text-text-secondary" />
+                  </button>
+                </>
+              )}
             </>
           ) : (
             <div className="text-center">
@@ -1346,25 +1460,6 @@ const App: React.FC = () => {
                 <p className="text-text-muted text-xs mt-4">上传图片需要先登录</p>
               )}
             </div>
-          )}
-
-          {images.length > 1 && (
-            <>
-              <button
-                onClick={() => setCurrentImageIndex(i => Math.max(0, i - 1))}
-                disabled={currentImageIndex === 0}
-                className="absolute left-4 top-1/2 -translate-y-1/2 p-2 bg-white/80 rounded-full disabled:opacity-30 hover:bg-surface-100 transition-all opacity-0 group-hover/canvas:opacity-100 shadow-sm border border-border"
-              >
-                <ChevronLeft size={20} className="text-text-secondary" />
-              </button>
-              <button
-                onClick={() => setCurrentImageIndex(i => Math.min(images.length - 1, i + 1))}
-                disabled={currentImageIndex === images.length - 1}
-                className="absolute right-4 top-1/2 -translate-y-1/2 p-2 bg-white/80 rounded-full disabled:opacity-30 hover:bg-surface-100 transition-all opacity-0 group-hover/canvas:opacity-100 shadow-sm border border-border"
-              >
-                <ChevronRight size={20} className="text-text-secondary" />
-              </button>
-            </>
           )}
         </div>
 

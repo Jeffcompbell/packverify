@@ -1,20 +1,69 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# PackVerify Pro
 
-# Run and deploy your AI Studio app
+AI-powered packaging design quality assurance tool that automatically detects content errors, performs OCR text extraction, and compares against QIL specifications.
 
-This contains everything you need to run your app locally.
+## Features
 
-View your app in AI Studio: https://ai.studio/apps/temp/2
+- **Multi-Model AI Analysis**: Support for Gemini 3 Pro, GPT-4o, GPT-4.1, and GPT-5.1
+- **Automated Quality Checks**: Vision analysis + OCR + deterministic rule validation
+- **QIL Comparison**: Compare packaging content against Quality Inspection Lists
+- **Industry-Specific Rules**: Specialized validation for cosmetics, food, pharma, and general products
+- **Cloud Sync**: Firebase-based session management and image storage
+- **Multi-Image Support**: Batch analysis with per-image model selection
+- **Visual Annotations**: Bounding box overlays for detected issues
+
+## Tech Stack
+
+- React 19 + TypeScript
+- Vite
+- TailwindCSS
+- Firebase (Auth, Firestore, Storage)
+- OpenAI SDK (for API compatibility)
 
 ## Run Locally
 
-**Prerequisites:**  Node.js
-
+**Prerequisites:** Node.js 18+
 
 1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+   ```bash
+   npm install
+   ```
+
+2. Set up environment variables in `.env.local`:
+   ```
+   VITE_GEMINI_API_KEY=your_packyapi_key
+   VITE_OPENAI_API_KEY=your_zenmux_key
+   ```
+
+3. Run the development server:
+   ```bash
+   npm run dev
+   ```
+
+4. Open http://localhost:3000
+
+## Build for Production
+
+```bash
+npm run build
+npm run preview
+```
+
+## Project Structure
+
+- `App.tsx` - Main application orchestrator
+- `components/` - React components (IssuesPanel, InfiniteCanvas, QilPanel, etc.)
+- `services/` - API services (openaiService, firebase, authService)
+- `types.ts` - TypeScript type definitions
+- `utils/` - Helper functions
+
+## API Configuration
+
+The app supports multiple AI providers configured in `services/openaiService.ts`:
+
+- **PackyAPI** (default): Gemini 3 Pro via `https://api-slb.packyapi.com/v1`
+- **Zenmux**: GPT models via `https://zenmux.ai/api/v1`
+
+## License
+
+MIT

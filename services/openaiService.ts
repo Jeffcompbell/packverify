@@ -1,5 +1,5 @@
 import OpenAI from 'openai';
-import { DiagnosisIssue, DiffResult, SourceField, DiagnosisResult, DeterministicCheck } from "../types";
+import { DiagnosisIssue, DiffResult, SourceField, DiagnosisResult, DeterministicCheck, TokenUsage } from "../types";
 
 // Helper to convert file to base64
 export const fileToGenerativePart = async (file: File): Promise<string> => {
@@ -279,7 +279,7 @@ export const analyzeImageSinglePass = async (
     base64Image: string,
     mimeType: string,
     industry: string = 'general'
-): Promise<{ description: string; ocrText: string; issues: DiagnosisIssue[]; specs: SourceField[] }> => {
+): Promise<{ description: string; ocrText: string; issues: DiagnosisIssue[]; specs: SourceField[]; tokenUsage?: TokenUsage }> => {
     try {
         const client = getClient();
         const modelId = getModelId();
@@ -343,9 +343,22 @@ ${examplesList}
 
         console.log(`API response time: ${Date.now() - startTime}ms`);
 
+        // 提取 token 使用信息
+        let tokenUsage: TokenUsage | undefined;
+        if (response.usage) {
+            tokenUsage = {
+                promptTokens: response.usage.prompt_tokens || 0,
+                completionTokens: response.usage.completion_tokens || 0,
+                totalTokens: response.usage.total_tokens || 0,
+                model: modelId,
+                timestamp: new Date()
+            };
+            console.log('Token usage:', tokenUsage);
+        }
+
         const text = response.choices[0].message.content;
         if (!text) {
-            return { description: '', ocrText: '', issues: [], specs: [] };
+            return { description: '', ocrText: '', issues: [], specs: [], tokenUsage };
         }
 
         const parsed = parseJSON(text);
@@ -382,7 +395,8 @@ ${examplesList}
             description: parsed.description || '',
             ocrText: parsed.ocrText || '',
             issues,
-            specs
+            specs,
+            tokenUsage
         };
     } catch (error) {
         console.error("Single-pass analysis failed:", error);
@@ -419,7 +433,8 @@ export const diagnoseImage = async (
             ocrText: aiResult.ocrText,
             issues: aiResult.issues,
             deterministicIssues,
-            specs: aiResult.specs
+            specs: aiResult.specs,
+            tokenUsage: aiResult.tokenUsage
         };
     } catch (error) {
         console.error("Diagnosis failed:", error);

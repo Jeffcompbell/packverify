@@ -146,13 +146,21 @@ export interface QuotaUsageRecord {
   imageName: string;
   count: number;
   timestamp: any;
+  // Token 使用统计（可选）
+  tokenUsage?: {
+    promptTokens: number;
+    completionTokens: number;
+    totalTokens: number;
+    model: string;
+  };
 }
 
 export const useQuotaFirebase = async (
   uid: string,
   count: number = 1,
   imageName: string = '图片',
-  type: 'analyze' | 'retry' = 'analyze'
+  type: 'analyze' | 'retry' = 'analyze',
+  tokenUsage?: { promptTokens: number; completionTokens: number; totalTokens: number; model: string }
 ): Promise<boolean> => {
   const userData = await getUserData(uid);
   if (!userData) return false;
@@ -166,14 +174,21 @@ export const useQuotaFirebase = async (
     used: increment(count)
   });
 
-  // 记录消耗历史
+  // 记录消耗历史（包含 token 使用信息）
   const usageRef = doc(collection(db, 'users', uid, 'usage'));
-  await setDoc(usageRef, {
+  const usageData: any = {
     type,
     imageName,
     count,
     timestamp: serverTimestamp()
-  });
+  };
+
+  // 如果有 token 使用信息，保存到 Firebase
+  if (tokenUsage) {
+    usageData.tokenUsage = tokenUsage;
+  }
+
+  await setDoc(usageRef, usageData);
 
   return true;
 };
