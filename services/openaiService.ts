@@ -407,6 +407,13 @@ export const extractOcrOnly = async (
             return { ocrText: '' };
         }
 
+        // ✅ 检测是否被截断
+        const finishReason = response.choices[0].finish_reason;
+        if (finishReason === 'length') {
+            console.error('[OCR-Only] ⚠️  Output truncated! OCR text may be incomplete.');
+            // OCR 截断不算致命错误，继续处理（但文字可能不完整）
+        }
+
         const parsed = parseJSON(text);
 
         // 提取 token 使用信息
@@ -516,11 +523,19 @@ ${checkItemsList}
                     ]
                 }
             ],
-            max_tokens: includeOcr ? 4500 : 2500,  // OCR模式需要更多tokens
+            max_tokens: includeOcr ? 4500 : 2000,  // 无OCR: 2000, 有OCR: 4500
             temperature: 0.1,
         });
         perfLog['2_api_call'] = Date.now() - apiStart;
         console.log(`⏱️  API call: ${perfLog['2_api_call']}ms`);
+
+        // ✅ 检测是否被截断
+        const finishReason = response.choices[0].finish_reason;
+        if (finishReason === 'length') {
+            console.error('⚠️  Output truncated! Response reached max_tokens limit.');
+            console.error(`   Max tokens: ${includeOcr ? 4500 : 2000}, Used: ${response.usage?.completion_tokens || 0}`);
+            throw new Error(`输出被截断：达到 token 上限 (${includeOcr ? 4500 : 2000})。请联系开发者增加限制。`);
+        }
 
         // 3. 提取 token 使用信息
         const tokenStart = Date.now();
@@ -545,7 +560,15 @@ ${checkItemsList}
             return { description: '', ocrText: '', issues: [], specs: [], tokenUsage };
         }
 
-        const parsed = parseJSON(text);
+        let parsed;
+        try {
+            parsed = parseJSON(text);
+        } catch (parseError) {
+            console.error('❌ JSON parsing failed:', parseError);
+            console.error('Response text:', text);
+            throw new Error('解析 AI 响应失败，可能输出被截断或格式错误');
+        }
+
         perfLog['4_json_parsing'] = Date.now() - parseStart;
         console.log(`⏱️  JSON parsing: ${perfLog['4_json_parsing']}ms`);
 
