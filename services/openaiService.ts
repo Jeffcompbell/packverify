@@ -430,7 +430,7 @@ ${checkItemsList}
                     ]
                 }
             ],
-            max_tokens: 2000,      // ✅ 优化1: 限制输出长度，加快生成速度
+            max_tokens: 3000,      // ✅ 优化1: 限制输出长度（3000足够完整返回）
             temperature: 0.1,      // ✅ 优化2: 降低随机性，OCR任务更快更准确
         });
         perfLog['2_api_call'] = Date.now() - apiStart;
