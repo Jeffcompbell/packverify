@@ -80,8 +80,8 @@ const App: React.FC = () => {
   const [showOverlay, setShowOverlay] = useState(true);
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
-  // Bottom panel height (resizable) - 默认收起
-  const [bottomHeight, setBottomHeight] = useState(48);
+  // Bottom panel height (resizable) - 默认收起（24px 仅显示标题栏）
+  const [bottomHeight, setBottomHeight] = useState(24);
   const [isResizing, setIsResizing] = useState(false);
 
   // Specs tab
@@ -1068,7 +1068,7 @@ const App: React.FC = () => {
 
     const handleMouseMove = (e: MouseEvent) => {
       const delta = startY - e.clientY;
-      const newHeight = Math.min(500, Math.max(48, startHeight + delta));
+      const newHeight = Math.min(500, Math.max(24, startHeight + delta));
       setBottomHeight(newHeight);
     };
 
@@ -1707,20 +1707,35 @@ const App: React.FC = () => {
       {/* BOTTOM BAR */}
       {/* BOTTOM PANEL - QIL (桌面端显示，移动端通过导航切换全屏) */}
       <div style={{ height: mobileTab === 'qil' ? 'auto' : bottomHeight }} className={`${mobileTab === 'qil' ? 'flex absolute inset-0 top-12 bottom-14 z-30' : 'hidden'} md:flex md:static md:z-auto border-t border-border bg-surface-50 flex-col shrink-0 relative`}>
+        {/* 拖动调整高度的把手区域 */}
         <div
           onMouseDown={handleResizeStart}
-          className={`absolute top-0 left-0 right-0 h-1.5 cursor-ns-resize hover:bg-primary-500/50 transition-colors hidden md:block ${isResizing ? 'bg-primary-500/50' : ''}`}
+          className={`hidden md:flex items-center justify-center h-6 cursor-ns-resize hover:bg-primary-500/10 transition-colors relative ${isResizing ? 'bg-primary-500/20' : ''}`}
         >
+          <div className="absolute inset-x-0 top-0 h-1 bg-border"></div>
           <button
-            onClick={() => setBottomHeight(prev => prev <= 48 ? 280 : 48)}
-            className="absolute left-1/2 -translate-x-1/2 top-0 bg-surface-100 hover:bg-primary-500/20 border border-border rounded-b px-2 py-0.5 text-[10px] text-text-muted hover:text-primary-500 transition-colors"
-            title={bottomHeight <= 48 ? '展开 QIL 面板' : '收起 QIL 面板'}
+            onClick={(e) => {
+              e.stopPropagation();
+              setBottomHeight(prev => prev <= 24 ? 280 : 24);
+            }}
+            className="bg-white hover:bg-primary-50 border border-border rounded px-3 py-0.5 text-[11px] text-text-muted hover:text-primary-600 transition-colors flex items-center gap-1 shadow-sm z-10"
+            title={bottomHeight <= 24 ? '展开 QIL 面板' : '收起 QIL 面板'}
           >
-            {bottomHeight <= 48 ? '▲' : '▼'}
+            {bottomHeight <= 24 ? (
+              <>
+                <span>展开</span>
+                <span className="text-[10px]">▲</span>
+              </>
+            ) : (
+              <>
+                <span>收起</span>
+                <span className="text-[10px]">▼</span>
+              </>
+            )}
           </button>
         </div>
 
-        <div className="flex-1 flex flex-col md:flex-row min-h-0 pt-1 overflow-hidden">
+        <div className="flex-1 flex flex-col md:flex-row min-h-0 overflow-hidden">
           {/* QIL Input Panel */}
           <QilPanel
             ref={qilPanelRef}
