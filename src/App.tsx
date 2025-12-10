@@ -31,8 +31,7 @@ import { HomePage } from './components/features/HomePage';
 import { DetectionConfigPage } from './components/features/DetectionConfigPage';
 import { BatchReportPage } from './components/features/BatchReportPage';
 import { BatchReportView } from './components/features/BatchReportView';
-import { base64ToBlobUrl, createVirtualFile, generateProductName, STORAGE_KEY } from './utils/helpers';
-import { StoredImageItem } from './types/storage';
+import { base64ToBlobUrl, createVirtualFile, generateProductName } from './utils/helpers';
 
 type AppView = 'home' | 'products' | 'analysis' | 'detection-config' | 'batch-report' | 'batch-view';
 
@@ -188,72 +187,7 @@ const App: React.FC = () => {
     return localDiffSpecs(manualSourceFields, currentImage.specs);
   }, [currentImage, manualSourceFields]);
 
-  // 从 localStorage 恢复数据
-  useEffect(() => {
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      if (stored) {
-        const data = JSON.parse(stored);
-        const storedImages: StoredImageItem[] = data.images || [];
-
-        const restoredImages: ImageItem[] = storedImages.map(item => ({
-          id: item.id,
-          src: base64ToBlobUrl(item.base64, item.mimeType),
-          base64: item.base64,
-          file: createVirtualFile(item.base64, item.mimeType, item.fileName),
-          description: item.description,
-          ocrText: item.ocrText,
-          specs: item.specs || [],
-          issues: item.issues || [],
-          deterministicIssues: item.deterministicIssues || [],
-          diffs: item.diffs || [],
-          issuesByModel: item.issuesByModel || {}
-        }));
-
-        if (restoredImages.length > 0) {
-          setImages(restoredImages);
-          setCurrentImageIndex(data.currentIndex || 0);
-        }
-
-        if (data.manualSourceFields) {
-          setManualSourceFields(data.manualSourceFields);
-        }
-      }
-    } catch (err) {
-      console.error('Failed to restore data:', err);
-    }
-  }, []);
-
-  // 保存数据到 localStorage
-  useEffect(() => {
-    if (images.length === 0 && manualSourceFields.length === 0) return;
-
-    try {
-      const storedImages: StoredImageItem[] = images.map(img => ({
-        id: img.id,
-        base64: img.base64,
-        mimeType: img.file.type,
-        fileName: img.file.name,
-        description: img.description,
-        ocrText: img.ocrText,
-        specs: img.specs,
-        issues: img.issues,
-        deterministicIssues: img.deterministicIssues,
-        diffs: img.diffs,
-        issuesByModel: img.issuesByModel
-      }));
-
-      const data = {
-        images: storedImages,
-        currentIndex: currentImageIndex,
-        manualSourceFields
-      };
-
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-    } catch (err) {
-      console.error('Failed to save data:', err);
-    }
-  }, [images, currentImageIndex, manualSourceFields]);
+  // 已移除 localStorage 缓存，完全依赖云端存储
 
   // 当选中问题时，滚动到对应的列表项
   useEffect(() => {
@@ -981,7 +915,6 @@ const App: React.FC = () => {
     setErrorMessage(null);
     setSelectedIssueId(null);
     setImageScale(1);
-    localStorage.removeItem(STORAGE_KEY);
 
     // 云同步 - 清空会话
     if (cloudSyncEnabled && sessionId && user) {
