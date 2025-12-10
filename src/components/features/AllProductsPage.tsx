@@ -150,18 +150,16 @@ export const AllProductsPage: React.FC<AllProductsPageProps> = ({
 
                 {/* 产品信息 */}
                 <div className="p-3">
-                  <div className="text-sm font-medium text-text-primary truncate mb-2 group-hover:text-primary-500 transition-colors">
+                  <div className="text-sm font-medium text-text-primary truncate mb-1 group-hover:text-primary-500 transition-colors">
                     {s.productName}
                   </div>
-                  <div className="flex items-center justify-between text-[10px] text-text-muted">
+                  <div className="flex items-center gap-3 text-[10px] text-text-muted">
+                    <span>{s.imageCount} 张图片</span>
                     <div className="flex items-center gap-1">
                       <Calendar size={10} />
                       <span>
-                        {s.updatedAt?.toDate ?
-                          s.updatedAt.toDate().toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' }) :
-                          s.createdAt?.toDate?.().toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' }) ||
-                          '未知'
-                        }
+                        {s.updatedAt ? new Date(s.updatedAt).toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' }) :
+                         s.createdAt ? new Date(s.createdAt).toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' }) : '未知'}
                       </span>
                     </div>
                   </div>

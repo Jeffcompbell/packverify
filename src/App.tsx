@@ -988,7 +988,6 @@ const App: React.FC = () => {
 
     try {
       setIsLoadingFromCloud(true);
-      setShowProductList(false);
 
       // 加载目标会话数据
       const { session, images: cloudImages } = await loadSessionFromCloud(user.uid, targetSession.id);
@@ -1059,7 +1058,6 @@ const App: React.FC = () => {
       setImages([]);
       setManualSourceFields([]);
       setCurrentImageIndex(0);
-      setShowProductList(false);
 
       // 刷新历史列表
       const sessions = await getUserSessions(user.uid, 10);
