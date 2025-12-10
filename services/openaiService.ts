@@ -719,14 +719,17 @@ export const diagnoseImage = async (
     onStepChange?: (step: number) => void,
     industry: string = 'general',
     includeOcr: boolean = false,  // 是否包含 OCR 原文
-    onStream?: (chunk: string) => void  // 流式输出回调
+    onStream?: (chunk: string) => void,  // 流式输出回调
+    customPrompt?: string  // 自定义检测提示词
 ): Promise<DiagnosisResult> => {
     try {
         console.log("Starting analysis (AI → Rules)...");
 
         // Step 1: AI 单步分析（OCR + 问题检测 + 规格提取，一次 API 调用）
         onStepChange?.(1);
-        const aiResult = await analyzeImageSinglePass(base64Image, mimeType, industry, includeOcr, onStream);
+        const aiResult = customPrompt
+            ? await analyzeImageWithCustomPrompt(base64Image, mimeType, customPrompt, includeOcr, onStream)
+            : await analyzeImageSinglePass(base64Image, mimeType, industry, includeOcr, onStream);
         console.log("AI analysis complete. Description:", aiResult.description);
         console.log("OCR text length:", aiResult.ocrText.length);
         console.log("AI issues found:", aiResult.issues.length);
@@ -1066,4 +1069,152 @@ export const localDiffSpecs = (
     }
 
     return results;
+};
+
+// 使用自定义提示词分析图片
+export const analyzeImageWithCustomPrompt = async (
+    base64Image: string,
+    mimeType: string,
+    customPrompt: string,
+    includeOcr: boolean = false,
+    onStream?: (chunk: string) => void
+): Promise<{ description: string; ocrText: string; issues: DiagnosisIssue[]; specs: SourceField[]; tokenUsage?: TokenUsage }> => {
+    try {
+        const client = getClient();
+        const modelId = getModelId();
+
+        const prompt = includeOcr
+            ? `${customPrompt}\n\n返回JSON格式：\n{\n  "description": "一句话描述",\n  "ocrText": "提取所有文字，换行分隔",\n  "issues": [{"original": "错误原文", "problem": "问题", "suggestion": "建议", "severity": "high/medium/low"}],\n  "specs": [{"key": "项目名", "value": "值", "category": "content/compliance/specs"}]\n}`
+            : `${customPrompt}\n\n返回JSON格式（无需OCR原文）：\n{\n  "description": "一句话描述",\n  "issues": [{"original": "错误原文", "problem": "问题", "suggestion": "建议", "severity": "high/medium/low"}],\n  "specs": [{"key": "项目名", "value": "值", "category": "content/compliance/specs"}]\n}`;
+
+        const response = await client.chat.completions.create({
+            model: modelId,
+            messages: [{
+                role: "user",
+                content: [
+                    { type: "text", text: prompt },
+                    { type: "image_url", image_url: { url: `data:${mimeType};base64,${base64Image}`, detail: "high" } }
+                ]
+            }],
+            max_tokens: includeOcr ? 4500 : 4000,
+            temperature: 0.1
+        });
+
+        const text = response.choices[0].message.content || '';
+        const parsed = parseJSON(text);
+
+        const tokenUsage: TokenUsage | undefined = response.usage ? {
+            promptTokens: response.usage.prompt_tokens || 0,
+            completionTokens: response.usage.completion_tokens || 0,
+            totalTokens: response.usage.total_tokens || 0,
+            model: modelId,
+            timestamp: new Date()
+        } : undefined;
+
+        return {
+            description: parsed.description || '',
+            ocrText: parsed.ocrText || parsed.text || '',
+            issues: (parsed.issues || []).map((issue: any, idx: number) => ({
+                id: `issue-${idx}-${Date.now()}`,
+                type: 'content',
+                original: issue.original || issue.text,
+                problem: issue.problem,
+                suggestion: issue.suggestion,
+                severity: issue.severity || 'medium',
+                confidence: 'likely'
+            })),
+            specs: parsed.specs || [],
+            tokenUsage
+        };
+    } catch (error) {
+        console.error("Custom prompt analysis failed:", error);
+        throw error;
+    }
+};
+
+// 批量分析图片（使用自定义提示词）
+export const analyzeBatchWithCustomPrompt = async (
+    images: Array<{ base64: string; mimeType: string; id: string }>,
+    customPrompt: string,
+    onProgress?: (current: number, total: number) => void
+): Promise<Array<{ id: string; result: DiagnosisResult; error?: string }>> => {
+    const results: Array<{ id: string; result: DiagnosisResult; error?: string }> = [];
+
+    for (let i = 0; i < images.length; i++) {
+        const image = images[i];
+        onProgress?.(i + 1, images.length);
+
+        try {
+            const aiResult = await analyzeImageWithCustomPrompt(image.base64, image.mimeType, customPrompt, false);
+            const deterministicIssues = runDeterministicChecks(aiResult.ocrText);
+
+            results.push({
+                id: image.id,
+                result: {
+                    description: aiResult.description,
+                    ocrText: aiResult.ocrText,
+                    issues: aiResult.issues,
+                    deterministicIssues,
+                    specs: aiResult.specs,
+                    tokenUsage: aiResult.tokenUsage
+                }
+            });
+        } catch (error) {
+            results.push({
+                id: image.id,
+                result: {
+                    description: '',
+                    ocrText: '',
+                    issues: [],
+                    deterministicIssues: [],
+                    specs: []
+                },
+                error: error instanceof Error ? error.message : 'Unknown error'
+            });
+        }
+    }
+
+    return results;
+};
+
+// 生成批量分析汇总报告
+export const generateBatchSummary = async (
+    results: Array<{ id: string; fileName: string; result: DiagnosisResult }>
+): Promise<string> => {
+    try {
+        const client = getClient();
+        const modelId = getModelId();
+
+        const summaryData = results.map(r => ({
+            fileName: r.fileName,
+            issueCount: r.result.issues.length + r.result.deterministicIssues.length,
+            highSeverity: r.result.issues.filter(i => i.severity === 'high').length,
+            mediumSeverity: r.result.issues.filter(i => i.severity === 'medium').length,
+            lowSeverity: r.result.issues.filter(i => i.severity === 'low').length,
+            topIssues: r.result.issues.slice(0, 3).map(i => i.problem || i.text)
+        }));
+
+        const prompt = `基于以下批量检测结果，生成一份简洁的汇总报告（中文）：
+
+${JSON.stringify(summaryData, null, 2)}
+
+报告应包括：
+1. 总体统计（总图片数、总问题数、严重程度分布）
+2. 主要问题类型和频率
+3. 建议改进措施
+
+请用Markdown格式返回，简洁明了。`;
+
+        const response = await client.chat.completions.create({
+            model: modelId,
+            messages: [{ role: "user", content: prompt }],
+            max_tokens: 1000,
+            temperature: 0.3
+        });
+
+        return response.choices[0].message.content || '无法生成汇总报告';
+    } catch (error) {
+        console.error("Generate batch summary failed:", error);
+        return '生成汇总报告时出错';
+    }
 };

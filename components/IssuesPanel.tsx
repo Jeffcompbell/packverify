@@ -10,6 +10,7 @@ interface IssuesPanelProps {
   currentIndex: number;
   onNavigate: (index: number) => void;
   isCurrentProcessing: boolean;
+  processingModelId: string | null;
   onRetryAnalysis: (modelId: string) => void;
   selectedIssueId: string | null;
   onSelectIssue: (id: string) => void;
@@ -30,6 +31,7 @@ export const IssuesPanel: React.FC<IssuesPanelProps> = ({
   currentIndex,
   onNavigate,
   isCurrentProcessing,
+  processingModelId,
   onRetryAnalysis,
   selectedIssueId,
   onSelectIssue,
@@ -183,6 +185,8 @@ export const IssuesPanel: React.FC<IssuesPanelProps> = ({
           const issueCount = (modelData?.issues.length || 0) + (modelData?.deterministicIssues?.length || 0);
           const displayName = model?.name || (modelId.includes('gemini') ? 'Gemini 3 Pro' : modelId);
 
+          const isProcessing = isCurrentProcessing && processingModelId === modelId;
+
           return (
             <button
               key={modelId}
@@ -194,6 +198,7 @@ export const IssuesPanel: React.FC<IssuesPanelProps> = ({
                   : 'text-text-muted hover:text-text-secondary hover:bg-white/50'
               }`}
             >
+              {isProcessing && <Loader2 size={10} className="animate-spin" />}
               <span>{displayName}</span>
               {issueCount > 0 && (
                 <span className="bg-primary-500 text-white text-[9px] px-1.5 rounded-full">{issueCount}</span>
@@ -250,7 +255,7 @@ export const IssuesPanel: React.FC<IssuesPanelProps> = ({
             <AlertCircle size={24} className="mx-auto mb-2 opacity-30" />
             <p className="text-xs">上传图片后显示检测结果</p>
           </div>
-        ) : isCurrentProcessing ? (
+        ) : (isCurrentProcessing && processingModelId === activeModelTab) ? (
           <div className="text-center py-12 text-text-muted">
             <Loader2 size={24} className="mx-auto mb-2 animate-spin" />
             <p className="text-xs">正在分析...</p>

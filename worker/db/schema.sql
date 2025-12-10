@@ -60,6 +60,45 @@ CREATE TABLE IF NOT EXISTS quota_usage (
   FOREIGN KEY (user_id) REFERENCES users(uid) ON DELETE CASCADE
 );
 
+-- 检测配置表
+CREATE TABLE IF NOT EXISTS detection_configs (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL,
+  name TEXT NOT NULL,
+  industry TEXT NOT NULL,
+  rules TEXT NOT NULL,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL,
+  FOREIGN KEY (user_id) REFERENCES users(uid) ON DELETE CASCADE
+);
+
+-- 批量报告表
+CREATE TABLE IF NOT EXISTS batch_reports (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL,
+  name TEXT NOT NULL,
+  config_id TEXT,
+  status TEXT DEFAULT 'pending',
+  total_images INTEGER DEFAULT 0,
+  processed_images INTEGER DEFAULT 0,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL,
+  FOREIGN KEY (user_id) REFERENCES users(uid) ON DELETE CASCADE,
+  FOREIGN KEY (config_id) REFERENCES detection_configs(id) ON DELETE SET NULL
+);
+
+-- 批量报告图片表
+CREATE TABLE IF NOT EXISTS batch_report_images (
+  id TEXT PRIMARY KEY,
+  report_id TEXT NOT NULL,
+  image_id TEXT NOT NULL,
+  status TEXT DEFAULT 'pending',
+  result TEXT,
+  created_at INTEGER NOT NULL,
+  FOREIGN KEY (report_id) REFERENCES batch_reports(id) ON DELETE CASCADE,
+  FOREIGN KEY (image_id) REFERENCES images(id) ON DELETE CASCADE
+);
+
 -- 索引
 CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id);
 CREATE INDEX IF NOT EXISTS idx_sessions_updated_at ON sessions(updated_at DESC);
@@ -67,3 +106,7 @@ CREATE INDEX IF NOT EXISTS idx_images_session_id ON images(session_id);
 CREATE INDEX IF NOT EXISTS idx_images_user_id ON images(user_id);
 CREATE INDEX IF NOT EXISTS idx_quota_usage_user_id ON quota_usage(user_id);
 CREATE INDEX IF NOT EXISTS idx_quota_usage_timestamp ON quota_usage(timestamp DESC);
+CREATE INDEX IF NOT EXISTS idx_detection_configs_user_id ON detection_configs(user_id);
+CREATE INDEX IF NOT EXISTS idx_batch_reports_user_id ON batch_reports(user_id);
+CREATE INDEX IF NOT EXISTS idx_batch_reports_status ON batch_reports(status);
+CREATE INDEX IF NOT EXISTS idx_batch_report_images_report_id ON batch_report_images(report_id);

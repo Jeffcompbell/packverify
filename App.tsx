@@ -25,10 +25,21 @@ import { IssuesPanel } from './components/IssuesPanel';
 import { QilPanel, QilPanelRef } from './components/QilPanel';
 import { AnnouncementBanner, AnnouncementModal } from './components/AnnouncementBanner';
 import { UpgradeModal } from './components/UpgradeModal';
+import { Sidebar } from './components/Sidebar';
+import { HomePage } from './components/HomePage';
+import { DetectionConfigPage } from './components/DetectionConfigPage';
+import { BatchReportPage } from './components/BatchReportPage';
+import { BatchReportView } from './components/BatchReportView';
 import { base64ToBlobUrl, createVirtualFile, generateProductName, STORAGE_KEY } from './utils/helpers';
 import { StoredImageItem } from './types/storage';
 
+type AppView = 'home' | 'analysis' | 'detection-config' | 'batch-report' | 'batch-view';
+
 const App: React.FC = () => {
+  // 路由状态
+  const [currentView, setCurrentView] = useState<AppView>('analysis');
+  const [selectedReportId, setSelectedReportId] = useState<string | null>(null);
+
   // 用户认证状态
   const [user, setUser] = useState<UserData | null>(null);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
@@ -57,6 +68,7 @@ const App: React.FC = () => {
 
   const [isProcessing, setIsProcessing] = useState(false);
   const [processingImageId, setProcessingImageId] = useState<string | null>(null);
+  const [processingModelId, setProcessingModelId] = useState<string | null>(null);
   const [processingStep, setProcessingStep] = useState<number>(1);
   const [streamText, setStreamText] = useState<string>(''); // 流式输出文本
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -396,6 +408,7 @@ const App: React.FC = () => {
 
       setIsProcessing(true);
       setProcessingImageId(newImageId);
+      setProcessingModelId(currentModel);
       setErrorMessage(null);
 
       // 直接进行完整分析（已移除预检）
@@ -537,8 +550,9 @@ const App: React.FC = () => {
     } finally {
       setIsProcessing(false);
       setProcessingImageId(null);
+      setProcessingModelId(null);
     }
-  }, [user, images.length, manualSourceFields, cloudSyncEnabled, sessionId, industry]);
+  }, [user, images.length, manualSourceFields, cloudSyncEnabled, sessionId, industry, currentModel]);
 
   const handleRetryAnalysis = useCallback(async (imageId: string) => {
     // 未登录时弹出登录框
@@ -557,8 +571,10 @@ const App: React.FC = () => {
     }
 
     try {
+      const usedModelId = getModelId();
       setIsProcessing(true);
       setProcessingImageId(imageId);
+      setProcessingModelId(usedModelId);
       setErrorMessage(null);
 
       // 添加超时机制：60秒超时，自动重试一次
@@ -605,7 +621,6 @@ const App: React.FC = () => {
         diffs = localDiffSpecs(manualSourceFields, imageSpecs);
       }
 
-      const usedModelId = getModelId();
       const analysisDuration = image.analyzingStartedAt ? Date.now() - image.analyzingStartedAt : undefined;
       setImages(prev => prev.map(img =>
         img.id === imageId ? {
@@ -687,6 +702,7 @@ const App: React.FC = () => {
     } finally {
       setIsProcessing(false);
       setProcessingImageId(null);
+      setProcessingModelId(null);
     }
   }, [user, images, manualSourceFields, cloudSyncEnabled, sessionId, industry]);
 
@@ -719,6 +735,7 @@ const App: React.FC = () => {
     try {
       setIsProcessing(true);
       setProcessingImageId(imageId);
+      setProcessingModelId(modelId);
       setErrorMessage(null);
 
       // 临时切换模型
@@ -769,6 +786,7 @@ const App: React.FC = () => {
     } finally {
       setIsProcessing(false);
       setProcessingImageId(null);
+      setProcessingModelId(null);
     }
   }, [user, images, cloudSyncEnabled, sessionId]);
 
@@ -1146,11 +1164,29 @@ const App: React.FC = () => {
   }
 
   return (
-    <div
-      className="h-screen w-screen bg-surface-50 flex flex-col font-sans text-text-primary overflow-hidden"
-      onDragOver={onDragOver}
-      onDrop={onDrop}
-    >
+    <div className="h-screen w-screen bg-surface-50 flex font-sans text-text-primary overflow-hidden">
+      {/* Sidebar - 仅在登录后显示 */}
+      {user && (
+        <Sidebar
+          currentView={currentView}
+          onNavigate={setCurrentView}
+          userQuota={{ remaining: user.quota - user.used, total: user.quota }}
+          user={{
+            displayName: user.displayName,
+            email: user.email,
+            photoURL: user.photoURL
+          }}
+          onLogout={handleLogout}
+          onOpenAnnouncement={() => setShowAnnouncementModal(true)}
+        />
+      )}
+
+      {/* Main Content Area */}
+      <div
+        className="flex-1 flex flex-col overflow-hidden"
+        onDragOver={onDragOver}
+        onDrop={onDrop}
+      >
       {/* 登录弹窗 */}
       <LoginModal
         isOpen={showLoginModal}
@@ -1198,103 +1234,24 @@ const App: React.FC = () => {
         onClose={() => setShowAnnouncementModal(false)}
       />
 
-      {/* TOP BAR - 重新设计 */}
-      <div className="h-14 border-b border-gray-100 bg-white/80 backdrop-blur-xl flex items-center px-4 md:px-6 shrink-0 gap-6 relative z-50">
-        {/* Left: Logo */}
+      {/* TOP BAR - 简化版，仅在分析视图显示 */}
+      {currentView === 'analysis' && (
+      <div className="h-12 border-b border-gray-100 bg-white flex items-center px-4 shrink-0 gap-4 relative z-50">
+        {/* Left: 云同步状态 + 产品名称 */}
         <div className="flex items-center gap-3 min-w-0">
-          {/* Logo & Brand - 点击返回首页 */}
-          <a
-            href="/"
-            className="flex items-center gap-2 hover:opacity-80 transition-opacity flex-shrink-0"
-            title="返回首页"
-          >
-            <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-purple-700 rounded-xl flex items-center justify-center shadow-sm">
-              <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"/>
-              </svg>
-            </div>
-            <span className="hidden lg:block text-sm font-semibold text-gray-900">PackVerify</span>
-          </a>
-
-          {/* 云同步状态 - 桌面端 */}
+          {/* 云同步状态 */}
           {user && (
-            <div className="hidden md:flex items-center gap-1.5" title={cloudSyncEnabled ? '云同步已开启' : '云同步已关闭'}>
+            <div className="flex items-center gap-1.5" title={cloudSyncEnabled ? '云同步已开启' : '云同步已关闭'}>
               {isSyncing || isLoadingFromCloud ? (
-                <Loader2 size={12} className="animate-spin text-text-muted" />
+                <Loader2 size={12} className="animate-spin text-gray-400" />
               ) : (
-                <Cloud size={12} className="text-text-muted" />
+                <Cloud size={12} className="text-gray-400" />
               )}
-              <span className="text-[10px] text-text-muted">
-                {isSyncing ? '同步中' : isLoadingFromCloud ? '加载中' : '已同步'}
-              </span>
             </div>
           )}
-        </div>
 
-        {/* Center: 图片工具 */}
-        <div className="absolute left-1/2 -translate-x-1/2 flex items-center gap-3">
-          {/* 图片工具 - 仅在有图片时显示 */}
-          {currentImage && (
-            <div className="hidden md:flex items-center gap-1.5 px-3 py-1.5 bg-gray-50 rounded-lg">
-              <button
-                onClick={() => setShowOverlay(!showOverlay)}
-                className={`p-1 rounded hover:bg-white transition-colors ${showOverlay ? 'text-purple-600' : 'text-gray-400'}`}
-                title="标注"
-              >
-                {showOverlay ? <Eye size={16} /> : <EyeOff size={16} />}
-              </button>
-
-              <button
-                onClick={() => setImageScale(s => Math.max(0.3, s / 1.2))}
-                className="p-1 text-gray-600 hover:text-gray-900 hover:bg-white rounded transition-colors"
-                title="缩小"
-              >
-                <ZoomOut size={16} />
-              </button>
-              <span className="text-xs text-gray-600 font-medium min-w-[42px] text-center">
-                {Math.round(imageScale * 100)}%
-              </span>
-              <button
-                onClick={() => setImageScale(s => Math.min(3, s * 1.2))}
-                className="p-1 text-gray-600 hover:text-gray-900 hover:bg-white rounded transition-colors"
-                title="放大"
-              >
-                <ZoomIn size={16} />
-              </button>
-
-              <button
-                onClick={() => setImages(imgs => imgs.map((img, i) => i === currentImageIndex ? { ...img, rotation: (img.rotation || 0) - 90 } : img))}
-                className="p-1 text-gray-600 hover:text-gray-900 hover:bg-white rounded transition-colors"
-                title="逆时针"
-              >
-                <RotateCcw size={16} />
-              </button>
-              <button
-                onClick={() => setImages(imgs => imgs.map((img, i) => i === currentImageIndex ? { ...img, rotation: (img.rotation || 0) + 90 } : img))}
-                className="p-1 text-gray-600 hover:text-gray-900 hover:bg-white rounded transition-colors"
-                title="顺时针"
-              >
-                <RotateCw size={16} />
-              </button>
-
-              <button
-                onClick={() => {
-                  setImageScale(1);
-                  setImages(imgs => imgs.map((img, i) => i === currentImageIndex ? { ...img, rotation: 0 } : img));
-                }}
-                className="p-1 text-gray-600 hover:text-gray-900 hover:bg-white rounded transition-colors"
-                title="重置"
-              >
-                <Maximize2 size={16} />
-              </button>
-            </div>
-          )}
-        </div>
-
-        {/* Right: Product + Industry + Quota + User */}
-        <div className="ml-auto flex items-center gap-2 md:gap-3">
           {/* 当前产品 */}
-          <div ref={productMenuRef} className="hidden md:flex items-center gap-1.5 px-2.5 py-1.5 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors group relative">
+          <div ref={productMenuRef} className="flex items-center gap-1.5 px-2.5 py-1.5 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors group relative">
             {isEditingProductName ? (
               <input
                 type="text"
@@ -1336,7 +1293,7 @@ const App: React.FC = () => {
 
             {/* 产品切换下拉 */}
             {user && showProductList && (
-              <div className="absolute top-full right-0 mt-1 w-64 bg-white border border-gray-200 rounded-lg shadow-xl z-[100] overflow-hidden">
+              <div className="absolute top-full left-0 mt-1 w-64 bg-white border border-gray-200 rounded-lg shadow-xl z-[100] overflow-hidden">
                 {/* 新建产品 */}
                 <div className="border-b border-gray-100">
                   <button
@@ -1397,7 +1354,7 @@ const App: React.FC = () => {
             )}
           </div>
 
-          {/* 行业选择（通用场景） */}
+          {/* 行业选择 */}
           <div ref={industryMenuRef} className="relative">
             <button
               onClick={() => setShowIndustryMenu(!showIndustryMenu)}
@@ -1408,7 +1365,7 @@ const App: React.FC = () => {
               <ChevronDown size={12} className={`transition-transform ${showIndustryMenu ? 'rotate-180' : ''}`} />
             </button>
             {showIndustryMenu && (
-              <div className="absolute top-full right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-xl overflow-hidden z-[100]">
+              <div className="absolute top-full left-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-xl overflow-hidden z-[100]">
                 {(['cosmetics', 'food', 'pharma', 'general'] as IndustryType[]).map((ind) => (
                   <button
                     key={ind}
@@ -1421,103 +1378,91 @@ const App: React.FC = () => {
               </div>
             )}
           </div>
+        </div>
 
-          {user ? (
-            <>
-              {/* 配额 */}
+        {/* Center: 图片工具 */}
+        <div className="absolute left-1/2 -translate-x-1/2 flex items-center gap-3">
+          {currentImage && (
+            <div className="hidden md:flex items-center gap-1.5 px-3 py-1.5 bg-gray-50 rounded-lg">
               <button
-                onClick={handleOpenQuotaModal}
-                className="flex items-center gap-1 md:gap-1.5 px-1.5 md:px-2 py-1 bg-surface-100 hover:bg-surface-200 rounded text-[10px] transition-colors"
-                title="点击查看配额详情"
+                onClick={() => setShowOverlay(!showOverlay)}
+                className={`p-1 rounded hover:bg-white transition-colors ${showOverlay ? 'text-purple-600' : 'text-gray-400'}`}
+                title="标注"
               >
-                <span className="text-text-muted hidden md:inline">额度</span>
-                <span className="text-text-secondary font-medium tabular-nums">{user.quota - user.used}/{user.quota}</span>
+                {showOverlay ? <Eye size={16} /> : <EyeOff size={16} />}
               </button>
 
-              {/* 系统公告 */}
               <button
-                onClick={() => setShowAnnouncementModal(true)}
-                className="relative p-2 hover:bg-surface-100 rounded-lg transition-colors"
-                title="系统公告"
+                onClick={() => setImageScale(s => Math.max(0.3, s / 1.2))}
+                className="p-1 text-gray-600 hover:text-gray-900 hover:bg-white rounded transition-colors"
+                title="缩小"
               >
-                <Bell size={18} className="text-text-muted" />
-                {/* 未读标记 */}
-                <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
+                <ZoomOut size={16} />
+              </button>
+              <span className="text-xs text-gray-600 font-medium min-w-[42px] text-center">
+                {Math.round(imageScale * 100)}%
+              </span>
+              <button
+                onClick={() => setImageScale(s => Math.min(3, s * 1.2))}
+                className="p-1 text-gray-600 hover:text-gray-900 hover:bg-white rounded transition-colors"
+                title="放大"
+              >
+                <ZoomIn size={16} />
               </button>
 
-              {/* 用户头像 */}
-              <div className="relative group">
-                <button className="flex items-center gap-1 md:gap-1.5 p-1 rounded hover:bg-surface-100 transition-all">
-                  <div className="w-6 h-6 rounded-full bg-surface-200 overflow-hidden">
-                    {user.photoURL ? (
-                      <img src={user.photoURL} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center text-[10px] font-medium text-text-muted">
-                        {(user.displayName || user.email || 'U')[0].toUpperCase()}
-                      </div>
-                    )}
-                  </div>
-                  <ChevronDown size={12} className="text-text-muted hidden md:block" />
-                </button>
+              <button
+                onClick={() => setImages(imgs => imgs.map((img, i) => i === currentImageIndex ? { ...img, rotation: (img.rotation || 0) - 90 } : img))}
+                className="p-1 text-gray-600 hover:text-gray-900 hover:bg-white rounded transition-colors"
+                title="逆时针"
+              >
+                <RotateCcw size={16} />
+              </button>
+              <button
+                onClick={() => setImages(imgs => imgs.map((img, i) => i === currentImageIndex ? { ...img, rotation: (img.rotation || 0) + 90 } : img))}
+                className="p-1 text-gray-600 hover:text-gray-900 hover:bg-white rounded transition-colors"
+                title="顺时针"
+              >
+                <RotateCw size={16} />
+              </button>
 
-                {/* 下拉菜单 */}
-                <div className="absolute top-full right-0 mt-1 w-44 py-1 bg-white border border-gray-200 rounded-lg shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-[100]">
-                  <div className="px-3 py-2 border-b border-gray-200">
-                    <div className="text-xs font-medium text-gray-900 truncate">{user.displayName || '用户'}</div>
-                    <div className="text-[10px] text-gray-500 truncate">{user.email}</div>
-                  </div>
-                  {user.plan === 'free' && (
-                    <button
-                      onClick={() => setShowUpgradeModal(true)}
-                      className="w-full px-3 py-2 text-left text-xs text-purple-600 hover:bg-gray-50 transition-colors flex items-center gap-2 font-medium"
-                    >
-                      <Zap size={12} />
-                      升级订阅
-                    </button>
-                  )}
-                  <a
-                    href="/help.html"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="w-full px-3 py-2 text-left text-xs text-gray-600 hover:text-gray-900 hover:bg-gray-50 transition-colors flex items-center gap-2"
-                  >
-                    <FileText size={12} />
-                    帮助文档
-                  </a>
-                  <a
-                    href="/pricing.html"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="w-full px-3 py-2 text-left text-xs text-gray-600 hover:text-gray-900 hover:bg-gray-50 transition-colors flex items-center gap-2"
-                  >
-                    <Package size={12} />
-                    查看定价
-                  </a>
-                  <div className="border-t border-gray-200 my-1" />
-                  <button
-                    onClick={handleLogout}
-                    className="w-full px-3 py-2 text-left text-xs text-gray-600 hover:text-gray-900 hover:bg-gray-50 transition-colors flex items-center gap-2"
-                  >
-                    <LogOut size={12} />
-                    退出登录
-                  </button>
-                </div>
-              </div>
-            </>
-          ) : (
-            <button
-              onClick={() => setShowLoginModal(true)}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-slate-100 text-slate-900 rounded text-xs font-medium transition-colors"
-            >
-              <GoogleIcon />
-              登录
-            </button>
+              <button
+                onClick={() => {
+                  setImageScale(1);
+                  setImages(imgs => imgs.map((img, i) => i === currentImageIndex ? { ...img, rotation: 0 } : img));
+                }}
+                className="p-1 text-gray-600 hover:text-gray-900 hover:bg-white rounded transition-colors"
+                title="重置"
+              >
+                <Maximize2 size={16} />
+              </button>
+            </div>
           )}
         </div>
       </div>
+      )}
+
 
       {/* MAIN CONTENT */}
-      <div className="flex-1 flex min-h-0 pb-14 md:pb-0">
+      {currentView === 'home' ? (
+        <HomePage
+          onNavigate={setCurrentView}
+          userQuota={user ? { quota: user.quota, used: user.used } : undefined}
+        />
+      ) : currentView === 'detection-config' ? (
+        <DetectionConfigPage onBack={() => setCurrentView('home')} />
+      ) : currentView === 'batch-report' ? (
+        <BatchReportPage
+          onBack={() => setCurrentView('home')}
+          onViewReport={(id) => { setSelectedReportId(id); setCurrentView('batch-view'); }}
+        />
+      ) : currentView === 'batch-view' ? (
+        <BatchReportView
+          reportId={selectedReportId}
+          onBack={() => setCurrentView('batch-report')}
+        />
+      ) : (
+        <>
+        <div className="flex-1 flex min-h-0 pb-14 md:pb-0">
         {/* LEFT: Thumbnails - 桌面端显示，移动端通过底部导航切换 */}
         <div className={`${mobileTab === 'images' ? 'flex' : 'hidden'} md:flex w-full md:w-[140px] border-r border-border bg-surface-50 p-2 overflow-y-auto shrink-0 flex-col`}>
           <div className="text-[10px] font-bold text-text-muted uppercase tracking-wider mb-2">
@@ -1716,6 +1661,7 @@ const App: React.FC = () => {
           currentIndex={currentImageIndex}
           onNavigate={setCurrentImageIndex}
           isCurrentProcessing={isCurrentProcessing}
+          processingModelId={processingModelId}
           onRetryAnalysis={(modelId) => currentImage && handleRetryAnalysis(currentImage.id)}
           selectedIssueId={selectedIssueId}
           onSelectIssue={setSelectedIssueId}
@@ -1742,7 +1688,6 @@ const App: React.FC = () => {
         />
       </div>
 
-      {/* BOTTOM BAR */}
       {/* BOTTOM PANEL - QIL (桌面端显示，移动端通过导航切换全屏) */}
       <div style={{ height: mobileTab === 'qil' ? 'auto' : bottomHeight }} className={`${mobileTab === 'qil' ? 'flex absolute inset-0 top-12 bottom-14 z-30' : 'hidden'} md:flex md:static md:z-auto border-t border-border bg-surface-50 flex-col shrink-0 relative`}>
         {/* 拖动调整高度的把手区域 */}
@@ -2147,6 +2092,8 @@ const App: React.FC = () => {
           )}
         </button>
       </div>
+        </>
+      )}
 
       {/* Error Toast */}
       {errorMessage && (
@@ -2158,6 +2105,7 @@ const App: React.FC = () => {
           </button>
         </div>
       )}
+      </div>
     </div>
   );
 };

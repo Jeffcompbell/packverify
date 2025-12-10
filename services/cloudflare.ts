@@ -396,3 +396,185 @@ export const resetUserUsage = async (targetUid: string): Promise<boolean> => {
     return false;
   }
 };
+
+// 检测配置接口
+export interface DetectionConfig {
+  id: string;
+  userId: string;
+  name: string;
+  prompt: string;
+  isActive: boolean;
+  createdAt: any;
+  updatedAt: any;
+}
+
+// 获取检测配置列表
+export const listDetectionConfigs = async (): Promise<DetectionConfig[]> => {
+  try {
+    const configs = await apiRequest('/api/detection-configs');
+    return configs.map((data: any) => ({
+      id: data.id,
+      userId: data.user_id,
+      name: data.name,
+      prompt: data.prompt,
+      isActive: data.is_active,
+      createdAt: data.created_at,
+      updatedAt: data.updated_at
+    }));
+  } catch (error) {
+    return [];
+  }
+};
+
+// 创建检测配置
+export const createDetectionConfig = async (name: string, prompt: string): Promise<DetectionConfig | null> => {
+  try {
+    const config = await apiRequest('/api/detection-configs', {
+      method: 'POST',
+      body: JSON.stringify({ name, prompt })
+    });
+    return {
+      id: config.id,
+      userId: config.user_id,
+      name: config.name,
+      prompt: config.prompt,
+      isActive: config.is_active,
+      createdAt: config.created_at,
+      updatedAt: config.updated_at
+    };
+  } catch (error) {
+    return null;
+  }
+};
+
+// 更新检测配置
+export const updateDetectionConfig = async (id: string, updates: { name?: string; prompt?: string; isActive?: boolean }): Promise<boolean> => {
+  try {
+    await apiRequest(`/api/detection-configs/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(updates)
+    });
+    return true;
+  } catch (error) {
+    return false;
+  }
+};
+
+// 删除检测配置
+export const deleteDetectionConfig = async (id: string): Promise<boolean> => {
+  try {
+    await apiRequest(`/api/detection-configs/${id}`, {
+      method: 'DELETE'
+    });
+    return true;
+  } catch (error) {
+    return false;
+  }
+};
+
+// 批量报告接口
+export interface BatchReport {
+  id: string;
+  userId: string;
+  name: string;
+  configId?: string;
+  status: 'pending' | 'processing' | 'completed' | 'failed';
+  totalImages: number;
+  processedImages: number;
+  createdAt: any;
+  updatedAt: any;
+}
+
+export interface BatchReportImage {
+  id: string;
+  reportId: string;
+  imageId: string;
+  status: 'pending' | 'processing' | 'completed' | 'failed';
+  result?: any;
+  createdAt: any;
+}
+
+// 创建批量报告
+export const createBatchReport = async (name: string, configId?: string): Promise<BatchReport | null> => {
+  try {
+    const report = await apiRequest('/api/batch-reports', {
+      method: 'POST',
+      body: JSON.stringify({ name, configId })
+    });
+    return {
+      id: report.id,
+      userId: report.user_id,
+      name: report.name,
+      configId: report.config_id,
+      status: report.status,
+      totalImages: report.total_images,
+      processedImages: report.processed_images,
+      createdAt: report.created_at,
+      updatedAt: report.updated_at
+    };
+  } catch (error) {
+    return null;
+  }
+};
+
+// 获取批量报告列表
+export const listBatchReports = async (): Promise<BatchReport[]> => {
+  try {
+    const reports = await apiRequest('/api/batch-reports');
+    return reports.map((data: any) => ({
+      id: data.id,
+      userId: data.user_id,
+      name: data.name,
+      configId: data.config_id,
+      status: data.status,
+      totalImages: data.total_images,
+      processedImages: data.processed_images,
+      createdAt: data.created_at,
+      updatedAt: data.updated_at
+    }));
+  } catch (error) {
+    return [];
+  }
+};
+
+// 获取批量报告详情
+export const getBatchReport = async (reportId: string): Promise<{ report: BatchReport | null; images: BatchReportImage[] }> => {
+  try {
+    const data = await apiRequest(`/api/batch-reports/${reportId}`);
+    const report: BatchReport = {
+      id: data.id,
+      userId: data.user_id,
+      name: data.name,
+      configId: data.config_id,
+      status: data.status,
+      totalImages: data.total_images,
+      processedImages: data.processed_images,
+      createdAt: data.created_at,
+      updatedAt: data.updated_at
+    };
+    const images: BatchReportImage[] = (data.images || []).map((img: any) => ({
+      id: img.id,
+      reportId: img.report_id,
+      imageId: img.image_id,
+      status: img.status,
+      result: img.result ? JSON.parse(img.result) : null,
+      createdAt: img.created_at
+    }));
+    return { report, images };
+  } catch (error) {
+    return { report: null, images: [] };
+  }
+};
+
+// 批量分析图片
+export const analyzeBatchWithCustomPrompt = async (reportId: string, imageIds: string[], prompt: string): Promise<boolean> => {
+  try {
+    await apiRequest(`/api/batch-reports/${reportId}/analyze`, {
+      method: 'POST',
+      body: JSON.stringify({ imageIds, prompt })
+    });
+    return true;
+  } catch (error) {
+    return false;
+  }
+};

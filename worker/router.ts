@@ -3,6 +3,8 @@ import { handleGetUser, handleCreateOrUpdateUser } from './handlers/users';
 import { handleCreateSession, handleGetSession, handleListSessions, handleUpdateSession } from './handlers/sessions';
 import { handleUploadImage, handleUpdateImage, handleDeleteImage, handleGetImageData } from './handlers/images';
 import { handleUseQuota, handleGetQuotaHistory } from './handlers/quota';
+import { handleCreateConfig, handleListConfigs, handleGetConfig, handleUpdateConfig, handleDeleteConfig } from './handlers/detection-configs';
+import { handleCreateReport, handleListReports, handleGetReport, handleUpdateReport, handleDeleteReport, handleAddReportImage, handleUpdateReportImage } from './handlers/batch-reports';
 
 export async function handleAPI(request: Request, env: Env): Promise<Response> {
   const url = new URL(request.url);
@@ -87,6 +89,77 @@ export async function handleAPI(request: Request, env: Env): Promise<Response> {
 
     if (path === '/api/quota/history' && method === 'GET') {
       const response = await requireAuth(handleGetQuotaHistory)(request, env);
+      return addCorsHeaders(response, corsHeaders);
+    }
+
+    // Detection config routes
+    if (path === '/api/detection-configs' && method === 'POST') {
+      const response = await requireAuth(handleCreateConfig)(request, env);
+      return addCorsHeaders(response, corsHeaders);
+    }
+
+    if (path === '/api/detection-configs' && method === 'GET') {
+      const response = await requireAuth(handleListConfigs)(request, env);
+      return addCorsHeaders(response, corsHeaders);
+    }
+
+    if (path.match(/^\\/api\\/detection-configs\\/[^/]+$/) && method === 'GET') {
+      const configId = path.split('/')[3];
+      const response = await requireAuth((req, env, uid) => handleGetConfig(req, env, uid, configId))(request, env);
+      return addCorsHeaders(response, corsHeaders);
+    }
+
+    if (path.match(/^\\/api\\/detection-configs\\/[^/]+$/) && method === 'PUT') {
+      const configId = path.split('/')[3];
+      const response = await requireAuth((req, env, uid) => handleUpdateConfig(req, env, uid, configId))(request, env);
+      return addCorsHeaders(response, corsHeaders);
+    }
+
+    if (path.match(/^\\/api\\/detection-configs\\/[^/]+$/) && method === 'DELETE') {
+      const configId = path.split('/')[3];
+      const response = await requireAuth((req, env, uid) => handleDeleteConfig(req, env, uid, configId))(request, env);
+      return addCorsHeaders(response, corsHeaders);
+    }
+
+    // Batch report routes
+    if (path === '/api/batch-reports' && method === 'POST') {
+      const response = await requireAuth(handleCreateReport)(request, env);
+      return addCorsHeaders(response, corsHeaders);
+    }
+
+    if (path === '/api/batch-reports' && method === 'GET') {
+      const response = await requireAuth(handleListReports)(request, env);
+      return addCorsHeaders(response, corsHeaders);
+    }
+
+    if (path.match(/^\\/api\\/batch-reports\\/[^/]+$/) && method === 'GET') {
+      const reportId = path.split('/')[3];
+      const response = await requireAuth((req, env, uid) => handleGetReport(req, env, uid, reportId))(request, env);
+      return addCorsHeaders(response, corsHeaders);
+    }
+
+    if (path.match(/^\\/api\\/batch-reports\\/[^/]+$/) && method === 'PUT') {
+      const reportId = path.split('/')[3];
+      const response = await requireAuth((req, env, uid) => handleUpdateReport(req, env, uid, reportId))(request, env);
+      return addCorsHeaders(response, corsHeaders);
+    }
+
+    if (path.match(/^\\/api\\/batch-reports\\/[^/]+$/) && method === 'DELETE') {
+      const reportId = path.split('/')[3];
+      const response = await requireAuth((req, env, uid) => handleDeleteReport(req, env, uid, reportId))(request, env);
+      return addCorsHeaders(response, corsHeaders);
+    }
+
+    if (path.match(/^\\/api\\/batch-reports\\/[^/]+\\/images$/) && method === 'POST') {
+      const reportId = path.split('/')[3];
+      const response = await requireAuth((req, env, uid) => handleAddReportImage(req, env, uid, reportId))(request, env);
+      return addCorsHeaders(response, corsHeaders);
+    }
+
+    if (path.match(/^\\/api\\/batch-reports\\/[^/]+\\/images\\/[^/]+$/) && method === 'PUT') {
+      const reportId = path.split('/')[3];
+      const imageId = path.split('/')[5];
+      const response = await requireAuth((req, env, uid) => handleUpdateReportImage(req, env, uid, reportId, imageId))(request, env);
       return addCorsHeaders(response, corsHeaders);
     }
 
