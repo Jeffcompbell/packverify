@@ -343,9 +343,10 @@ const App: React.FC = () => {
     try {
       console.log("Processing file:", file.name);
 
-      // 处理 HEIC/HEIF 格式
+      // 处理 HEIC/HEIF 格式 - 浏览器端转换有限制
       let processedFile = file;
       if (isHeic || file.type === 'image/heic' || file.type === 'image/heif') {
+        setErrorMessage('正在转换 HEIC 格式...');
         try {
           const heic2any = (await import('heic2any')).default;
           const convertedBlob = await heic2any({
@@ -356,9 +357,10 @@ const App: React.FC = () => {
           const blob = Array.isArray(convertedBlob) ? convertedBlob[0] : convertedBlob;
           processedFile = new File([blob], file.name.replace(/\.heic$/i, '.jpg'), { type: 'image/jpeg' });
           console.log('HEIC converted to JPEG');
+          setErrorMessage(null);
         } catch (err) {
           console.error('HEIC conversion failed:', err);
-          setErrorMessage('HEIC 格式转换失败。建议：在 iPhone 设置 > 相机 > 格式 中选择"最兼容"，或使用其他图片格式（JPG/PNG）');
+          setErrorMessage('HEIC 格式暂不支持浏览器端转换。请使用以下方法：\n1. iPhone: 设置 > 相机 > 格式 > 选择"最兼容"\n2. 使用在线工具转换为 JPG: heictojpg.com\n3. 或直接上传 JPG/PNG 格式');
           return;
         }
       }

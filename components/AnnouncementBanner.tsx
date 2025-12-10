@@ -157,33 +157,28 @@ export function AnnouncementModal({ isOpen, onClose }: AnnouncementModalProps) {
                 key={announcement.id}
                 className="bg-gray-50 border border-gray-100 rounded-lg p-3.5 hover:bg-white hover:border-purple-100 transition"
               >
-                <div className="flex items-start gap-2.5">
-                  <div className="mt-0.5 flex-shrink-0">{getIconForType(announcement.type)}</div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                      <h3 className="text-sm font-medium text-gray-900">
-                        {announcement.title}
-                      </h3>
-                      <span className="text-[10px] text-gray-400">
-                        {announcement.date}
-                      </span>
-                    </div>
-                    <p className="text-xs text-gray-600 leading-relaxed mb-2">
-                      {announcement.message}
-                    </p>
-                    {announcement.link && (
-                      <a
-                        href={announcement.link}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-xs text-purple-600 hover:text-purple-700 font-medium inline-flex items-center gap-1"
-                      >
-                        {announcement.linkText || '查看详情'}
-                        <span className="text-[10px]">→</span>
-                      </a>
-                    )}
-                  </div>
+                <div className="flex items-center justify-between gap-2 mb-1.5">
+                  <h3 className="text-sm font-medium text-gray-900">
+                    {announcement.title}
+                  </h3>
+                  <span className="text-[10px] text-gray-400 whitespace-nowrap">
+                    {announcement.date}
+                  </span>
                 </div>
+                <p className="text-xs text-gray-600 leading-relaxed mb-2">
+                  {announcement.message}
+                </p>
+                {announcement.link && (
+                  <a
+                    href={announcement.link}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs text-purple-600 hover:text-purple-700 font-medium inline-flex items-center gap-1"
+                  >
+                    {announcement.linkText || '查看详情'}
+                    <span className="text-[10px]">→</span>
+                  </a>
+                )}
               </div>
             ))}
           </div>
