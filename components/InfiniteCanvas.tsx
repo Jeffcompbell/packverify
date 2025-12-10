@@ -359,6 +359,9 @@ export const InfiniteCanvas: React.FC<InfiniteCanvasProps> = ({
                       ) : !isThisProcessing && (
                         <span className="text-[9px] bg-emerald-500/20 text-emerald-400 px-1.5 py-0.5 rounded ml-auto">✓ 通过</span>
                       )}
+                      {!isThisProcessing && imgItem.analysisDuration && (
+                        <span className="text-[9px] text-slate-500">{(imgItem.analysisDuration / 1000).toFixed(1)}s</span>
+                      )}
                     </div>
 
                     {isThisProcessing ? (

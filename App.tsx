@@ -544,6 +544,7 @@ const App: React.FC = () => {
       }
 
       const usedModelId = getModelId();
+      const analysisDuration = image.analyzingStartedAt ? Date.now() - image.analyzingStartedAt : undefined;
       setImages(prev => prev.map(img =>
         img.id === imageId ? {
           ...img,
@@ -553,6 +554,7 @@ const App: React.FC = () => {
           deterministicIssues: diagResult.deterministicIssues,
           specs: imageSpecs,
           diffs: diffs,
+          analysisDuration,
           issuesByModel: {
             ...img.issuesByModel,
             [usedModelId]: {

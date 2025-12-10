@@ -107,6 +107,7 @@ export interface ImageItem {
   rotation?: number; // 旋转角度
   status?: ImageStatus; // 分析状态
   analyzingStartedAt?: number; // 分析开始时间戳（毫秒）
+  analysisDuration?: number; // 分析耗时（毫秒）
   errorMessage?: string; // 错误信息
 }
 
