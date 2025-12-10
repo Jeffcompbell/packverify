@@ -339,7 +339,7 @@ export const loadSessionFromCloud = async (
       userId: img.user_id,
       fileName: img.file_name,
       mimeType: img.mime_type,
-      storageUrl: `${API_BASE_URL}/api/images/${img.id}/data`,
+      storageUrl: `${API_BASE_URL}/api/public/images/${img.id}`,
       description: img.description,
       ocrText: img.ocr_text,
       specs: img.specs ? JSON.parse(img.specs) : [],

@@ -33,16 +33,17 @@ import { BatchReportPage } from './components/features/BatchReportPage';
 import { BatchReportView } from './components/features/BatchReportView';
 import { base64ToBlobUrl, createVirtualFile, generateProductName } from './utils/helpers';
 
-type AppView = 'home' | 'products' | 'analysis' | 'detection-config' | 'batch-report' | 'batch-view';
+type AppView = 'home' | 'products' | 'analysis' | 'detection-config' | 'batch-report' | 'batch-view' | '404';
 
 // URL 路径映射
 const VIEW_PATHS: Record<AppView, string> = {
   'home': '/home',
-  'products': '/app',  // AI视觉分析（产品列表）
-  'analysis': '/app',  // 画布（带产品ID时）
+  'products': '/app',
+  'analysis': '/app',
   'detection-config': '/config',
   'batch-report': '/reports',
   'batch-view': '/reports',
+  '404': '/404',
 };
 
 const PATH_TO_VIEW: Record<string, AppView> = {
@@ -50,8 +51,11 @@ const PATH_TO_VIEW: Record<string, AppView> = {
   '/config': 'detection-config',
   '/reports': 'batch-report',
   '/': 'products',
-  '/app': 'products',  // /app 显示产品列表
+  '/app': 'products',
 };
+
+// 已知的有效路径前缀
+const VALID_PATH_PREFIXES = ['/', '/home', '/app', '/config', '/reports'];
 
 const App: React.FC = () => {
   const location = useLocation();
@@ -59,14 +63,12 @@ const App: React.FC = () => {
 
   // 从 URL 解析初始视图
   const getViewFromPath = (pathname: string): AppView => {
-    if (pathname.startsWith('/reports/')) {
-      return 'batch-view';
-    }
-    // /app/:productId 进入画布
-    if (pathname.startsWith('/app/')) {
-      return 'analysis';
-    }
-    return PATH_TO_VIEW[pathname] || 'products';
+    if (pathname.startsWith('/reports/')) return 'batch-view';
+    if (pathname.startsWith('/app/')) return 'analysis';
+    if (PATH_TO_VIEW[pathname]) return PATH_TO_VIEW[pathname];
+    // 检查是否是有效路径
+    const isValid = VALID_PATH_PREFIXES.some(p => pathname === p || pathname.startsWith(p + '/'));
+    return isValid ? 'products' : '404';
   };
 
   // 路由状态
@@ -1420,6 +1422,17 @@ const App: React.FC = () => {
           reportId={selectedReportId}
           onBack={() => setCurrentView('batch-report')}
         />
+      ) : currentView === '404' ? (
+        <div className="flex-1 flex flex-col items-center justify-center bg-surface-50">
+          <div className="text-6xl mb-4">404</div>
+          <div className="text-text-muted mb-6">页面不存在</div>
+          <button
+            onClick={() => { navigate('/'); setCurrentViewState('products'); }}
+            className="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-500 transition-colors"
+          >
+            返回首页
+          </button>
+        </div>
       ) : (
         <>
         <div className="flex-1 flex min-h-0 pb-14 md:pb-0">
