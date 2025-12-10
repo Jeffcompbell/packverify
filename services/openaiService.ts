@@ -157,7 +157,7 @@ const getClient = (useBackup = false) => {
         apiKey: apiKey || 'dummy',
         baseURL,
         dangerouslyAllowBrowser: true,
-        timeout: 30000, // 30秒超时
+        timeout: 60000, // 60秒超时
     });
 };
 
@@ -167,7 +167,7 @@ const getZenmuxClient = () => {
         apiKey: import.meta.env.VITE_ZENMUX_API_KEY || 'dummy',
         baseURL: 'https://zenmux.ai/api/v1',
         dangerouslyAllowBrowser: true,
-        timeout: 30000,
+        timeout: 60000, // 60秒超时
     });
 };
 
