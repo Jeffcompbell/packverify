@@ -1,5 +1,5 @@
 import React, { useRef } from 'react';
-import { ImageItem } from '../types';
+import { ImageItem } from '../../types/types';
 import { Plus, Image as ImageIcon, Trash2 } from 'lucide-react';
 
 interface ImageSidebarProps {

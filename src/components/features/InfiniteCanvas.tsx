@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState } from 'react';
-import { CanvasTransform, DiagnosisIssue, DiffResult, ViewLayers, BoundingBox, ImageItem } from '../types';
+import { CanvasTransform, DiagnosisIssue, DiffResult, ViewLayers, BoundingBox, ImageItem } from '../../types/types';
 import { AlertCircle, CheckCircle, Info, XCircle, ImagePlus, Loader2, Trash2, FileText, AlertTriangle, RefreshCw, Copy, CheckCheck, Upload, GripVertical, Eye, FileSearch, CheckSquare } from 'lucide-react';
 
 interface InfiniteCanvasProps {

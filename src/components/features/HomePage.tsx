@@ -15,7 +15,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate, userQuota }) => 
   ];
 
   return (
-    <div className="min-h-screen bg-gray-50 p-4">
+    <div className="flex-1 bg-gray-50 p-4 overflow-auto">
       <div className="max-w-4xl mx-auto">
         {userQuota && (
           <div className="bg-white rounded-lg border border-gray-200 p-3 mb-4">

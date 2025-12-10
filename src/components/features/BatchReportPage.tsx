@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { X, Upload, Loader2, FileText, Trash2 } from 'lucide-react';
-import { listBatchReports, createBatchReport, BatchReport } from '../services/cloudflare';
+import { listBatchReports, createBatchReport, BatchReport } from '../../services/cloudflare';
 
 interface BatchReportPageProps {
   onBack: () => void;
@@ -67,12 +67,9 @@ export const BatchReportPage: React.FC<BatchReportPageProps> = ({ onBack, onView
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-surface-50 flex flex-col">
-      <div className="h-14 border-b border-border bg-white flex items-center justify-between px-6 shrink-0">
+    <div className="flex-1 flex flex-col bg-surface-50 overflow-hidden">
+      <div className="h-14 border-b border-border bg-white flex items-center px-6 shrink-0">
         <h2 className="text-base font-semibold text-text-primary">批量检测</h2>
-        <button onClick={onBack} className="p-1.5 hover:bg-surface-100 rounded transition-colors">
-          <X size={18} className="text-text-muted" />
-        </button>
       </div>
 
       <div className="flex-1 overflow-y-auto p-6">

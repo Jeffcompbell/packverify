@@ -1,4 +1,4 @@
-import { ImageSpec, DiagnosisIssue, DiffResult, DeterministicCheck } from '../types';
+import { ImageSpec, DiagnosisIssue, DiffResult, DeterministicCheck } from './types';
 
 export interface StoredImageItem {
   id: string;

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ArrowLeft, Plus, Edit, Trash2, ToggleLeft, ToggleRight, Loader2, X } from 'lucide-react';
-import { listDetectionConfigs, createDetectionConfig, updateDetectionConfig, deleteDetectionConfig, DetectionConfig } from '../services/cloudflare';
+import { listDetectionConfigs, createDetectionConfig, updateDetectionConfig, deleteDetectionConfig, DetectionConfig } from '../../services/cloudflare';
 
 interface DetectionConfigPageProps {
   onBack: () => void;
@@ -80,15 +80,10 @@ export const DetectionConfigPage: React.FC<DetectionConfigPageProps> = ({ onBack
   };
 
   return (
-    <div className="fixed inset-0 bg-white z-50 flex flex-col">
+    <div className="flex-1 flex flex-col bg-white overflow-hidden">
       {/* Header */}
-      <div className="border-b border-gray-200 px-4 py-3 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <button onClick={onBack} className="p-1.5 hover:bg-gray-100 rounded-md transition">
-            <ArrowLeft className="w-4 h-4 text-gray-600" />
-          </button>
-          <h1 className="text-sm font-semibold text-gray-900">检测配置管理</h1>
-        </div>
+      <div className="border-b border-gray-200 px-4 py-3 flex items-center justify-between shrink-0">
+        <h1 className="text-sm font-semibold text-gray-900">检测配置管理</h1>
         <button
           onClick={handleCreate}
           className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-900 text-white text-xs rounded-md hover:bg-gray-800 transition"

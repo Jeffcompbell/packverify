@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { DiffResult, SourceField } from '../types';
+import { DiffResult, SourceField } from '../../types/types';
 import {
   Check, X, ArrowRight,
   RefreshCw, Search, ListFilter, ClipboardCheck, AlertOctagon, FileSpreadsheet,

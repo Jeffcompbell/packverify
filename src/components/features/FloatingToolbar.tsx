@@ -1,5 +1,5 @@
 import React from 'react';
-import { ViewLayers, IndustryType } from '../types';
+import { ViewLayers, IndustryType } from '../../types/types';
 import { ScanEye, FileDiff, ZoomIn, ZoomOut, Maximize, ImagePlus, RotateCcw, Package } from 'lucide-react';
 
 interface FloatingToolbarProps {

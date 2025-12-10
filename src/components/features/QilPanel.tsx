@@ -3,8 +3,8 @@ import {
   Table, Upload, Search, ImagePlus, XCircle, Loader2,
   FileSpreadsheet, ClipboardCheck, Image
 } from 'lucide-react';
-import { parseSourceText, parseQILImage, fileToGenerativePart } from '../services/openaiService';
-import { SourceField } from '../types';
+import { parseSourceText, parseQILImage, fileToGenerativePart } from '../../services/openaiService';
+import { SourceField } from '../../types/types';
 
 interface QilPanelProps {
   manualSourceFields: SourceField[];

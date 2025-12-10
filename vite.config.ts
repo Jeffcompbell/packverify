@@ -9,6 +9,8 @@ export default defineConfig(({ mode }) => {
     server: {
       port: 3000,
       host: '0.0.0.0',
+      // 支持 History API fallback
+      historyApiFallback: true,
     },
     plugins: [react(), tailwindcss()],
     define: {
@@ -16,7 +18,7 @@ export default defineConfig(({ mode }) => {
     },
     resolve: {
       alias: {
-        '@': path.resolve(__dirname, '.'),
+        '@': path.resolve(__dirname, './src'),
       }
     },
     build: {

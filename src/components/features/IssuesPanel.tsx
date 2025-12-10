@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { AlertTriangle, Type, RefreshCw, FileText, AlertCircle, Loader2, CheckCheck, Copy, Brackets, ShieldAlert, CheckCircle, Plus, X, Columns, ChevronLeft, ChevronRight, ZoomIn, ZoomOut, RotateCw } from 'lucide-react';
-import { ImageItem } from '../types';
-import { AVAILABLE_MODELS } from '../services/openaiService';
+import { ImageItem } from '../../types/types';
+import { AVAILABLE_MODELS } from '../../services/openaiService';
 
 interface IssuesPanelProps {
   currentImage: ImageItem | null;

@@ -1,11 +1,12 @@
 import React from 'react';
-import { Search, Settings, FileText, HelpCircle, Bell, LogOut, ChevronDown } from 'lucide-react';
+import { Link, useLocation } from 'react-router-dom';
+import { Search, Settings, FileText, HelpCircle, Bell, LogOut } from 'lucide-react';
 
-type AppView = 'analysis' | 'detection-config' | 'batch-report';
+type AppView = 'analysis' | 'detection-config' | 'batch-report' | 'home';
 
 interface SidebarProps {
-  currentView: AppView;
-  onNavigate: (view: AppView) => void;
+  currentView?: AppView;
+  onNavigate?: (view: AppView) => void;
   userQuota?: { remaining: number; total: number };
   user?: {
     displayName?: string;
@@ -17,24 +18,33 @@ interface SidebarProps {
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
-  currentView,
-  onNavigate,
   userQuota,
   user,
   onLogout,
   onOpenAnnouncement
 }) => {
+  const location = useLocation();
+
   const menuItems = [
-    { id: 'analysis' as AppView, label: '质检分析', icon: Search },
-    { id: 'detection-config' as AppView, label: '检测配置', icon: Settings },
-    { id: 'batch-report' as AppView, label: '批量报告', icon: FileText },
+    { id: 'analysis', path: '/app.html', label: '质检分析', icon: Search },
+    { id: 'detection-config', path: '/config', label: '检测配置', icon: Settings },
+    { id: 'batch-report', path: '/reports', label: '批量报告', icon: FileText },
   ];
+
+  const isActive = (path: string) => {
+    const pathname = location.pathname;
+    // /app.html 或 / 或 /analysis 都算质检分析
+    if (path === '/app.html' && (pathname === '/app.html' || pathname === '/' || pathname === '' || pathname === '/analysis')) {
+      return true;
+    }
+    return pathname === path || pathname.startsWith(path + '/');
+  };
 
   return (
     <div className="w-52 bg-white border-r border-gray-200 flex flex-col h-full">
-      {/* Logo - 可点击返回首页 */}
-      <button
-        onClick={() => onNavigate('home' as AppView)}
+      {/* Logo - 点击返回落地页 */}
+      <a
+        href="/"
         className="h-14 flex items-center px-4 hover:bg-gray-50 transition-colors w-full"
       >
         <div className="flex items-center gap-2">
@@ -45,28 +55,28 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </div>
           <span className="text-sm font-semibold text-gray-900">PackVerify</span>
         </div>
-      </button>
+      </a>
 
       {/* Navigation */}
       <nav className="flex-1 px-3 py-4">
         <div className="space-y-0.5">
           {menuItems.map((item) => {
             const Icon = item.icon;
-            const isActive = currentView === item.id;
+            const active = isActive(item.path);
 
             return (
-              <button
+              <Link
                 key={item.id}
-                onClick={() => onNavigate(item.id)}
+                to={item.path}
                 className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors ${
-                  isActive
+                  active
                     ? 'bg-purple-50 text-purple-700 font-medium'
                     : 'text-gray-700 hover:bg-gray-50'
                 }`}
               >
-                <Icon size={16} className={isActive ? 'text-purple-600' : 'text-gray-400'} />
+                <Icon size={16} className={active ? 'text-purple-600' : 'text-gray-400'} />
                 <span>{item.label}</span>
-              </button>
+              </Link>
             );
           })}
         </div>

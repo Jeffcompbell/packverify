@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import imageCompression from 'browser-image-compression';
 import { diagnoseImage, fileToGenerativePart, parseSourceText, AVAILABLE_MODELS, getModelId, setModelId, parseQILImage, localDiffSpecs, extractOcrOnly } from './services/openaiService';
 import { signInWithGoogle, signOutUser, onAuthChange } from './services/firebase';
@@ -9,7 +10,7 @@ import {
   getUserSessions, createNewSession, updateSessionProductName, getQuotaUsageHistory, QuotaUsageRecord,
   updateImageStatusInCloud
 } from './services/cloudflare';
-import { DiagnosisIssue, SourceField, DiffResult, ImageItem, ImageSpec, BoundingBox, DeterministicCheck, IndustryType } from './types';
+import { DiagnosisIssue, SourceField, DiffResult, ImageItem, ImageSpec, BoundingBox, DeterministicCheck, IndustryType } from './types/types';
 import {
   Table, Zap, AlertCircle, XCircle, ChevronDown, ChevronLeft, ChevronRight,
   ImagePlus, Trash2, RefreshCw, Copy, CheckCheck, Upload, Eye, EyeOff,
@@ -18,27 +19,82 @@ import {
   Type, Brackets, ShieldAlert, GitCompare, LogOut, User as UserIcon, X, Cloud, CloudOff,
   Menu, Home, List, Settings, Package, Bell, Plus
 } from 'lucide-react';
-import { LoginModal, GoogleIcon } from './components/LoginModal';
-import { QuotaModal } from './components/QuotaModal';
-import { AllProductsPage } from './components/AllProductsPage';
-import { IssuesPanel } from './components/IssuesPanel';
-import { QilPanel, QilPanelRef } from './components/QilPanel';
-import { AnnouncementBanner, AnnouncementModal } from './components/AnnouncementBanner';
-import { UpgradeModal } from './components/UpgradeModal';
-import { Sidebar } from './components/Sidebar';
-import { HomePage } from './components/HomePage';
-import { DetectionConfigPage } from './components/DetectionConfigPage';
-import { BatchReportPage } from './components/BatchReportPage';
-import { BatchReportView } from './components/BatchReportView';
+import { LoginModal, GoogleIcon } from './components/features/LoginModal';
+import { QuotaModal } from './components/features/QuotaModal';
+import { AllProductsPage } from './components/features/AllProductsPage';
+import { IssuesPanel } from './components/features/IssuesPanel';
+import { QilPanel, QilPanelRef } from './components/features/QilPanel';
+import { AnnouncementBanner, AnnouncementModal } from './components/features/AnnouncementBanner';
+import { UpgradeModal } from './components/features/UpgradeModal';
+import { Sidebar } from './components/layout/Sidebar';
+import { HomePage } from './components/features/HomePage';
+import { DetectionConfigPage } from './components/features/DetectionConfigPage';
+import { BatchReportPage } from './components/features/BatchReportPage';
+import { BatchReportView } from './components/features/BatchReportView';
 import { base64ToBlobUrl, createVirtualFile, generateProductName, STORAGE_KEY } from './utils/helpers';
 import { StoredImageItem } from './types/storage';
 
 type AppView = 'home' | 'analysis' | 'detection-config' | 'batch-report' | 'batch-view';
 
+// URL 路径映射
+const VIEW_PATHS: Record<AppView, string> = {
+  'home': '/home',
+  'analysis': '/app.html',  // 质检分析固定用 /app.html
+  'detection-config': '/config',
+  'batch-report': '/reports',
+  'batch-view': '/reports',
+};
+
+const PATH_TO_VIEW: Record<string, AppView> = {
+  '/home': 'home',
+  '/analysis': 'analysis',
+  '/config': 'detection-config',
+  '/reports': 'batch-report',
+  '/': 'analysis',
+  '/app.html': 'analysis',
+};
+
 const App: React.FC = () => {
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  // 从 URL 解析初始视图
+  const getViewFromPath = (pathname: string): AppView => {
+    // 检查是否是报告详情页
+    if (pathname.startsWith('/reports/')) {
+      return 'batch-view';
+    }
+    return PATH_TO_VIEW[pathname] || 'analysis';
+  };
+
   // 路由状态
-  const [currentView, setCurrentView] = useState<AppView>('analysis');
-  const [selectedReportId, setSelectedReportId] = useState<string | null>(null);
+  const [currentView, setCurrentViewState] = useState<AppView>(() => getViewFromPath(location.pathname));
+  const [selectedReportId, setSelectedReportId] = useState<string | null>(() => {
+    const match = location.pathname.match(/\/reports\/(.+)/);
+    return match ? match[1] : null;
+  });
+
+  // 同步 URL 变化到视图状态
+  useEffect(() => {
+    const newView = getViewFromPath(location.pathname);
+    if (newView !== currentView) {
+      setCurrentViewState(newView);
+    }
+    // 提取报告 ID
+    const match = location.pathname.match(/\/reports\/(.+)/);
+    if (match) {
+      setSelectedReportId(match[1]);
+    }
+  }, [location.pathname]);
+
+  // 封装 setCurrentView，同时更新 URL
+  const setCurrentView = useCallback((view: AppView) => {
+    setCurrentViewState(view);
+    const path = VIEW_PATHS[view];
+    if (location.pathname !== path) {
+      navigate(path);
+    }
+  }, [navigate, location.pathname]);
 
   // 用户认证状态
   const [user, setUser] = useState<UserData | null>(null);
@@ -215,6 +271,13 @@ const App: React.FC = () => {
     });
     return () => unsubscribe();
   }, []);
+
+  // 未登录时自动显示登录弹窗
+  useEffect(() => {
+    if (!isCheckingAuth && !user) {
+      setShowLoginModal(true);
+    }
+  }, [isCheckingAuth, user]);
 
   // 用户登录后，加载云端会话数据
   useEffect(() => {
@@ -1133,15 +1196,17 @@ const App: React.FC = () => {
   const handleLogout = useCallback(async () => {
     await signOutUser();
     setUser(null);
+    // 跳转到落地页
+    window.location.href = '/';
   }, []);
 
   const handleLogin = useCallback(async () => {
     try {
-      const loggedInUser = await signInWithGoogle();
-      if (loggedInUser) {
-        const userData = await getOrCreateUser(loggedInUser);
+      // signInWithGoogle 已经内部调用了 getOrCreateUser，直接返回 UserData
+      const userData = await signInWithGoogle();
+      if (userData) {
         setUser(userData);
-        console.log('Login successful:', userData);
+        setShowLoginModal(false);
       }
     } catch (error) {
       console.error('Login failed:', error);
@@ -1165,21 +1230,19 @@ const App: React.FC = () => {
 
   return (
     <div className="h-screen w-screen bg-surface-50 flex font-sans text-text-primary overflow-hidden">
-      {/* Sidebar - 仅在登录后显示 */}
-      {user && (
-        <Sidebar
-          currentView={currentView}
-          onNavigate={setCurrentView}
-          userQuota={{ remaining: user.quota - user.used, total: user.quota }}
-          user={{
-            displayName: user.displayName,
-            email: user.email,
-            photoURL: user.photoURL
-          }}
-          onLogout={handleLogout}
-          onOpenAnnouncement={() => setShowAnnouncementModal(true)}
-        />
-      )}
+      {/* Sidebar - 始终显示 */}
+      <Sidebar
+        currentView={currentView}
+        onNavigate={setCurrentView}
+        userQuota={user ? { remaining: user.quota - user.used, total: user.quota } : undefined}
+        user={user ? {
+          displayName: user.displayName,
+          email: user.email,
+          photoURL: user.photoURL
+        } : undefined}
+        onLogout={user ? handleLogout : undefined}
+        onOpenAnnouncement={() => setShowAnnouncementModal(true)}
+      />
 
       {/* Main Content Area */}
       <div

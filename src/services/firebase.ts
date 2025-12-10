@@ -2,7 +2,7 @@ import { initializeApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
 import { getFirestore, doc, getDoc, setDoc, updateDoc, increment, serverTimestamp, collection, query, orderBy, getDocs, deleteDoc, writeBatch, limit, startAfter } from 'firebase/firestore';
 import { getStorage, ref, uploadString, getDownloadURL, deleteObject } from 'firebase/storage';
-import { ImageItem, DiagnosisIssue, DiffResult, ImageSpec, DeterministicCheck, SourceField } from '../types';
+import { ImageItem, DiagnosisIssue, DiffResult, ImageSpec, DeterministicCheck, SourceField } from '../types/types';
 
 // Firebase 配置 - 从环境变量读取
 const firebaseConfig = {

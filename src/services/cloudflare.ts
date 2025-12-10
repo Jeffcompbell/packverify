@@ -1,5 +1,5 @@
 import { auth } from './firebase';
-import { ImageItem, DiagnosisIssue, DiffResult, ImageSpec, DeterministicCheck, SourceField } from '../types';
+import { ImageItem, DiagnosisIssue, DiffResult, ImageSpec, DeterministicCheck, SourceField } from '../types/types';
 
 // Worker API 基础 URL
 const API_BASE_URL = import.meta.env.VITE_WORKERS_URL || '';

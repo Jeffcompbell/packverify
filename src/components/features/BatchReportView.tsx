@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ArrowLeft, Loader2, ChevronDown, ChevronRight, Download } from 'lucide-react';
-import { getBatchReport, BatchReport, BatchReportImage } from '../services/cloudflare';
+import { getBatchReport, BatchReport, BatchReportImage } from '../../services/cloudflare';
 
 interface BatchReportViewProps {
   reportId: string;
@@ -39,7 +39,7 @@ export const BatchReportView: React.FC<BatchReportViewProps> = ({ reportId, onBa
 
   if (isLoading) {
     return (
-      <div className="fixed inset-0 z-50 bg-surface-50 flex items-center justify-center">
+      <div className="flex-1 flex items-center justify-center bg-surface-50">
         <Loader2 size={32} className="animate-spin text-primary-400" />
       </div>
     );
@@ -47,7 +47,7 @@ export const BatchReportView: React.FC<BatchReportViewProps> = ({ reportId, onBa
 
   if (!report) {
     return (
-      <div className="fixed inset-0 z-50 bg-surface-50 flex items-center justify-center">
+      <div className="flex-1 flex items-center justify-center bg-surface-50">
         <p className="text-sm text-text-muted">报告不存在</p>
       </div>
     );
@@ -64,7 +64,7 @@ export const BatchReportView: React.FC<BatchReportViewProps> = ({ reportId, onBa
   }, 0);
 
   return (
-    <div className="fixed inset-0 z-50 bg-surface-50 flex flex-col">
+    <div className="flex-1 flex flex-col bg-surface-50 overflow-hidden">
       <div className="h-14 border-b border-border bg-white flex items-center justify-between px-6 shrink-0">
         <div className="flex items-center gap-3">
           <button onClick={onBack} className="p-1.5 hover:bg-surface-100 rounded transition-colors">
