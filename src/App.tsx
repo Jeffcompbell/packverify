@@ -384,6 +384,18 @@ const App: React.FC = () => {
     loadCloudData();
   }, [user, cloudSyncEnabled]);
 
+  // 切换到产品列表时刷新数据
+  useEffect(() => {
+    if (currentView === 'products' && user && !isLoadingHistory) {
+      setIsLoadingHistory(true);
+      getUserSessions(user.uid, 50).then(sessions => {
+        setHistorySessions(sessions);
+      }).finally(() => {
+        setIsLoadingHistory(false);
+      });
+    }
+  }, [currentView, user]);
+
   // Check for API Key on mount
   useEffect(() => {
     if (!import.meta.env.VITE_PACKY_API_KEY) {
