@@ -39,7 +39,7 @@ type AppView = 'home' | 'analysis' | 'detection-config' | 'batch-report' | 'batc
 // URL 路径映射
 const VIEW_PATHS: Record<AppView, string> = {
   'home': '/home',
-  'analysis': '/app.html',  // 质检分析固定用 /app.html
+  'analysis': '/app',  // 质检分析
   'detection-config': '/config',
   'batch-report': '/reports',
   'batch-view': '/reports',
@@ -51,7 +51,7 @@ const PATH_TO_VIEW: Record<string, AppView> = {
   '/config': 'detection-config',
   '/reports': 'batch-report',
   '/': 'analysis',
-  '/app.html': 'analysis',
+  '/app': 'analysis',
 };
 
 const App: React.FC = () => {

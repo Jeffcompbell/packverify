@@ -9,13 +9,31 @@ export default defineConfig(({ mode }) => {
     server: {
       port: 3000,
       host: '0.0.0.0',
-      // 支持 History API fallback
-      historyApiFallback: true,
     },
-    plugins: [react(), tailwindcss()],
-    define: {
-      // 'process.env.API_KEY': JSON.stringify(env.GEMINI_API_KEY),
-    },
+    plugins: [
+      react(),
+      tailwindcss(),
+      {
+        name: 'rewrite-middleware',
+        configureServer(server) {
+          server.middlewares.use((req, res, next) => {
+            // /app、/config、/reports 等路由都指向 app/index.html
+            if (req.url && (req.url === '/app' || req.url.startsWith('/config') || req.url.startsWith('/reports'))) {
+              req.url = '/app/index.html';
+            }
+            // /help 指向 help/index.html
+            if (req.url === '/help') {
+              req.url = '/help/index.html';
+            }
+            // /pricing 指向 pricing/index.html
+            if (req.url === '/pricing') {
+              req.url = '/pricing/index.html';
+            }
+            next();
+          });
+        },
+      },
+    ],
     resolve: {
       alias: {
         '@': path.resolve(__dirname, './src'),
@@ -25,9 +43,9 @@ export default defineConfig(({ mode }) => {
       rollupOptions: {
         input: {
           main: path.resolve(__dirname, 'index.html'),
-          app: path.resolve(__dirname, 'app.html'),
-          pricing: path.resolve(__dirname, 'pricing.html'),
-          help: path.resolve(__dirname, 'help.html'),
+          app: path.resolve(__dirname, 'app/index.html'),
+          pricing: path.resolve(__dirname, 'pricing/index.html'),
+          help: path.resolve(__dirname, 'help/index.html'),
         },
       },
     },

@@ -26,15 +26,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const location = useLocation();
 
   const menuItems = [
-    { id: 'analysis', path: '/app.html', label: '质检分析', icon: Search },
+    { id: 'analysis', path: '/app', label: '质检分析', icon: Search },
     { id: 'detection-config', path: '/config', label: '检测配置', icon: Settings },
     { id: 'batch-report', path: '/reports', label: '批量报告', icon: FileText },
   ];
 
   const isActive = (path: string) => {
     const pathname = location.pathname;
-    // /app.html 或 / 或 /analysis 都算质检分析
-    if (path === '/app.html' && (pathname === '/app.html' || pathname === '/' || pathname === '' || pathname === '/analysis')) {
+    // /app 或 / 都算质检分析
+    if (path === '/app' && (pathname === '/app' || pathname === '/' || pathname === '')) {
       return true;
     }
     return pathname === path || pathname.startsWith(path + '/');
@@ -86,7 +86,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       <div className="px-3 pb-3 space-y-2">
         {/* Help Link */}
         <a
-          href="/help.html"
+          href="/help"
           target="_blank"
           rel="noopener noreferrer"
           className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-gray-600 hover:bg-gray-50 transition-colors"
