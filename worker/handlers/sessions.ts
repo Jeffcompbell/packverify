@@ -34,30 +34,41 @@ export async function handleGetSession(request: Request, env: Env, uid: string, 
 }
 
 export async function handleListSessions(request: Request, env: Env, uid: string): Promise<Response> {
-  const sessions = await env.DB.prepare('SELECT * FROM sessions WHERE user_id = ? ORDER BY updated_at DESC').bind(uid).all();
+  try {
+    const sessions = await env.DB.prepare('SELECT * FROM sessions WHERE user_id = ? ORDER BY updated_at DESC').bind(uid).all();
 
-  // 为每个 session 获取缩略图和实际图片数量
-  const sessionsWithThumbnails = await Promise.all(
-    (sessions.results || []).map(async (session: any) => {
-      const images = await env.DB.prepare(
-        'SELECT storage_url FROM images WHERE session_id = ? ORDER BY created_at ASC LIMIT 4'
-      ).bind(session.id).all();
+    // 为每个 session 获取缩略图和实际图片数量
+    const sessionsWithThumbnails = await Promise.all(
+      (sessions.results || []).map(async (session: any) => {
+        try {
+          const images = await env.DB.prepare(
+            'SELECT storage_url FROM images WHERE session_id = ? ORDER BY created_at ASC LIMIT 4'
+          ).bind(session.id).all();
 
-      const imageCount = await env.DB.prepare(
-        'SELECT COUNT(*) as count FROM images WHERE session_id = ?'
-      ).bind(session.id).first() as { count: number } | null;
+          const imageCount = await env.DB.prepare(
+            'SELECT COUNT(*) as count FROM images WHERE session_id = ?'
+          ).bind(session.id).first() as { count: number } | null;
 
-      return {
-        ...session,
-        image_count: imageCount?.count || 0,
-        thumbnails: (images.results || []).map((img: any) => img.storage_url)
-      };
-    })
-  );
+          return {
+            ...session,
+            image_count: imageCount?.count || 0,
+            thumbnails: (images.results || []).map((img: any) => img.storage_url).filter(Boolean)
+          };
+        } catch {
+          return { ...session, image_count: 0, thumbnails: [] };
+        }
+      })
+    );
 
-  return new Response(JSON.stringify(sessionsWithThumbnails), {
-    headers: { 'Content-Type': 'application/json' }
-  });
+    return new Response(JSON.stringify(sessionsWithThumbnails), {
+      headers: { 'Content-Type': 'application/json' }
+    });
+  } catch (error: any) {
+    return new Response(JSON.stringify({ error: error.message }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' }
+    });
+  }
 }
 
 export async function handleUpdateSession(request: Request, env: Env, uid: string, sessionId: string): Promise<Response> {
