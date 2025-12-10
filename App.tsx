@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import imageCompression from 'browser-image-compression';
 import { diagnoseImage, fileToGenerativePart, parseSourceText, AVAILABLE_MODELS, getModelId, setModelId, parseQILImage, localDiffSpecs, extractOcrOnly } from './services/openaiService';
 import { signInWithGoogle, signOutUser, onAuthChange } from './services/firebase';
 import {
@@ -15,7 +16,7 @@ import {
   ZoomIn, ZoomOut, RotateCcw, RotateCw, FileText, AlertTriangle, CheckCircle,
   ClipboardCheck, Image, Search, FileSpreadsheet, Loader2, Maximize2,
   Type, Brackets, ShieldAlert, GitCompare, LogOut, User as UserIcon, X, Cloud, CloudOff,
-  Menu, Home, List, Settings, Package, Bell
+  Menu, Home, List, Settings, Package, Bell, Plus
 } from 'lucide-react';
 import { LoginModal, GoogleIcon } from './components/LoginModal';
 import { QuotaModal } from './components/QuotaModal';
@@ -327,8 +328,8 @@ const App: React.FC = () => {
       return;
     }
 
-    if (images.length >= 8) {
-      setErrorMessage("最多支持 8 张图片");
+    if (images.length >= 30) {
+      setErrorMessage("每个产品最多支持 30 张图片");
       return;
     }
 
@@ -341,26 +342,37 @@ const App: React.FC = () => {
     const newImageId = `img-${Date.now()}`;
 
     try {
-      console.log("Processing file:", file.name);
+      console.log("Processing file:", file.name, `(${(file.size / 1024 / 1024).toFixed(2)} MB)`);
 
-      // 处理 HEIC/HEIF 格式 - 浏览器端转换有限制
       let processedFile = file;
-      if (isHeic || file.type === 'image/heic' || file.type === 'image/heif') {
-        setErrorMessage('正在转换 HEIC 格式...');
+      const maxSizeMB = 10;
+      const fileSizeMB = file.size / 1024 / 1024;
+
+      // 处理 HEIC/HEIF 格式或大文件压缩
+      if (isHeic || file.type === 'image/heic' || file.type === 'image/heif' || fileSizeMB > maxSizeMB) {
+        const action = isHeic ? '转换 HEIC 格式' : `压缩图片 (${fileSizeMB.toFixed(1)}MB → ${maxSizeMB}MB)`;
+        setErrorMessage(`正在${action}...`);
+
         try {
-          const heic2any = (await import('heic2any')).default;
-          const convertedBlob = await heic2any({
-            blob: file,
-            toType: 'image/jpeg',
-            quality: 0.9
-          });
-          const blob = Array.isArray(convertedBlob) ? convertedBlob[0] : convertedBlob;
-          processedFile = new File([blob], file.name.replace(/\.heic$/i, '.jpg'), { type: 'image/jpeg' });
-          console.log('HEIC converted to JPEG');
+          const options = {
+            maxSizeMB: maxSizeMB,
+            maxWidthOrHeight: 4096,
+            useWebWorker: true,
+            fileType: 'image/jpeg' as const,
+            initialQuality: 0.9
+          };
+
+          processedFile = await imageCompression(file, options);
+          const newSizeMB = processedFile.size / 1024 / 1024;
+          console.log(`Image processed: ${fileSizeMB.toFixed(2)}MB → ${newSizeMB.toFixed(2)}MB`);
           setErrorMessage(null);
         } catch (err) {
-          console.error('HEIC conversion failed:', err);
-          setErrorMessage('HEIC 格式暂不支持浏览器端转换。请使用以下方法：\n1. iPhone: 设置 > 相机 > 格式 > 选择"最兼容"\n2. 使用在线工具转换为 JPG: heictojpg.com\n3. 或直接上传 JPG/PNG 格式');
+          console.error('Image processing failed:', err);
+          if (isHeic) {
+            setErrorMessage('HEIC 格式转换失败。建议：\n1. iPhone: 设置 > 相机 > 格式 > 选择"最兼容"\n2. 使用在线工具转换: heictojpg.com\n3. 或直接上传 JPG/PNG 格式');
+          } else {
+            setErrorMessage(`图片处理失败（${fileSizeMB.toFixed(1)}MB）。请尝试：\n1. 使用图片编辑工具压缩后上传\n2. 或上传小于 ${maxSizeMB}MB 的图片`);
+          }
           return;
         }
       }
@@ -1324,23 +1336,23 @@ const App: React.FC = () => {
 
             {/* 产品切换下拉 */}
             {user && showProductList && (
-              <div className="absolute top-full right-0 mt-1 w-64 bg-white border border-gray-200 rounded-lg shadow-xl z-[100] max-h-80 overflow-hidden">
+              <div className="absolute top-full right-0 mt-1 w-64 bg-white border border-gray-200 rounded-lg shadow-xl z-[100] overflow-hidden">
                 {/* 新建产品 */}
-                <div className="p-2 border-b border-gray-200 bg-gray-50">
+                <div className="border-b border-gray-100">
                   <button
                     onClick={handleCreateNewProduct}
                     disabled={isCreatingProduct}
-                    className="w-full px-3 py-2 text-xs text-gray-700 hover:bg-white rounded flex items-center gap-2 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="w-full px-3 py-2 text-xs text-gray-700 hover:bg-gray-50 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                   >
-                    {isCreatingProduct ? <Loader2 size={12} className="animate-spin" /> : <ImagePlus size={12} />}
+                    {isCreatingProduct ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} className="text-gray-600" />}
                     {isCreatingProduct ? '创建中...' : '新建产品'}
                   </button>
                 </div>
 
                 {/* 历史产品列表 */}
-                <div className="max-h-60 overflow-y-auto bg-white">
+                <div className="max-h-60 overflow-y-auto">
                   {historySessions.length === 0 ? (
-                    <div className="p-3 text-[10px] text-gray-500 text-center">
+                    <div className="p-4 text-[10px] text-gray-400 text-center">
                       暂无历史产品
                     </div>
                   ) : (
@@ -1348,16 +1360,16 @@ const App: React.FC = () => {
                       <button
                         key={s.id}
                         onClick={() => handleSwitchSession(s)}
-                        className={`w-full px-3 py-2 text-left hover:bg-gray-50 transition-colors flex items-center justify-between ${
-                          s.id === sessionId ? 'bg-purple-50' : ''
+                        className={`w-full px-3 py-2 text-left hover:bg-gray-50 transition-colors flex items-center justify-between border-b border-gray-50 last:border-0 ${
+                          s.id === sessionId ? 'bg-purple-50/50' : ''
                         }`}
                       >
                         <div className="flex-1 min-w-0">
-                          <div className={`text-xs font-medium truncate ${s.id === sessionId ? 'text-purple-700' : 'text-gray-700'}`}>
+                          <div className={`text-xs truncate ${s.id === sessionId ? 'text-purple-700 font-medium' : 'text-gray-700'}`}>
                             {s.productName}
                           </div>
-                          <div className="text-[10px] text-gray-500 flex items-center gap-2">
-                            <span>{s.imageCount} 张图片</span>
+                          <div className="text-[10px] text-gray-400 flex items-center gap-2 mt-0.5">
+                            <span>{s.imageCount} 张</span>
                             {s.updatedAt?.toDate && (
                               <span>{s.updatedAt.toDate().toLocaleDateString()}</span>
                             )}
@@ -1371,12 +1383,12 @@ const App: React.FC = () => {
 
                 {/* 查看全部 */}
                 {historySessions.length > 0 && (
-                  <div className="p-2 border-t border-gray-200 bg-gray-50">
+                  <div className="border-t border-gray-100">
                     <button
                       onClick={() => { setShowProductList(false); setShowAllProducts(true); }}
-                      className="w-full px-3 py-1.5 text-xs text-gray-600 hover:text-gray-900 hover:bg-white rounded flex items-center justify-center gap-1"
+                      className="w-full px-3 py-2 text-xs text-gray-600 hover:bg-gray-50 flex items-center justify-center gap-1.5 transition-colors"
                     >
-                      <List size={12} />
+                      <List size={14} className="text-gray-500" />
                       查看全部
                     </button>
                   </div>

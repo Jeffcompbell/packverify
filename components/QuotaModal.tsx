@@ -91,28 +91,30 @@ export const QuotaModal: React.FC<QuotaModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/20 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative w-full max-w-3xl bg-white rounded-2xl shadow-xl border border-gray-200/60">
+    <div className="fixed inset-0 bg-black/30 z-[100] flex items-center justify-center p-4" onClick={onClose}>
+      <div className="relative w-full max-w-3xl bg-white rounded-xl shadow-2xl" onClick={(e) => e.stopPropagation()}>
         <button
           onClick={onClose}
-          className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100/50 transition-colors z-10"
+          className="absolute top-4 right-4 p-1.5 hover:bg-gray-100 rounded-md transition"
         >
-          <X size={18} />
+          <X className="w-4 h-4 text-gray-400" />
         </button>
 
-        <div className="p-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">配额使用情况</h2>
+        <div className="p-5">
+          <h2 className="text-sm font-semibold text-gray-900 mb-4">配额使用情况</h2>
 
-          {/* Arc 风格简约卡片 */}
-          <div className="bg-gray-50/50 border border-gray-200/60 rounded-xl p-3 mb-4">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-gray-600 text-sm">剩余额度</span>
-              <span className="text-2xl font-semibold text-gray-900 tabular-nums">{user.quota - user.used}</span>
+          {/* 简化的配额卡片 */}
+          <div className="bg-gray-50 rounded-lg p-3 mb-4">
+            <div className="flex items-baseline justify-between mb-2">
+              <div>
+                <span className="text-gray-600 text-xs">剩余额度</span>
+                <span className="text-[9px] text-gray-400 ml-2">每次分析消耗 1 额度</span>
+              </div>
+              <span className="text-xl font-semibold text-gray-900 tabular-nums">{user.quota - user.used}</span>
             </div>
-            <div className="w-full bg-gray-200/50 rounded-full h-1.5 mb-1.5 overflow-hidden">
+            <div className="w-full bg-gray-200 rounded-full h-1 mb-1.5 overflow-hidden">
               <div
-                className="bg-gray-900 h-1.5 rounded-full transition-all duration-500"
+                className="bg-gray-900 h-1 rounded-full transition-all duration-500"
                 style={{ width: `${((user.quota - user.used) / user.quota) * 100}%` }}
               />
             </div>
@@ -122,66 +124,62 @@ export const QuotaModal: React.FC<QuotaModalProps> = ({
             </div>
           </div>
 
-          <div className="bg-gray-50/50 border border-gray-200/60 rounded-lg px-3 py-2 mb-4 text-xs text-gray-600">
-            每张图片的新建分析或重新分析都会消耗 1 次额度
-          </div>
-
           <div className="flex items-center justify-between mb-3">
-            <h3 className="text-sm font-medium text-gray-900">使用记录</h3>
-            <span className="text-xs text-gray-500">共 {usageHistory.length} 条</span>
+            <h3 className="text-xs font-medium text-gray-900">使用记录</h3>
+            <span className="text-[10px] text-gray-500">共 {usageHistory.length} 条</span>
           </div>
 
-          <div className="border border-gray-200/60 rounded-xl overflow-hidden">
+          <div className="border border-gray-200 rounded-lg overflow-hidden">
             {isLoading ? (
-              <div className="text-center py-12">
-                <Loader2 size={20} className="animate-spin mx-auto mb-2 text-gray-400" />
-                <span className="text-xs text-gray-500">加载中...</span>
+              <div className="text-center py-8">
+                <Loader2 size={16} className="animate-spin mx-auto mb-1.5 text-gray-400" />
+                <span className="text-[10px] text-gray-500">加载中...</span>
               </div>
             ) : usageHistory.length === 0 ? (
-              <div className="text-center py-12 text-gray-500 text-xs">暂无使用记录</div>
+              <div className="text-center py-8 text-gray-500 text-[10px]">暂无使用记录</div>
             ) : (
               <>
                 <div className="overflow-x-auto">
-                  <table className="w-full text-xs">
-                    <thead className="bg-gray-50/50 text-gray-600 border-b border-gray-200/60">
+                  <table className="w-full text-[10px]">
+                    <thead className="bg-gray-50 text-gray-600 border-b border-gray-200">
                       <tr>
-                        <th className="text-left py-2.5 px-3 font-medium">图片</th>
-                        <th className="text-left py-2.5 px-3 font-medium">类型</th>
-                        <th className="text-left py-2.5 px-3 font-medium">Token</th>
-                        <th className="text-left py-2.5 px-3 font-medium">时间</th>
-                        <th className="text-right py-2.5 px-3 font-medium">额度</th>
+                        <th className="text-left py-2 px-3 font-medium">图片</th>
+                        <th className="text-left py-2 px-3 font-medium">类型</th>
+                        <th className="text-left py-2 px-3 font-medium">Token</th>
+                        <th className="text-left py-2 px-3 font-medium">时间</th>
+                        <th className="text-right py-2 px-3 font-medium">额度</th>
                       </tr>
                     </thead>
-                    <tbody className="text-gray-700 divide-y divide-gray-100/60">
+                    <tbody className="text-gray-700 divide-y divide-gray-100">
                       {currentData.map((record, idx) => (
-                        <tr key={record.id} className="hover:bg-gray-50/30 transition-colors">
-                          <td className="py-2.5 px-3">
-                            <div className="flex items-center gap-2.5">
+                        <tr key={record.id} className="hover:bg-gray-50 transition-colors">
+                          <td className="py-2 px-3">
+                            <div className="flex items-center gap-2">
                               {record.imageUrl && (
-                                <img src={record.imageUrl} alt="" className="w-8 h-8 rounded object-cover bg-gray-100 flex-shrink-0" />
+                                <img src={record.imageUrl} alt="" className="w-6 h-6 rounded object-cover bg-gray-100 flex-shrink-0" />
                               )}
-                              <span className="truncate max-w-[150px] text-gray-700">{record.imageName}</span>
+                              <span className="truncate max-w-[120px] text-gray-700">{record.imageName}</span>
                             </div>
                           </td>
-                          <td className="py-2.5 px-3">
+                          <td className="py-2 px-3">
                             <span className="text-gray-500">
                               {record.type === 'retry' ? '重试' : record.type === 'analyze' ? '分析' : '新建'}
                             </span>
                           </td>
-                          <td className="py-2.5 px-3">
+                          <td className="py-2 px-3">
                             {record.tokenUsage ? (
-                              <div className="text-[10px] text-gray-500">
+                              <div className="text-[9px] text-gray-500">
                                 <div>{record.tokenUsage.totalTokens.toLocaleString()}</div>
-                                <div className="text-[9px] text-gray-400">
+                                <div className="text-[8px] text-gray-400">
                                   {record.tokenUsage.promptTokens.toLocaleString()} + {record.tokenUsage.completionTokens.toLocaleString()}
                                 </div>
                               </div>
                             ) : (
-                              <span className="text-gray-400 text-xs">-</span>
+                              <span className="text-gray-400">-</span>
                             )}
                           </td>
-                          <td className="py-2.5 px-3 text-gray-500 tabular-nums">{formatTime(record.timestamp)}</td>
-                          <td className="py-2.5 px-3 text-right text-gray-700 tabular-nums">-{record.count || 1}</td>
+                          <td className="py-2 px-3 text-gray-500 tabular-nums">{formatTime(record.timestamp)}</td>
+                          <td className="py-2 px-3 text-right text-gray-700 tabular-nums">-{record.count || 1}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -190,7 +188,7 @@ export const QuotaModal: React.FC<QuotaModalProps> = ({
 
                 {/* 分页 */}
                 {totalPages > 1 && (
-                  <div className="flex items-center justify-center py-3 border-t border-gray-200/60 bg-gray-50/30">
+                  <div className="flex items-center justify-center py-2.5 border-t border-gray-200 bg-gray-50">
                     <Pagination
                       currentPage={currentPage}
                       totalPages={totalPages}
@@ -201,9 +199,9 @@ export const QuotaModal: React.FC<QuotaModalProps> = ({
 
                 {/* 加载中提示 */}
                 {isLoadingMore && (
-                  <div className="flex items-center justify-center py-3 border-t border-gray-200/60 bg-gray-50/30">
-                    <Loader2 size={14} className="animate-spin text-gray-400 mr-2" />
-                    <span className="text-xs text-gray-500">加载更多数据...</span>
+                  <div className="flex items-center justify-center py-2.5 border-t border-gray-200 bg-gray-50">
+                    <Loader2 size={12} className="animate-spin text-gray-400 mr-1.5" />
+                    <span className="text-[10px] text-gray-500">加载更多数据...</span>
                   </div>
                 )}
               </>

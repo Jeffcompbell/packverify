@@ -133,7 +133,7 @@ export function AnnouncementModal({ isOpen, onClose }: AnnouncementModalProps) {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/30 backdrop-blur-sm z-[100] flex items-center justify-center p-4" onClick={onClose}>
+    <div className="fixed inset-0 bg-black/30 z-[100] flex items-center justify-center p-4" onClick={onClose}>
       <div className="bg-white rounded-xl max-w-lg w-full max-h-[70vh] overflow-hidden flex flex-col shadow-2xl" onClick={(e) => e.stopPropagation()}>
         {/* Header */}
         <div className="px-5 py-3.5 border-b border-gray-100 flex items-center justify-between">
@@ -151,34 +151,33 @@ export function AnnouncementModal({ isOpen, onClose }: AnnouncementModalProps) {
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-5">
-          <div className="space-y-3">
-            {ANNOUNCEMENTS.map((announcement) => (
-              <div
-                key={announcement.id}
-                className="bg-gray-50 border border-gray-100 rounded-lg p-3.5 hover:bg-white hover:border-purple-100 transition"
-              >
-                <div className="flex items-center justify-between gap-2 mb-1.5">
+          <div className="space-y-4">
+            {ANNOUNCEMENTS.map((announcement, index) => (
+              <div key={announcement.id} className="pb-4 border-b border-gray-100 last:border-0 last:pb-0">
+                <div className="flex items-baseline gap-2 mb-1">
                   <h3 className="text-sm font-medium text-gray-900">
                     {announcement.title}
                   </h3>
-                  <span className="text-[10px] text-gray-400 whitespace-nowrap">
+                  <span className="text-[10px] text-gray-400">
                     {announcement.date}
                   </span>
                 </div>
-                <p className="text-xs text-gray-600 leading-relaxed mb-2">
+                <p className="text-xs text-gray-600 leading-relaxed">
                   {announcement.message}
+                  {announcement.link && (
+                    <>
+                      {' '}
+                      <a
+                        href={announcement.link}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-purple-600 hover:text-purple-700 font-medium"
+                      >
+                        {announcement.linkText || '查看详情'} →
+                      </a>
+                    </>
+                  )}
                 </p>
-                {announcement.link && (
-                  <a
-                    href={announcement.link}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-xs text-purple-600 hover:text-purple-700 font-medium inline-flex items-center gap-1"
-                  >
-                    {announcement.linkText || '查看详情'}
-                    <span className="text-[10px]">→</span>
-                  </a>
-                )}
               </div>
             ))}
           </div>

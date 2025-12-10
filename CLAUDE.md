@@ -93,6 +93,7 @@ Key types:
 - OpenAI SDK (client-side with `dangerouslyAllowBrowser: true`) - used for OpenAI-compatible APIs
 - Firebase (Authentication, Firestore, Storage)
 - Lucide React icons
+- browser-image-compression - Auto-compress large images and convert HEIC/HEIF formats
 
 ## Key Patterns
 
@@ -114,3 +115,5 @@ Key types:
 - **Cloud sync**: Automatic sync to Firebase when user is logged in and `cloudSyncEnabled` is true
 - **Image rotation**: Per-image rotation state stored in `ImageItem.rotation`
 - **QIL input modes**: Supports both text input and image upload (up to 4 images) for QIL data
+- **Image limits**: Max 30 images per product, 10MB file size limit with auto-compression
+- **HEIC/HEIF support**: Automatic conversion to JPEG using browser-image-compression library
