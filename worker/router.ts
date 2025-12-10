@@ -103,19 +103,19 @@ export async function handleAPI(request: Request, env: Env): Promise<Response> {
       return addCorsHeaders(response, corsHeaders);
     }
 
-    if (path.match(/^\\/api\\/detection-configs\\/[^/]+$/) && method === 'GET') {
+    if (path.match(/^\/api\/detection-configs\/[^/]+$/) && method === 'GET') {
       const configId = path.split('/')[3];
       const response = await requireAuth((req, env, uid) => handleGetConfig(req, env, uid, configId))(request, env);
       return addCorsHeaders(response, corsHeaders);
     }
 
-    if (path.match(/^\\/api\\/detection-configs\\/[^/]+$/) && method === 'PUT') {
+    if (path.match(/^\/api\/detection-configs\/[^/]+$/) && method === 'PUT') {
       const configId = path.split('/')[3];
       const response = await requireAuth((req, env, uid) => handleUpdateConfig(req, env, uid, configId))(request, env);
       return addCorsHeaders(response, corsHeaders);
     }
 
-    if (path.match(/^\\/api\\/detection-configs\\/[^/]+$/) && method === 'DELETE') {
+    if (path.match(/^\/api\/detection-configs\/[^/]+$/) && method === 'DELETE') {
       const configId = path.split('/')[3];
       const response = await requireAuth((req, env, uid) => handleDeleteConfig(req, env, uid, configId))(request, env);
       return addCorsHeaders(response, corsHeaders);
@@ -132,31 +132,31 @@ export async function handleAPI(request: Request, env: Env): Promise<Response> {
       return addCorsHeaders(response, corsHeaders);
     }
 
-    if (path.match(/^\\/api\\/batch-reports\\/[^/]+$/) && method === 'GET') {
+    if (path.match(/^\/api\/batch-reports\/[^/]+$/) && method === 'GET') {
       const reportId = path.split('/')[3];
       const response = await requireAuth((req, env, uid) => handleGetReport(req, env, uid, reportId))(request, env);
       return addCorsHeaders(response, corsHeaders);
     }
 
-    if (path.match(/^\\/api\\/batch-reports\\/[^/]+$/) && method === 'PUT') {
+    if (path.match(/^\/api\/batch-reports\/[^/]+$/) && method === 'PUT') {
       const reportId = path.split('/')[3];
       const response = await requireAuth((req, env, uid) => handleUpdateReport(req, env, uid, reportId))(request, env);
       return addCorsHeaders(response, corsHeaders);
     }
 
-    if (path.match(/^\\/api\\/batch-reports\\/[^/]+$/) && method === 'DELETE') {
+    if (path.match(/^\/api\/batch-reports\/[^/]+$/) && method === 'DELETE') {
       const reportId = path.split('/')[3];
       const response = await requireAuth((req, env, uid) => handleDeleteReport(req, env, uid, reportId))(request, env);
       return addCorsHeaders(response, corsHeaders);
     }
 
-    if (path.match(/^\\/api\\/batch-reports\\/[^/]+\\/images$/) && method === 'POST') {
+    if (path.match(/^\/api\/batch-reports\/[^/]+\/images$/) && method === 'POST') {
       const reportId = path.split('/')[3];
       const response = await requireAuth((req, env, uid) => handleAddReportImage(req, env, uid, reportId))(request, env);
       return addCorsHeaders(response, corsHeaders);
     }
 
-    if (path.match(/^\\/api\\/batch-reports\\/[^/]+\\/images\\/[^/]+$/) && method === 'PUT') {
+    if (path.match(/^\/api\/batch-reports\/[^/]+\/images\/[^/]+$/) && method === 'PUT') {
       const reportId = path.split('/')[3];
       const imageId = path.split('/')[5];
       const response = await requireAuth((req, env, uid) => handleUpdateReportImage(req, env, uid, reportId, imageId))(request, env);
