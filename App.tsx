@@ -209,8 +209,26 @@ const App: React.FC = () => {
       try {
         setIsLoadingFromCloud(true);
 
-        // 获取或创建会话
-        const sid = await getOrCreateSession(user.uid, productName);
+        // 尝试从 localStorage 加载上次的 sessionId
+        const storedSessionId = localStorage.getItem('currentSessionId');
+
+        let sid: string;
+        if (storedSessionId) {
+          // 验证 session 是否存在
+          const { session } = await loadSessionFromCloud(user.uid, storedSessionId);
+          if (session) {
+            sid = storedSessionId;
+          } else {
+            // Session 不存在，创建新的
+            sid = await getOrCreateSession(user.uid, productName);
+            localStorage.setItem('currentSessionId', sid);
+          }
+        } else {
+          // 没有存储的 sessionId，创建新的
+          sid = await getOrCreateSession(user.uid, productName);
+          localStorage.setItem('currentSessionId', sid);
+        }
+
         setSessionId(sid);
 
         // 从云端加载数据
@@ -844,6 +862,7 @@ const App: React.FC = () => {
 
       if (session) {
         setSessionId(targetSession.id);
+        localStorage.setItem('currentSessionId', targetSession.id);
         setProductName(session.productName || '未命名产品');
 
         if (cloudImages.length > 0) {
