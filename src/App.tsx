@@ -34,12 +34,13 @@ import { BatchReportView } from './components/features/BatchReportView';
 import { base64ToBlobUrl, createVirtualFile, generateProductName, STORAGE_KEY } from './utils/helpers';
 import { StoredImageItem } from './types/storage';
 
-type AppView = 'home' | 'analysis' | 'detection-config' | 'batch-report' | 'batch-view';
+type AppView = 'home' | 'products' | 'analysis' | 'detection-config' | 'batch-report' | 'batch-view';
 
 // URL 路径映射
 const VIEW_PATHS: Record<AppView, string> = {
   'home': '/home',
-  'analysis': '/app',  // 质检分析
+  'products': '/products',  // 产品列表（默认）
+  'analysis': '/app',  // 质检分析画布
   'detection-config': '/config',
   'batch-report': '/reports',
   'batch-view': '/reports',
@@ -47,10 +48,11 @@ const VIEW_PATHS: Record<AppView, string> = {
 
 const PATH_TO_VIEW: Record<string, AppView> = {
   '/home': 'home',
+  '/products': 'products',
   '/analysis': 'analysis',
   '/config': 'detection-config',
   '/reports': 'batch-report',
-  '/': 'analysis',
+  '/': 'products',  // 默认显示产品列表
   '/app': 'analysis',
 };
 
@@ -64,7 +66,7 @@ const App: React.FC = () => {
     if (pathname.startsWith('/reports/')) {
       return 'batch-view';
     }
-    return PATH_TO_VIEW[pathname] || 'analysis';
+    return PATH_TO_VIEW[pathname] || 'products';
   };
 
   // 路由状态
@@ -141,7 +143,6 @@ const App: React.FC = () => {
   const [showModelSelector, setShowModelSelector] = useState(false);
   const [industry, setIndustry] = useState<IndustryType>('general');
   const [showIndustryMenu, setShowIndustryMenu] = useState(false);
-  const [showAllProducts, setShowAllProducts] = useState(false);
 
   // Refs for click-outside detection
   const productMenuRef = useRef<HTMLDivElement>(null);
@@ -1280,16 +1281,6 @@ const App: React.FC = () => {
         quotaTotal={user?.quota || 10}
       />
 
-      {/* 全部产品页面 */}
-      {user && (
-        <AllProductsPage
-          isOpen={showAllProducts}
-          onClose={() => setShowAllProducts(false)}
-          sessions={historySessions}
-          isLoading={isLoadingHistory}
-          onSelectSession={handleSwitchSession}
-        />
-      )}
 
       {/* 系统公告弹窗 */}
       <AnnouncementModal
@@ -1405,7 +1396,7 @@ const App: React.FC = () => {
                 {historySessions.length > 0 && (
                   <div className="border-t border-gray-100">
                     <button
-                      onClick={() => { setShowProductList(false); setShowAllProducts(true); }}
+                      onClick={() => { setShowProductList(false); setCurrentView('products'); }}
                       className="w-full px-3 py-2 text-xs text-gray-600 hover:bg-gray-50 flex items-center justify-center gap-1.5 transition-colors"
                     >
                       <List size={14} className="text-gray-500" />
@@ -1511,11 +1502,24 @@ const App: React.FC = () => {
           onNavigate={setCurrentView}
           userQuota={user ? { quota: user.quota, used: user.used } : undefined}
         />
+      ) : currentView === 'products' ? (
+        <AllProductsPage
+          isOpen={true}
+          onClose={() => {}}
+          sessions={historySessions}
+          isLoading={isLoadingHistory}
+          onSelectSession={(session) => {
+            handleSwitchSession(session);
+            setCurrentView('analysis');
+          }}
+          onCreateNew={handleCreateNewProduct}
+          isCreatingProduct={isCreatingProduct}
+        />
       ) : currentView === 'detection-config' ? (
-        <DetectionConfigPage onBack={() => setCurrentView('home')} />
+        <DetectionConfigPage onBack={() => setCurrentView('products')} />
       ) : currentView === 'batch-report' ? (
         <BatchReportPage
-          onBack={() => setCurrentView('home')}
+          onBack={() => setCurrentView('products')}
           onViewReport={(id) => { setSelectedReportId(id); setCurrentView('batch-view'); }}
         />
       ) : currentView === 'batch-view' ? (

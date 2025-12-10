@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { X, Loader2, Search, ArrowUpDown, Calendar, Image as ImageIcon } from 'lucide-react';
+import { X, Loader2, Search, ArrowUpDown, Calendar, Image as ImageIcon, Plus } from 'lucide-react';
 
 interface CloudSession {
   id: string;
@@ -16,6 +16,8 @@ interface AllProductsPageProps {
   sessions: CloudSession[];
   isLoading: boolean;
   onSelectSession: (session: CloudSession) => void;
+  onCreateNew?: () => void;
+  isCreatingProduct?: boolean;
 }
 
 export const AllProductsPage: React.FC<AllProductsPageProps> = ({
@@ -23,7 +25,9 @@ export const AllProductsPage: React.FC<AllProductsPageProps> = ({
   onClose,
   sessions,
   isLoading,
-  onSelectSession
+  onSelectSession,
+  onCreateNew,
+  isCreatingProduct
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<'date' | 'name' | 'count'>('date');
@@ -58,12 +62,12 @@ export const AllProductsPage: React.FC<AllProductsPageProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 bg-surface-50 flex flex-col">
-      {/* Header - 简化版，无工具栏 */}
+    <div className="flex-1 flex flex-col bg-surface-50 overflow-hidden">
+      {/* Header */}
       <div className="h-14 border-b border-border bg-white flex items-center justify-between px-6 shrink-0">
-        <h2 className="text-base font-semibold text-text-primary">全部产品</h2>
+        <h2 className="text-base font-semibold text-text-primary">产品列表</h2>
 
-        {/* 搜索和排序 */}
+        {/* 搜索、排序和新建 */}
         <div className="flex items-center gap-3">
           <div className="relative">
             <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-text-muted" />
@@ -86,9 +90,16 @@ export const AllProductsPage: React.FC<AllProductsPageProps> = ({
             <option value="count">图片数量</option>
           </select>
 
-          <button onClick={onClose} className="p-1.5 hover:bg-surface-100 rounded transition-colors">
-            <X size={18} className="text-text-muted" />
-          </button>
+          {onCreateNew && (
+            <button
+              onClick={onCreateNew}
+              disabled={isCreatingProduct}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white text-xs font-medium rounded-md transition-colors disabled:opacity-50"
+            >
+              {isCreatingProduct ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
+              新建产品
+            </button>
+          )}
         </div>
       </div>
 
@@ -107,10 +118,7 @@ export const AllProductsPage: React.FC<AllProductsPageProps> = ({
             {filteredAndSortedSessions.map((s) => (
               <button
                 key={s.id}
-                onClick={() => {
-                  onSelectSession(s);
-                  onClose();
-                }}
+                onClick={() => onSelectSession(s)}
                 className="bg-white border border-border rounded-lg overflow-hidden hover:border-primary-400 hover:shadow-md transition-all text-left group"
               >
                 {/* 缩略图区域 */}

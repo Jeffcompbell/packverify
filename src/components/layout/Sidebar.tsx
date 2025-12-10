@@ -1,8 +1,8 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Search, Settings, FileText, HelpCircle, Bell, LogOut } from 'lucide-react';
+import { Search, Settings, FileText, HelpCircle, Bell, LogOut, Package } from 'lucide-react';
 
-type AppView = 'analysis' | 'detection-config' | 'batch-report' | 'home';
+type AppView = 'products' | 'analysis' | 'detection-config' | 'batch-report' | 'home';
 
 interface SidebarProps {
   currentView?: AppView;
@@ -26,15 +26,19 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const location = useLocation();
 
   const menuItems = [
-    { id: 'analysis', path: '/app', label: '质检分析', icon: Search },
+    { id: 'products', path: '/products', label: '产品列表', icon: Package },
     { id: 'detection-config', path: '/config', label: '检测配置', icon: Settings },
     { id: 'batch-report', path: '/reports', label: '批量报告', icon: FileText },
   ];
 
   const isActive = (path: string) => {
     const pathname = location.pathname;
-    // /app 或 / 都算质检分析
-    if (path === '/app' && (pathname === '/app' || pathname === '/' || pathname === '')) {
+    // /products 或 / 都算产品列表
+    if (path === '/products' && (pathname === '/products' || pathname === '/' || pathname === '')) {
+      return true;
+    }
+    // /app 是质检分析画布
+    if (path === '/app' && pathname === '/app') {
       return true;
     }
     return pathname === path || pathname.startsWith(path + '/');
