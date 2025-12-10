@@ -15,7 +15,7 @@ import {
   ZoomIn, ZoomOut, RotateCcw, RotateCw, FileText, AlertTriangle, CheckCircle,
   ClipboardCheck, Image, Search, FileSpreadsheet, Loader2, Maximize2,
   Type, Brackets, ShieldAlert, GitCompare, LogOut, User as UserIcon, X, Cloud, CloudOff,
-  Menu, Home, List, Settings, Package
+  Menu, Home, List, Settings, Package, Bell
 } from 'lucide-react';
 import { LoginModal, GoogleIcon } from './components/LoginModal';
 import { QuotaModal } from './components/QuotaModal';
@@ -47,6 +47,7 @@ const App: React.FC = () => {
   const [showProductList, setShowProductList] = useState(false);
   const [historySessions, setHistorySessions] = useState<CloudSession[]>([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+  const [isCreatingProduct, setIsCreatingProduct] = useState(false);
 
   // 云同步状态
   const [isSyncing, setIsSyncing] = useState(false);
@@ -357,7 +358,7 @@ const App: React.FC = () => {
           console.log('HEIC converted to JPEG');
         } catch (err) {
           console.error('HEIC conversion failed:', err);
-          setErrorMessage('HEIC 格式转换失败，请尝试其他格式');
+          setErrorMessage('HEIC 格式转换失败。建议：在 iPhone 设置 > 相机 > 格式 中选择"最兼容"，或使用其他图片格式（JPG/PNG）');
           return;
         }
       }
@@ -937,13 +938,15 @@ const App: React.FC = () => {
 
   // 创建新产品
   const handleCreateNewProduct = useCallback(async () => {
-    if (!user) return;
+    if (!user || isCreatingProduct) return;
 
+    setIsCreatingProduct(true);
     try {
       const newName = generateProductName();
       const newSid = await createNewSession(user.uid, newName);
 
       setSessionId(newSid);
+      localStorage.setItem('currentSessionId', newSid);
       setProductName(newName);
       setImages([]);
       setManualSourceFields([]);
@@ -956,8 +959,10 @@ const App: React.FC = () => {
     } catch (error) {
       console.error('Failed to create new product:', error);
       setErrorMessage('创建新产品失败');
+    } finally {
+      setIsCreatingProduct(false);
     }
-  }, [user]);
+  }, [user, isCreatingProduct]);
 
   // 产品名称变更时保存到云端
   const handleProductNameChange = useCallback(async (newName: string) => {
@@ -1322,10 +1327,11 @@ const App: React.FC = () => {
                 <div className="p-2 border-b border-gray-200 bg-gray-50">
                   <button
                     onClick={handleCreateNewProduct}
-                    className="w-full px-3 py-2 text-xs text-gray-700 hover:bg-white rounded flex items-center gap-2 font-medium"
+                    disabled={isCreatingProduct}
+                    className="w-full px-3 py-2 text-xs text-gray-700 hover:bg-white rounded flex items-center gap-2 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    <ImagePlus size={12} />
-                    新建产品
+                    {isCreatingProduct ? <Loader2 size={12} className="animate-spin" /> : <ImagePlus size={12} />}
+                    {isCreatingProduct ? '创建中...' : '新建产品'}
                   </button>
                 </div>
 
