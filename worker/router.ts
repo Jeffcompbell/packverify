@@ -1,6 +1,6 @@
 import { Env, requireAuth } from './middleware/auth';
 import { handleGetUser, handleCreateOrUpdateUser } from './handlers/users';
-import { handleCreateSession, handleGetSession, handleListSessions, handleUpdateSession } from './handlers/sessions';
+import { handleCreateSession, handleGetSession, handleListSessions, handleUpdateSession, handleDeleteSession } from './handlers/sessions';
 import { handleUploadImage, handleUpdateImage, handleDeleteImage, handleGetImageData, handleGetImagePublic } from './handlers/images';
 import { handleUseQuota, handleGetQuotaHistory } from './handlers/quota';
 import { handleCreateConfig, handleListConfigs, handleGetConfig, handleUpdateConfig, handleDeleteConfig } from './handlers/detection-configs';
@@ -54,6 +54,12 @@ export async function handleAPI(request: Request, env: Env): Promise<Response> {
     if (path.match(/^\/api\/sessions\/[^/]+$/) && method === 'PUT') {
       const sessionId = path.split('/')[3];
       const response = await requireAuth((req, env, uid) => handleUpdateSession(req, env, uid, sessionId))(request, env);
+      return addCorsHeaders(response, corsHeaders);
+    }
+
+    if (path.match(/^\/api\/sessions\/[^/]+$/) && method === 'DELETE') {
+      const sessionId = path.split('/')[3];
+      const response = await requireAuth((req, env, uid) => handleDeleteSession(req, env, uid, sessionId))(request, env);
       return addCorsHeaders(response, corsHeaders);
     }
 

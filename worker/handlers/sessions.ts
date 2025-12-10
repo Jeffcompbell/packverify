@@ -90,3 +90,23 @@ export async function handleUpdateSession(request: Request, env: Env, uid: strin
     headers: { 'Content-Type': 'application/json' }
   });
 }
+
+export async function handleDeleteSession(request: Request, env: Env, uid: string, sessionId: string): Promise<Response> {
+  // 先获取该 session 的所有图片，删除 R2 中的文件
+  const images = await env.DB.prepare('SELECT storage_path FROM images WHERE session_id = ? AND user_id = ?').bind(sessionId, uid).all();
+  for (const img of images.results || []) {
+    if ((img as any).storage_path) {
+      await env.R2_BUCKET.delete((img as any).storage_path);
+    }
+  }
+
+  // 删除数据库中的图片记录
+  await env.DB.prepare('DELETE FROM images WHERE session_id = ? AND user_id = ?').bind(sessionId, uid).run();
+
+  // 删除 session
+  await env.DB.prepare('DELETE FROM sessions WHERE id = ? AND user_id = ?').bind(sessionId, uid).run();
+
+  return new Response(JSON.stringify({ success: true }), {
+    headers: { 'Content-Type': 'application/json' }
+  });
+}

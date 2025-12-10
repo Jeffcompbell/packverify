@@ -7,7 +7,7 @@ import {
   getOrCreateUser, getUserData, useQuotaFirebase, UserData,
   getOrCreateSession, saveImageToCloud, updateImageInCloud, deleteImageFromCloud, saveQilToCloud,
   loadSessionFromCloud, clearSessionInCloud, CloudImageData, CloudSession,
-  getUserSessions, createNewSession, updateSessionProductName, getQuotaUsageHistory, QuotaUsageRecord,
+  getUserSessions, createNewSession, updateSessionProductName, deleteSession, getQuotaUsageHistory, QuotaUsageRecord,
   updateImageStatusInCloud
 } from './services/cloudflare';
 import { DiagnosisIssue, SourceField, DiffResult, ImageItem, ImageSpec, BoundingBox, DeterministicCheck, IndustryType } from './types/types';
@@ -1458,13 +1458,22 @@ const App: React.FC = () => {
           }}
           onCreateNew={async () => {
             await handleCreateNewProduct();
-            // 新建后自动进入画布
             const newSid = localStorage.getItem('currentSessionId');
             if (newSid) {
               setCurrentView('analysis', newSid);
             }
           }}
           isCreatingProduct={isCreatingProduct}
+          onRenameSession={async (sessionId, newName) => {
+            if (!user) return;
+            await updateSessionProductName(user.uid, sessionId, newName);
+            setHistorySessions(prev => prev.map(s => s.id === sessionId ? { ...s, productName: newName } : s));
+          }}
+          onDeleteSession={async (sessionId) => {
+            if (!user) return;
+            await deleteSession(user.uid, sessionId);
+            setHistorySessions(prev => prev.filter(s => s.id !== sessionId));
+          }}
         />
       ) : currentView === 'detection-config' ? (
         <DetectionConfigPage onBack={() => setCurrentView('products')} />

@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { X, Loader2, Search, ArrowUpDown, Calendar, Image as ImageIcon, Plus } from 'lucide-react';
+import { Loader2, Search, Calendar, Image as ImageIcon, Plus, MoreVertical, Pencil, Trash2 } from 'lucide-react';
 
 interface CloudSession {
   id: string;
@@ -7,7 +7,7 @@ interface CloudSession {
   imageCount: number;
   updatedAt?: any;
   createdAt?: any;
-  thumbnails?: string[]; // 前几张图片的缩略图 URL
+  thumbnails?: string[];
 }
 
 interface AllProductsPageProps {
@@ -18,6 +18,8 @@ interface AllProductsPageProps {
   onSelectSession: (session: CloudSession) => void;
   onCreateNew?: () => void;
   isCreatingProduct?: boolean;
+  onRenameSession?: (sessionId: string, newName: string) => void;
+  onDeleteSession?: (sessionId: string) => void;
 }
 
 export const AllProductsPage: React.FC<AllProductsPageProps> = ({
@@ -27,10 +29,15 @@ export const AllProductsPage: React.FC<AllProductsPageProps> = ({
   isLoading,
   onSelectSession,
   onCreateNew,
-  isCreatingProduct
+  isCreatingProduct,
+  onRenameSession,
+  onDeleteSession
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<'date' | 'name' | 'count'>('date');
+  const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingName, setEditingName] = useState('');
 
   // 搜索和排序
   const filteredAndSortedSessions = useMemo(() => {
@@ -116,55 +123,115 @@ export const AllProductsPage: React.FC<AllProductsPageProps> = ({
         ) : (
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
             {filteredAndSortedSessions.map((s) => (
-              <button
+              <div
                 key={s.id}
-                onClick={() => onSelectSession(s)}
-                className="bg-white border border-border rounded-lg overflow-hidden hover:border-primary-400 hover:shadow-md transition-all text-left group"
+                className="bg-white border border-border rounded-lg overflow-hidden hover:border-primary-400 hover:shadow-md transition-all text-left group relative"
               >
-                {/* 缩略图区域 */}
-                <div className="aspect-video bg-gradient-to-br from-surface-100 to-surface-200 relative overflow-hidden">
-                  {s.thumbnails && s.thumbnails.length > 0 ? (
-                    <div className="grid grid-cols-2 gap-0.5 h-full">
-                      {s.thumbnails.slice(0, 4).map((thumb, idx) => (
-                        <div key={idx} className="relative bg-surface-100">
-                          <img
-                            src={thumb}
-                            alt=""
-                            className="w-full h-full object-cover"
-                          />
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="flex items-center justify-center h-full">
-                      <ImageIcon size={32} className="text-text-muted opacity-30" />
-                    </div>
-                  )}
-                  {/* 图片数量角标 */}
-                  {s.imageCount > 0 && (
-                    <div className="absolute bottom-2 right-2 bg-black/60 text-white text-[10px] px-1.5 py-0.5 rounded backdrop-blur-sm">
-                      {s.imageCount} 张
-                    </div>
-                  )}
-                </div>
+                <button onClick={() => onSelectSession(s)} className="w-full text-left">
+                  {/* 缩略图区域 */}
+                  <div className="aspect-video bg-gradient-to-br from-surface-100 to-surface-200 relative overflow-hidden">
+                    {s.thumbnails && s.thumbnails.length > 0 ? (
+                      <div className="grid grid-cols-2 gap-0.5 h-full">
+                        {s.thumbnails.slice(0, 4).map((thumb, idx) => (
+                          <div key={idx} className="relative bg-surface-100">
+                            <img src={thumb} alt="" className="w-full h-full object-cover" />
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-center h-full">
+                        <ImageIcon size={32} className="text-text-muted opacity-30" />
+                      </div>
+                    )}
+                    {s.imageCount > 0 && (
+                      <div className="absolute bottom-2 right-2 bg-black/60 text-white text-[10px] px-1.5 py-0.5 rounded backdrop-blur-sm">
+                        {s.imageCount} 张
+                      </div>
+                    )}
+                  </div>
 
-                {/* 产品信息 */}
-                <div className="p-3">
-                  <div className="text-sm font-medium text-text-primary truncate mb-1 group-hover:text-primary-500 transition-colors">
-                    {s.productName}
-                  </div>
-                  <div className="flex items-center gap-3 text-[10px] text-text-muted">
-                    <span>{s.imageCount} 张图片</span>
-                    <div className="flex items-center gap-1">
-                      <Calendar size={10} />
-                      <span>
-                        {s.updatedAt ? new Date(s.updatedAt).toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' }) :
-                         s.createdAt ? new Date(s.createdAt).toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' }) : '未知'}
-                      </span>
+                  {/* 产品信息 */}
+                  <div className="p-3">
+                    {editingId === s.id ? (
+                      <input
+                        type="text"
+                        value={editingName}
+                        onChange={(e) => setEditingName(e.target.value)}
+                        onBlur={() => {
+                          if (editingName.trim() && onRenameSession) {
+                            onRenameSession(s.id, editingName.trim());
+                          }
+                          setEditingId(null);
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            if (editingName.trim() && onRenameSession) {
+                              onRenameSession(s.id, editingName.trim());
+                            }
+                            setEditingId(null);
+                          } else if (e.key === 'Escape') {
+                            setEditingId(null);
+                          }
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                        autoFocus
+                        className="w-full text-sm font-medium border border-primary-400 rounded px-1 py-0.5 focus:outline-none"
+                      />
+                    ) : (
+                      <div className="text-sm font-medium text-text-primary truncate mb-1 group-hover:text-primary-500 transition-colors">
+                        {s.productName}
+                      </div>
+                    )}
+                    <div className="flex items-center gap-3 text-[10px] text-text-muted">
+                      <span>{s.imageCount} 张图片</span>
+                      <div className="flex items-center gap-1">
+                        <Calendar size={10} />
+                        <span>
+                          {s.updatedAt ? new Date(s.updatedAt).toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' }) :
+                           s.createdAt ? new Date(s.createdAt).toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' }) : '未知'}
+                        </span>
+                      </div>
                     </div>
                   </div>
-                </div>
-              </button>
+                </button>
+
+                {/* 更多菜单按钮 */}
+                <button
+                  onClick={(e) => { e.stopPropagation(); setMenuOpenId(menuOpenId === s.id ? null : s.id); }}
+                  className="absolute bottom-2 right-2 p-1 rounded bg-white/80 opacity-0 group-hover:opacity-100 hover:bg-surface-100 transition-all"
+                >
+                  <MoreVertical size={14} className="text-text-muted" />
+                </button>
+
+                {/* 下拉菜单 */}
+                {menuOpenId === s.id && (
+                  <div className="absolute bottom-8 right-2 bg-white border border-border rounded-md shadow-lg py-1 z-10 min-w-[100px]">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setEditingId(s.id);
+                        setEditingName(s.productName);
+                        setMenuOpenId(null);
+                      }}
+                      className="w-full px-3 py-1.5 text-xs text-left hover:bg-surface-100 flex items-center gap-2"
+                    >
+                      <Pencil size={12} /> 重命名
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (onDeleteSession && confirm('确定删除此产品？')) {
+                          onDeleteSession(s.id);
+                        }
+                        setMenuOpenId(null);
+                      }}
+                      className="w-full px-3 py-1.5 text-xs text-left hover:bg-surface-100 flex items-center gap-2 text-red-500"
+                    >
+                      <Trash2 size={12} /> 删除
+                    </button>
+                  </div>
+                )}
+              </div>
             ))}
           </div>
         )}

@@ -207,6 +207,10 @@ export const updateSessionProductName = async (uid: string, sessionId: string, p
   });
 };
 
+export const deleteSession = async (uid: string, sessionId: string): Promise<void> => {
+  await apiRequest(`/api/sessions/${sessionId}`, { method: 'DELETE' });
+};
+
 // 保存图片数据到云端
 export const saveImageToCloud = async (
   uid: string,
