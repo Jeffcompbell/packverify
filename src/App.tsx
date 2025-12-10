@@ -591,7 +591,7 @@ const App: React.FC = () => {
           id: newImageId,
           src: url,
           base64,
-          file,
+          file: processedFile,
           description: diagResult.description,
           ocrText: diagResult.ocrText,
           specs: imageSpecs,

@@ -213,24 +213,41 @@ export const saveImageToCloud = async (
   sessionId: string,
   image: ImageItem
 ): Promise<void> => {
+  if (!image.base64) {
+    console.error('saveImageToCloud: image.base64 is undefined');
+    throw new Error('Image base64 data is missing');
+  }
+
   const formData = new FormData();
 
   // 将 base64 转换为 Blob
-  const base64Data = image.base64.split(',')[1];
-  const blob = await fetch(`data:${image.file.type};base64,${base64Data}`).then(r => r.blob());
+  const base64Data = image.base64.includes(',') ? image.base64.split(',')[1] : image.base64;
+  if (!base64Data) {
+    console.error('saveImageToCloud: Failed to extract base64 data');
+    throw new Error('Failed to extract base64 data');
+  }
 
-  formData.append('file', blob, image.file.name);
+  const mimeType = image.file?.type || 'image/png';
+  const blob = await fetch(`data:${mimeType};base64,${base64Data}`).then(r => r.blob());
+
+  formData.append('file', blob, image.file?.name || 'image.png');
   formData.append('sessionId', sessionId);
-  formData.append('fileName', image.file.name);
+  formData.append('fileName', image.file?.name || 'image.png');
 
   const token = await getAuthToken();
-  await fetch(`${API_BASE_URL}/api/images`, {
+  const response = await fetch(`${API_BASE_URL}/api/images`, {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${token}`
     },
     body: formData
   });
+
+  if (!response.ok) {
+    const error = await response.text();
+    console.error('saveImageToCloud: Upload failed', error);
+    throw new Error(`Upload failed: ${error}`);
+  }
 };
 
 // 更新云端图片分析结果
