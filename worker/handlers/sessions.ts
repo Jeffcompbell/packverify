@@ -36,7 +36,26 @@ export async function handleGetSession(request: Request, env: Env, uid: string, 
 export async function handleListSessions(request: Request, env: Env, uid: string): Promise<Response> {
   const sessions = await env.DB.prepare('SELECT * FROM sessions WHERE user_id = ? ORDER BY updated_at DESC').bind(uid).all();
 
-  return new Response(JSON.stringify(sessions.results), {
+  // 为每个 session 获取缩略图和实际图片数量
+  const sessionsWithThumbnails = await Promise.all(
+    (sessions.results || []).map(async (session: any) => {
+      const images = await env.DB.prepare(
+        'SELECT storage_url FROM images WHERE session_id = ? ORDER BY created_at ASC LIMIT 4'
+      ).bind(session.id).all();
+
+      const imageCount = await env.DB.prepare(
+        'SELECT COUNT(*) as count FROM images WHERE session_id = ?'
+      ).bind(session.id).first() as { count: number } | null;
+
+      return {
+        ...session,
+        image_count: imageCount?.count || 0,
+        thumbnails: (images.results || []).map((img: any) => img.storage_url)
+      };
+    })
+  );
+
+  return new Response(JSON.stringify(sessionsWithThumbnails), {
     headers: { 'Content-Type': 'application/json' }
   });
 }

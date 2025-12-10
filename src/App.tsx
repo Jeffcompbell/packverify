@@ -128,7 +128,6 @@ const App: React.FC = () => {
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [productName, setProductName] = useState<string>(generateProductName());
   const [isEditingProductName, setIsEditingProductName] = useState(false);
-  const [showProductList, setShowProductList] = useState(false);
   const [historySessions, setHistorySessions] = useState<CloudSession[]>([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const [isCreatingProduct, setIsCreatingProduct] = useState(false);
@@ -159,7 +158,6 @@ const App: React.FC = () => {
   const [showIndustryMenu, setShowIndustryMenu] = useState(false);
 
   // Refs for click-outside detection
-  const productMenuRef = useRef<HTMLDivElement>(null);
   const industryMenuRef = useRef<HTMLDivElement>(null);
   const [activeModelTab, setActiveModelTab] = useState<string>(currentModel);
   const [imageScale, setImageScale] = useState(1);
@@ -1126,9 +1124,6 @@ const App: React.FC = () => {
   // Click outside to close dropdowns
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (productMenuRef.current && !productMenuRef.current.contains(event.target as Node)) {
-        setShowProductList(false);
-      }
       if (industryMenuRef.current && !industryMenuRef.current.contains(event.target as Node)) {
         setShowIndustryMenu(false);
       }
@@ -1305,8 +1300,17 @@ const App: React.FC = () => {
       {/* TOP BAR - 简化版，仅在分析视图显示 */}
       {currentView === 'analysis' && (
       <div className="h-12 border-b border-gray-100 bg-white flex items-center px-4 shrink-0 gap-4 relative z-50">
-        {/* Left: 云同步状态 + 产品名称 */}
+        {/* Left: 返回 + 云同步状态 + 产品名称 */}
         <div className="flex items-center gap-3 min-w-0">
+          {/* 返回产品列表 */}
+          <button
+            onClick={() => setCurrentView('products')}
+            className="flex items-center gap-1 text-gray-500 hover:text-gray-700 transition-colors"
+            title="返回产品列表"
+          >
+            <ChevronLeft size={18} />
+          </button>
+
           {/* 云同步状态 */}
           {user && (
             <div className="flex items-center gap-1.5" title={cloudSyncEnabled ? '云同步已开启' : '云同步已关闭'}>
@@ -1318,109 +1322,34 @@ const App: React.FC = () => {
             </div>
           )}
 
-          {/* 当前产品 */}
-          <div ref={productMenuRef} className="flex items-center gap-1.5 px-2.5 py-1.5 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors group relative">
-            {isEditingProductName ? (
-              <input
-                type="text"
-                value={productName}
-                onChange={(e) => setProductName(e.target.value)}
-                onBlur={() => {
+          {/* 当前产品名称（可编辑） */}
+          {isEditingProductName ? (
+            <input
+              type="text"
+              value={productName}
+              onChange={(e) => setProductName(e.target.value)}
+              onBlur={() => {
+                setIsEditingProductName(false);
+                handleProductNameChange(productName);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
                   setIsEditingProductName(false);
                   handleProductNameChange(productName);
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    setIsEditingProductName(false);
-                    handleProductNameChange(productName);
-                  }
-                }}
-                className="bg-white border border-gray-300 rounded px-2 py-1 text-sm text-gray-900 w-40 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500"
-                autoFocus
-              />
-            ) : (
-              <>
-                <button
-                  onClick={() => user && setIsEditingProductName(true)}
-                  className="text-sm font-medium text-gray-700 group-hover:text-gray-900 transition-colors truncate max-w-[150px]"
-                  title="点击编辑产品名称"
-                >
-                  {productName}
-                </button>
-                {user && (
-                  <button
-                    onClick={() => setShowProductList(!showProductList)}
-                    className="text-gray-400 hover:text-gray-600 transition-colors"
-                    title="切换产品"
-                  >
-                    <ChevronDown size={14} className={`transition-transform ${showProductList ? 'rotate-180' : ''}`} />
-                  </button>
-                )}
-              </>
-            )}
-
-            {/* 产品切换下拉 */}
-            {user && showProductList && (
-              <div className="absolute top-full left-0 mt-1 w-64 bg-white border border-gray-200 rounded-lg shadow-xl z-[100] overflow-hidden">
-                {/* 新建产品 */}
-                <div className="border-b border-gray-100">
-                  <button
-                    onClick={handleCreateNewProduct}
-                    disabled={isCreatingProduct}
-                    className="w-full px-3 py-2 text-xs text-gray-700 hover:bg-gray-50 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                  >
-                    {isCreatingProduct ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} className="text-gray-600" />}
-                    {isCreatingProduct ? '创建中...' : '新建产品'}
-                  </button>
-                </div>
-
-                {/* 历史产品列表 */}
-                <div className="max-h-60 overflow-y-auto">
-                  {historySessions.length === 0 ? (
-                    <div className="p-4 text-[10px] text-gray-400 text-center">
-                      暂无历史产品
-                    </div>
-                  ) : (
-                    historySessions.map((s) => (
-                      <button
-                        key={s.id}
-                        onClick={() => handleSwitchSession(s)}
-                        className={`w-full px-3 py-2 text-left hover:bg-gray-50 transition-colors flex items-center justify-between border-b border-gray-50 last:border-0 ${
-                          s.id === sessionId ? 'bg-purple-50/50' : ''
-                        }`}
-                      >
-                        <div className="flex-1 min-w-0">
-                          <div className={`text-xs truncate ${s.id === sessionId ? 'text-purple-700 font-medium' : 'text-gray-700'}`}>
-                            {s.productName}
-                          </div>
-                          <div className="text-[10px] text-gray-400 flex items-center gap-2 mt-0.5">
-                            <span>{s.imageCount} 张</span>
-                            {s.updatedAt?.toDate && (
-                              <span>{s.updatedAt.toDate().toLocaleDateString()}</span>
-                            )}
-                          </div>
-                        </div>
-                        {s.id === sessionId && <div className="w-1.5 h-1.5 bg-purple-600 rounded-full shrink-0 ml-2"></div>}
-                      </button>
-                    ))
-                  )}
-                </div>
-
-                {/* 查看全部 */}
-                {historySessions.length > 0 && (
-                  <div className="border-t border-gray-100">
-                    <button
-                      onClick={() => { setShowProductList(false); setCurrentView('products'); }}
-                      className="w-full px-3 py-2 text-xs text-gray-600 hover:bg-gray-50 flex items-center justify-center gap-1.5 transition-colors"
-                    >
-                      <List size={14} className="text-gray-500" />
-                      查看全部
-                    </button>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
+                }
+              }}
+              className="bg-white border border-gray-300 rounded px-2 py-1 text-sm text-gray-900 w-40 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500"
+              autoFocus
+            />
+          ) : (
+            <button
+              onClick={() => user && setIsEditingProductName(true)}
+              className="text-sm font-medium text-gray-700 hover:text-gray-900 transition-colors truncate max-w-[200px] px-2 py-1 rounded hover:bg-gray-50"
+              title="点击编辑产品名称"
+            >
+              {productName}
+            </button>
+          )}
 
           {/* 行业选择 */}
           <div ref={industryMenuRef} className="relative">

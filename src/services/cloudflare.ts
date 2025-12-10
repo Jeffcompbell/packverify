@@ -142,6 +142,7 @@ export interface CloudSession {
   createdAt: any;
   updatedAt: any;
   imageCount: number;
+  thumbnails?: string[];
   qilFields: SourceField[];
   qilInputText: string;
 }
@@ -363,7 +364,8 @@ export const getUserSessions = async (uid: string, maxResults: number = 10): Pro
       productName: data.product_name,
       createdAt: data.created_at,
       updatedAt: data.updated_at,
-      imageCount: data.image_count,
+      imageCount: data.image_count || 0,
+      thumbnails: data.thumbnails || [],
       qilFields: data.qil_fields ? JSON.parse(data.qil_fields) : [],
       qilInputText: data.qil_input_text || ''
     }));
