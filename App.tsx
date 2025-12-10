@@ -318,7 +318,9 @@ const App: React.FC = () => {
       return;
     }
 
-    if (!file.type.startsWith('image/')) {
+    // 检查是否是图片文件（包括 HEIC/HEIF）
+    const isHeic = file.name.toLowerCase().endsWith('.heic') || file.name.toLowerCase().endsWith('.heif');
+    if (!file.type.startsWith('image/') && !isHeic) {
       setErrorMessage("请上传图片文件");
       return;
     }
@@ -341,7 +343,7 @@ const App: React.FC = () => {
 
       // 处理 HEIC/HEIF 格式
       let processedFile = file;
-      if (file.type === 'image/heic' || file.type === 'image/heif' || file.name.toLowerCase().endsWith('.heic') || file.name.toLowerCase().endsWith('.heif')) {
+      if (isHeic || file.type === 'image/heic' || file.type === 'image/heif') {
         try {
           const heic2any = (await import('heic2any')).default;
           const convertedBlob = await heic2any({
@@ -1053,7 +1055,8 @@ const App: React.FC = () => {
     e.preventDefault();
     const files = Array.from(e.dataTransfer.files || []);
     files.forEach(file => {
-      if (file.type.startsWith('image/')) {
+      const isHeic = file.name.toLowerCase().endsWith('.heic') || file.name.toLowerCase().endsWith('.heif');
+      if (file.type.startsWith('image/') || isHeic) {
         processFile(file);
       }
     });
@@ -1718,20 +1721,10 @@ const App: React.FC = () => {
               e.stopPropagation();
               setBottomHeight(prev => prev <= 24 ? 280 : 24);
             }}
-            className="bg-white hover:bg-primary-50 border border-border rounded px-3 py-0.5 text-[11px] text-text-muted hover:text-primary-600 transition-colors flex items-center gap-1 shadow-sm z-10"
+            className="bg-white hover:bg-primary-50 border border-border rounded-full w-6 h-6 text-text-muted hover:text-primary-600 transition-colors flex items-center justify-center shadow-sm z-10"
             title={bottomHeight <= 24 ? '展开 QIL 面板' : '收起 QIL 面板'}
           >
-            {bottomHeight <= 24 ? (
-              <>
-                <span>展开</span>
-                <span className="text-[10px]">▲</span>
-              </>
-            ) : (
-              <>
-                <span>收起</span>
-                <span className="text-[10px]">▼</span>
-              </>
-            )}
+            <span className="text-[12px]">{bottomHeight <= 24 ? '▲' : '▼'}</span>
           </button>
         </div>
 
