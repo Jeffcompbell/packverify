@@ -11,6 +11,14 @@ export default {
     }
 
     // 静态资源（前端）
-    return env.ASSETS.fetch(request);
+    const response = await env.ASSETS.fetch(request);
+
+    // SPA fallback: 如果静态资源不存在，返回 index.html
+    if (response.status === 404 || response.status === 500) {
+      const indexRequest = new Request(new URL('/', request.url), request);
+      return env.ASSETS.fetch(indexRequest);
+    }
+
+    return response;
   }
 };
