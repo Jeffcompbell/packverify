@@ -1300,17 +1300,8 @@ const App: React.FC = () => {
       {/* TOP BAR - 简化版，仅在分析视图显示 */}
       {currentView === 'analysis' && (
       <div className="h-12 border-b border-gray-100 bg-white flex items-center px-4 shrink-0 gap-4 relative z-50">
-        {/* Left: 返回 + 云同步状态 + 产品名称 */}
+        {/* Left: 云同步状态 + 产品名称 */}
         <div className="flex items-center gap-3 min-w-0">
-          {/* 返回产品列表 */}
-          <button
-            onClick={() => setCurrentView('products')}
-            className="flex items-center gap-1 text-gray-500 hover:text-gray-700 transition-colors"
-            title="返回产品列表"
-          >
-            <ChevronLeft size={18} />
-          </button>
-
           {/* 云同步状态 */}
           {user && (
             <div className="flex items-center gap-1.5" title={cloudSyncEnabled ? '云同步已开启' : '云同步已关闭'}>
