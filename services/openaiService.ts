@@ -443,7 +443,8 @@ export const analyzeImageSinglePass = async (
     base64Image: string,
     mimeType: string,
     industry: string = 'general',
-    includeOcr: boolean = false  // 是否包含 OCR 原文
+    includeOcr: boolean = false,  // 是否包含 OCR 原文
+    onStream?: (chunk: string) => void  // 流式输出回调
 ): Promise<{ description: string; ocrText: string; issues: DiagnosisIssue[]; specs: SourceField[]; tokenUsage?: TokenUsage }> => {
     // 性能埋点
     const perfLog: { [key: string]: number } = {};
@@ -504,28 +505,72 @@ ${checkItemsList}
 
         let response;
         let usedBackup = false;
+        let fullText = '';
 
         try {
-            response = await client.chat.completions.create({
-                model: modelId,
-                messages: [
-                    {
-                        role: "user",
-                        content: [
-                            { type: "text", text: prompt },
-                            {
-                                type: "image_url",
-                                image_url: {
-                                    url: `data:${mimeType};base64,${base64Image}`,
-                                    detail: "high"
+            if (onStream) {
+                // 流式输出
+                const stream = await client.chat.completions.create({
+                    model: modelId,
+                    messages: [
+                        {
+                            role: "user",
+                            content: [
+                                { type: "text", text: prompt },
+                                {
+                                    type: "image_url",
+                                    image_url: {
+                                        url: `data:${mimeType};base64,${base64Image}`,
+                                        detail: "high"
+                                    }
                                 }
-                            }
-                        ]
+                            ]
+                        }
+                    ],
+                    max_tokens: includeOcr ? 4500 : 4000,
+                    temperature: 0.1,
+                    stream: true,
+                });
+
+                for await (const chunk of stream) {
+                    const content = chunk.choices[0]?.delta?.content || '';
+                    if (content) {
+                        fullText += content;
+                        onStream(content);
                     }
-                ],
-                max_tokens: includeOcr ? 4500 : 4000,
-                temperature: 0.1,
-            });
+                }
+
+                // 构造完整响应
+                response = {
+                    choices: [{
+                        message: { content: fullText },
+                        finish_reason: 'stop'
+                    }],
+                    usage: { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 }
+                } as any;
+            } else {
+                // 非流式输出
+                response = await client.chat.completions.create({
+                    model: modelId,
+                    messages: [
+                        {
+                            role: "user",
+                            content: [
+                                { type: "text", text: prompt },
+                                {
+                                    type: "image_url",
+                                    image_url: {
+                                        url: `data:${mimeType};base64,${base64Image}`,
+                                        detail: "high"
+                                    }
+                                }
+                            ]
+                        }
+                    ],
+                    max_tokens: includeOcr ? 4500 : 4000,
+                    temperature: 0.1,
+                });
+            }
         } catch (primaryError) {
             console.warn(`⚠️  PackyAPI failed, trying Zenmux backup...`, primaryError);
             usedBackup = true;
@@ -673,14 +718,15 @@ export const diagnoseImage = async (
     mimeType: string,
     onStepChange?: (step: number) => void,
     industry: string = 'general',
-    includeOcr: boolean = false  // 是否包含 OCR 原文
+    includeOcr: boolean = false,  // 是否包含 OCR 原文
+    onStream?: (chunk: string) => void  // 流式输出回调
 ): Promise<DiagnosisResult> => {
     try {
         console.log("Starting analysis (AI → Rules)...");
 
         // Step 1: AI 单步分析（OCR + 问题检测 + 规格提取，一次 API 调用）
         onStepChange?.(1);
-        const aiResult = await analyzeImageSinglePass(base64Image, mimeType, industry, includeOcr);
+        const aiResult = await analyzeImageSinglePass(base64Image, mimeType, industry, includeOcr, onStream);
         console.log("AI analysis complete. Description:", aiResult.description);
         console.log("OCR text length:", aiResult.ocrText.length);
         console.log("AI issues found:", aiResult.issues.length);

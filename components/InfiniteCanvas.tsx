@@ -15,6 +15,7 @@ interface InfiniteCanvasProps {
   isProcessing: boolean;
   processingImageId: string | null;
   processingStep?: number; // 1=视觉分析, 2=OCR提取, 3=终审验证
+  streamText?: string; // 流式输出文本
   onRemoveImage: (id: string) => void;
   onRetryAnalysis?: (imageId: string) => void;
 }
@@ -32,6 +33,7 @@ export const InfiniteCanvas: React.FC<InfiniteCanvasProps> = ({
   isProcessing,
   processingImageId,
   processingStep = 1,
+  streamText = '',
   onRemoveImage,
   onRetryAnalysis
 }) => {
@@ -365,11 +367,16 @@ export const InfiniteCanvas: React.FC<InfiniteCanvasProps> = ({
                     </div>
 
                     {isThisProcessing ? (
-                      <div className="flex items-center justify-center py-8 text-slate-500">
-                        <div className="flex items-center gap-2">
+                      <div className="p-4 space-y-3">
+                        <div className="flex items-center gap-2 text-slate-500">
                           <div className="w-4 h-4 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
                           <span className="text-xs">AI 正在分析...</span>
                         </div>
+                        {streamText && (
+                          <div className="text-[10px] text-slate-400 font-mono bg-slate-900/50 p-2 rounded max-h-32 overflow-y-auto whitespace-pre-wrap">
+                            {streamText}
+                          </div>
+                        )}
                       </div>
                     ) : imgItem.issues.length === 0 ? (
                       <div className="flex items-center justify-center py-6 text-slate-600">

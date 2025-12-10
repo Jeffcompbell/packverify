@@ -55,6 +55,7 @@ const App: React.FC = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [processingImageId, setProcessingImageId] = useState<string | null>(null);
   const [processingStep, setProcessingStep] = useState<number>(1);
+  const [streamText, setStreamText] = useState<string>(''); // 流式输出文本
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   // Data
@@ -352,10 +353,14 @@ const App: React.FC = () => {
       while (retryCount <= maxRetries) {
         try {
           // 使用 Promise.race 实现超时
+          setStreamText(''); // 清空流式文本
           diagResult = await Promise.race([
             diagnoseImage(base64, file.type, (step) => {
               setProcessingStep(step);
-            }, industry, false),  // ✅ 默认不包含 OCR（快速模式）
+            }, industry, false, (chunk) => {
+              // 流式输出回调
+              setStreamText(prev => prev + chunk);
+            }),  // ✅ 默认不包含 OCR（快速模式）
             new Promise<never>((_, reject) =>
               setTimeout(() => reject(new Error('分析超时')), timeoutMs)
             )
