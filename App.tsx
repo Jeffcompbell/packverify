@@ -338,14 +338,35 @@ const App: React.FC = () => {
 
     try {
       console.log("Processing file:", file.name);
-      const url = URL.createObjectURL(file);
-      const base64 = await fileToGenerativePart(file);
+
+      // 处理 HEIC/HEIF 格式
+      let processedFile = file;
+      if (file.type === 'image/heic' || file.type === 'image/heif' || file.name.toLowerCase().endsWith('.heic') || file.name.toLowerCase().endsWith('.heif')) {
+        try {
+          const heic2any = (await import('heic2any')).default;
+          const convertedBlob = await heic2any({
+            blob: file,
+            toType: 'image/jpeg',
+            quality: 0.9
+          });
+          const blob = Array.isArray(convertedBlob) ? convertedBlob[0] : convertedBlob;
+          processedFile = new File([blob], file.name.replace(/\.heic$/i, '.jpg'), { type: 'image/jpeg' });
+          console.log('HEIC converted to JPEG');
+        } catch (err) {
+          console.error('HEIC conversion failed:', err);
+          setErrorMessage('HEIC 格式转换失败，请尝试其他格式');
+          return;
+        }
+      }
+
+      const url = URL.createObjectURL(processedFile);
+      const base64 = await fileToGenerativePart(processedFile);
 
       const newImage: ImageItem = {
         id: newImageId,
         src: url,
         base64: base64,
-        file: file,
+        file: processedFile,
         specs: [],
         issues: [],
         diffs: [],
@@ -1030,8 +1051,12 @@ const App: React.FC = () => {
   const onDragOver = useCallback((e: React.DragEvent) => e.preventDefault(), []);
   const onDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
-    const file = e.dataTransfer.files?.[0];
-    if (file) processFile(file);
+    const files = Array.from(e.dataTransfer.files || []);
+    files.forEach(file => {
+      if (file.type.startsWith('image/')) {
+        processFile(file);
+      }
+    });
   }, [processFile]);
 
   // Resize handler for bottom panel
