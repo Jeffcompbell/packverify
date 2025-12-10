@@ -42,17 +42,22 @@ export async function handleListSessions(request: Request, env: Env, uid: string
       (sessions.results || []).map(async (session: any) => {
         try {
           const images = await env.DB.prepare(
-            'SELECT storage_url FROM images WHERE session_id = ? ORDER BY created_at ASC LIMIT 4'
+            'SELECT id, user_id FROM images WHERE session_id = ? ORDER BY created_at ASC LIMIT 4'
           ).bind(session.id).all();
 
           const imageCount = await env.DB.prepare(
             'SELECT COUNT(*) as count FROM images WHERE session_id = ?'
           ).bind(session.id).first() as { count: number } | null;
 
+          // 生成公开图片访问 URL
+          const thumbnails = (images.results || []).map((img: any) =>
+            `https://packverify.likelinxin.workers.dev/api/public/images/${img.id}`
+          );
+
           return {
             ...session,
             image_count: imageCount?.count || 0,
-            thumbnails: (images.results || []).map((img: any) => img.storage_url).filter(Boolean)
+            thumbnails
           };
         } catch {
           return { ...session, image_count: 0, thumbnails: [] };

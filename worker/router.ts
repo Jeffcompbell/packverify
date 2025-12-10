@@ -1,7 +1,7 @@
 import { Env, requireAuth } from './middleware/auth';
 import { handleGetUser, handleCreateOrUpdateUser } from './handlers/users';
 import { handleCreateSession, handleGetSession, handleListSessions, handleUpdateSession } from './handlers/sessions';
-import { handleUploadImage, handleUpdateImage, handleDeleteImage, handleGetImageData } from './handlers/images';
+import { handleUploadImage, handleUpdateImage, handleDeleteImage, handleGetImageData, handleGetImagePublic } from './handlers/images';
 import { handleUseQuota, handleGetQuotaHistory } from './handlers/quota';
 import { handleCreateConfig, handleListConfigs, handleGetConfig, handleUpdateConfig, handleDeleteConfig } from './handlers/detection-configs';
 import { handleCreateReport, handleListReports, handleGetReport, handleUpdateReport, handleDeleteReport, handleAddReportImage, handleUpdateReportImage } from './handlers/batch-reports';
@@ -78,6 +78,13 @@ export async function handleAPI(request: Request, env: Env): Promise<Response> {
     if (path.match(/^\/api\/images\/[^/]+\/data$/) && method === 'GET') {
       const imageId = path.split('/')[3];
       const response = await requireAuth((req, env, uid) => handleGetImageData(req, env, uid, imageId))(request, env);
+      return addCorsHeaders(response, corsHeaders);
+    }
+
+    // 公开图片访问（用于缩略图，不需要认证）
+    if (path.match(/^\/api\/public\/images\/[^/]+$/) && method === 'GET') {
+      const imageId = path.split('/')[4];
+      const response = await handleGetImagePublic(request, env, imageId);
       return addCorsHeaders(response, corsHeaders);
     }
 

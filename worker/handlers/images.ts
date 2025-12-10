@@ -124,3 +124,31 @@ export async function handleGetImageData(request: Request, env: Env, uid: string
     }
   });
 }
+
+// 公开访问图片（用于缩略图，不需要认证）
+export async function handleGetImagePublic(request: Request, env: Env, imageId: string): Promise<Response> {
+  const image = await env.DB.prepare('SELECT * FROM images WHERE id = ?').bind(imageId).first() as any;
+
+  if (!image) {
+    return new Response(JSON.stringify({ error: 'Image not found' }), {
+      status: 404,
+      headers: { 'Content-Type': 'application/json' }
+    });
+  }
+
+  const object = await env.IMAGES.get(image.storage_path);
+
+  if (!object) {
+    return new Response(JSON.stringify({ error: 'Image file not found' }), {
+      status: 404,
+      headers: { 'Content-Type': 'application/json' }
+    });
+  }
+
+  return new Response(object.body, {
+    headers: {
+      'Content-Type': image.mime_type,
+      'Cache-Control': 'public, max-age=31536000'
+    }
+  });
+}
