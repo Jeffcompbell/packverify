@@ -34,6 +34,7 @@ const App: React.FC = () => {
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [showQuotaModal, setShowQuotaModal] = useState(false);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  const [showAnnouncementModal, setShowAnnouncementModal] = useState(false);
   const [quotaUsageHistory, setQuotaUsageHistory] = useState<QuotaUsageRecord[]>([]);
   const [isLoadingQuotaHistory, setIsLoadingQuotaHistory] = useState(false);
   const [hasMoreQuotaHistory, setHasMoreQuotaHistory] = useState(false);
@@ -1172,8 +1173,11 @@ const App: React.FC = () => {
         />
       )}
 
-      {/* 系统公告 */}
-      <AnnouncementBanner />
+      {/* 系统公告弹窗 */}
+      <AnnouncementModal
+        isOpen={showAnnouncementModal}
+        onClose={() => setShowAnnouncementModal(false)}
+      />
 
       {/* TOP BAR - 重新设计 */}
       <div className="h-14 border-b border-gray-100 bg-white/80 backdrop-blur-xl flex items-center px-4 md:px-6 shrink-0 gap-6 relative z-50">
@@ -1408,6 +1412,17 @@ const App: React.FC = () => {
               >
                 <span className="text-text-muted hidden md:inline">额度</span>
                 <span className="text-text-secondary font-medium tabular-nums">{user.quota - user.used}/{user.quota}</span>
+              </button>
+
+              {/* 系统公告 */}
+              <button
+                onClick={() => setShowAnnouncementModal(true)}
+                className="relative p-2 hover:bg-surface-100 rounded-lg transition-colors"
+                title="系统公告"
+              >
+                <Bell size={18} className="text-text-muted" />
+                {/* 未读标记 */}
+                <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
               </button>
 
               {/* 用户头像 */}

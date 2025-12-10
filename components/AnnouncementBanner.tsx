@@ -174,9 +174,11 @@ export function AnnouncementModal({ isOpen, onClose }: AnnouncementModalProps) {
                     {announcement.link && (
                       <a
                         href={announcement.link}
+                        target="_blank"
+                        rel="noopener noreferrer"
                         className="text-sm text-purple-600 hover:text-purple-700 font-medium"
                       >
-                        {announcement.linkText || '了解更多'} →
+                        {announcement.linkText || '查看详情'} →
                       </a>
                     )}
                   </div>
