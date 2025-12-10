@@ -133,42 +133,42 @@ export function AnnouncementModal({ isOpen, onClose }: AnnouncementModalProps) {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[80vh] overflow-hidden flex flex-col">
+    <div className="fixed inset-0 bg-black/30 backdrop-blur-sm z-[100] flex items-center justify-center p-4" onClick={onClose}>
+      <div className="bg-white rounded-xl max-w-lg w-full max-h-[70vh] overflow-hidden flex flex-col shadow-2xl" onClick={(e) => e.stopPropagation()}>
         {/* Header */}
-        <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+        <div className="px-5 py-3.5 border-b border-gray-100 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Bell className="w-5 h-5 text-purple-600" />
-            <h2 className="text-xl font-bold text-gray-900">系统公告</h2>
+            <Bell className="w-4 h-4 text-purple-500" />
+            <h2 className="text-sm font-semibold text-gray-900">系统公告</h2>
           </div>
           <button
             onClick={onClose}
-            className="p-2 hover:bg-gray-100 rounded-lg transition"
+            className="p-1.5 hover:bg-gray-100 rounded-md transition"
           >
-            <X className="w-5 h-5 text-gray-500" />
+            <X className="w-4 h-4 text-gray-400" />
           </button>
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto p-6">
-          <div className="space-y-4">
+        <div className="flex-1 overflow-y-auto p-5">
+          <div className="space-y-3">
             {ANNOUNCEMENTS.map((announcement) => (
               <div
                 key={announcement.id}
-                className="bg-white border border-gray-200 rounded-xl p-4 hover:border-purple-200 transition"
+                className="bg-gray-50 border border-gray-100 rounded-lg p-3.5 hover:bg-white hover:border-purple-100 transition"
               >
-                <div className="flex items-start gap-3">
-                  <div className="mt-0.5">{getIconForType(announcement.type)}</div>
+                <div className="flex items-start gap-2.5">
+                  <div className="mt-0.5 flex-shrink-0">{getIconForType(announcement.type)}</div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
-                      <h3 className="font-semibold text-gray-900">
+                      <h3 className="text-sm font-medium text-gray-900">
                         {announcement.title}
                       </h3>
-                      <span className="text-xs text-gray-500">
+                      <span className="text-[10px] text-gray-400">
                         {announcement.date}
                       </span>
                     </div>
-                    <p className="text-sm text-gray-700 mb-2">
+                    <p className="text-xs text-gray-600 leading-relaxed mb-2">
                       {announcement.message}
                     </p>
                     {announcement.link && (
@@ -176,9 +176,10 @@ export function AnnouncementModal({ isOpen, onClose }: AnnouncementModalProps) {
                         href={announcement.link}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-sm text-purple-600 hover:text-purple-700 font-medium"
+                        className="text-xs text-purple-600 hover:text-purple-700 font-medium inline-flex items-center gap-1"
                       >
-                        {announcement.linkText || '查看详情'} →
+                        {announcement.linkText || '查看详情'}
+                        <span className="text-[10px]">→</span>
                       </a>
                     )}
                   </div>
@@ -195,14 +196,14 @@ export function AnnouncementModal({ isOpen, onClose }: AnnouncementModalProps) {
 function getIconForType(type: string) {
   switch (type) {
     case 'info':
-      return <Info className="w-5 h-5 text-blue-600" />;
+      return <Info className="w-4 h-4 text-blue-500" />;
     case 'warning':
-      return <AlertCircle className="w-5 h-5 text-yellow-600" />;
+      return <AlertCircle className="w-4 h-4 text-yellow-500" />;
     case 'success':
-      return <CheckCircle className="w-5 h-5 text-green-600" />;
+      return <CheckCircle className="w-4 h-4 text-green-500" />;
     case 'update':
-      return <Bell className="w-5 h-5 text-purple-600" />;
+      return <Bell className="w-4 h-4 text-purple-500" />;
     default:
-      return <Info className="w-5 h-5 text-gray-600" />;
+      return <Info className="w-4 h-4 text-gray-500" />;
   }
 }
