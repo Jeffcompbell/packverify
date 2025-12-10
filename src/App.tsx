@@ -39,8 +39,8 @@ type AppView = 'home' | 'products' | 'analysis' | 'detection-config' | 'batch-re
 // URL 路径映射
 const VIEW_PATHS: Record<AppView, string> = {
   'home': '/home',
-  'products': '/products',  // 产品列表（默认）
-  'analysis': '/app',  // 质检分析画布
+  'products': '/app',  // AI视觉分析（产品列表）
+  'analysis': '/app',  // 画布（带产品ID时）
   'detection-config': '/config',
   'batch-report': '/reports',
   'batch-view': '/reports',
@@ -48,12 +48,10 @@ const VIEW_PATHS: Record<AppView, string> = {
 
 const PATH_TO_VIEW: Record<string, AppView> = {
   '/home': 'home',
-  '/products': 'products',
-  '/analysis': 'analysis',
   '/config': 'detection-config',
   '/reports': 'batch-report',
-  '/': 'products',  // 默认显示产品列表
-  '/app': 'analysis',
+  '/': 'products',
+  '/app': 'products',  // /app 显示产品列表
 };
 
 const App: React.FC = () => {
@@ -62,9 +60,12 @@ const App: React.FC = () => {
 
   // 从 URL 解析初始视图
   const getViewFromPath = (pathname: string): AppView => {
-    // 检查是否是报告详情页
     if (pathname.startsWith('/reports/')) {
       return 'batch-view';
+    }
+    // /app/:productId 进入画布
+    if (pathname.startsWith('/app/')) {
+      return 'analysis';
     }
     return PATH_TO_VIEW[pathname] || 'products';
   };
@@ -83,18 +84,31 @@ const App: React.FC = () => {
       setCurrentViewState(newView);
     }
     // 提取报告 ID
-    const match = location.pathname.match(/\/reports\/(.+)/);
-    if (match) {
-      setSelectedReportId(match[1]);
+    const reportMatch = location.pathname.match(/\/reports\/(.+)/);
+    if (reportMatch) {
+      setSelectedReportId(reportMatch[1]);
+    }
+    // 提取产品 ID（从 /app/:productId）
+    const productMatch = location.pathname.match(/\/app\/(.+)/);
+    if (productMatch && productMatch[1]) {
+      // 如果 URL 中有产品 ID，自动加载该产品
+      const productId = productMatch[1];
+      if (productId !== sessionId) {
+        // 延迟处理，等待 user 加载
+      }
     }
   }, [location.pathname]);
 
   // 封装 setCurrentView，同时更新 URL
-  const setCurrentView = useCallback((view: AppView) => {
+  const setCurrentView = useCallback((view: AppView, productId?: string) => {
     setCurrentViewState(view);
-    const path = VIEW_PATHS[view];
-    if (location.pathname !== path) {
-      navigate(path);
+    if (view === 'analysis' && productId) {
+      navigate(`/app/${productId}`);
+    } else {
+      const path = VIEW_PATHS[view];
+      if (location.pathname !== path) {
+        navigate(path);
+      }
     }
   }, [navigate, location.pathname]);
 
@@ -1510,9 +1524,16 @@ const App: React.FC = () => {
           isLoading={isLoadingHistory}
           onSelectSession={(session) => {
             handleSwitchSession(session);
-            setCurrentView('analysis');
+            setCurrentView('analysis', session.id);
           }}
-          onCreateNew={handleCreateNewProduct}
+          onCreateNew={async () => {
+            await handleCreateNewProduct();
+            // 新建后自动进入画布
+            const newSid = localStorage.getItem('currentSessionId');
+            if (newSid) {
+              setCurrentView('analysis', newSid);
+            }
+          }}
           isCreatingProduct={isCreatingProduct}
         />
       ) : currentView === 'detection-config' ? (

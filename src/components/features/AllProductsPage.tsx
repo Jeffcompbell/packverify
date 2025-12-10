@@ -65,7 +65,7 @@ export const AllProductsPage: React.FC<AllProductsPageProps> = ({
     <div className="flex-1 flex flex-col bg-surface-50 overflow-hidden">
       {/* Header */}
       <div className="h-14 border-b border-border bg-white flex items-center justify-between px-6 shrink-0">
-        <h2 className="text-base font-semibold text-text-primary">产品列表</h2>
+        <h2 className="text-base font-semibold text-text-primary">AI视觉分析</h2>
 
         {/* 搜索、排序和新建 */}
         <div className="flex items-center gap-3">

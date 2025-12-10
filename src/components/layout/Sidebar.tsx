@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Search, Settings, FileText, HelpCircle, Bell, LogOut, Package } from 'lucide-react';
+import { Search, Settings, FileText, HelpCircle, Bell, LogOut } from 'lucide-react';
 
 type AppView = 'products' | 'analysis' | 'detection-config' | 'batch-report' | 'home';
 
@@ -26,19 +26,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const location = useLocation();
 
   const menuItems = [
-    { id: 'products', path: '/products', label: '产品列表', icon: Package },
+    { id: 'products', path: '/app', label: 'AI视觉分析', icon: Search },
     { id: 'detection-config', path: '/config', label: '检测配置', icon: Settings },
     { id: 'batch-report', path: '/reports', label: '批量报告', icon: FileText },
   ];
 
   const isActive = (path: string) => {
     const pathname = location.pathname;
-    // /products 或 / 都算产品列表
-    if (path === '/products' && (pathname === '/products' || pathname === '/' || pathname === '')) {
-      return true;
-    }
-    // /app 是质检分析画布
-    if (path === '/app' && pathname === '/app') {
+    // /app 或 /app/:id 或 / 都算 AI视觉分析
+    if (path === '/app' && (pathname === '/app' || pathname.startsWith('/app/') || pathname === '/' || pathname === '')) {
       return true;
     }
     return pathname === path || pathname.startsWith(path + '/');
