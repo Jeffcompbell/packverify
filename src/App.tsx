@@ -635,9 +635,15 @@ const App: React.FC = () => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Global Paste Handler
+  // Global Paste Handler with debounce
+  const lastPasteTime = useRef(0);
   useEffect(() => {
     const handlePaste = (e: ClipboardEvent) => {
+      // 防抖：300ms 内不重复处理
+      const now = Date.now();
+      if (now - lastPasteTime.current < 300) return;
+      lastPasteTime.current = now;
+
       const items = e.clipboardData?.items;
       if (!items) return;
 

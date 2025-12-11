@@ -16,7 +16,16 @@ interface ComparisonPanelProps {
 export const ComparisonPanel: React.FC<ComparisonPanelProps> = ({
   images, manualSourceFields, copiedId, onCopy, onFieldsUpdate, onError, onImageUpload
 }) => {
-  const [expandedImages, setExpandedImages] = useState<Set<string>>(new Set(images.map(img => img.id)));
+  const [expandedImages, setExpandedImages] = useState<Set<string>>(() => new Set(images.map(img => img.id)));
+
+  // 当图片列表变化时，自动展开新图片
+  React.useEffect(() => {
+    setExpandedImages(prev => {
+      const next = new Set(prev);
+      images.forEach(img => next.add(img.id));
+      return next;
+    });
+  }, [images.length]);
   const [qilProcessing, setQilProcessing] = useState(false);
   const qilPanelRef = useRef<QilPanelRef>(null);
 
