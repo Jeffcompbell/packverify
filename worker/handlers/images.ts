@@ -5,6 +5,7 @@ export async function handleUploadImage(request: Request, env: Env, uid: string)
   const file = formData.get('file') as File;
   const sessionId = formData.get('sessionId') as string;
   const fileName = formData.get('fileName') as string;
+  const clientImageId = formData.get('imageId') as string;
 
   if (!file || !sessionId || !fileName) {
     return new Response(JSON.stringify({ error: 'Missing required fields' }), {
@@ -13,7 +14,8 @@ export async function handleUploadImage(request: Request, env: Env, uid: string)
     });
   }
 
-  const imageId = crypto.randomUUID();
+  // 使用前端传来的 ID，保持一致性
+  const imageId = clientImageId || crypto.randomUUID();
   const storagePath = `${uid}/${sessionId}/${imageId}`;
 
   // 上传到 R2

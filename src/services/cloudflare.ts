@@ -237,6 +237,7 @@ export const saveImageToCloud = async (
   formData.append('file', blob, image.file?.name || 'image.png');
   formData.append('sessionId', sessionId);
   formData.append('fileName', image.file?.name || 'image.png');
+  formData.append('imageId', image.id); // 传递前端生成的 ID，保持一致性
 
   const token = await getAuthToken();
   const response = await fetch(`${API_BASE_URL}/api/images`, {
