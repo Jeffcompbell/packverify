@@ -160,6 +160,7 @@ const App: React.FC = () => {
 
   // Refs for click-outside detection
   const industryMenuRef = useRef<HTMLDivElement>(null);
+  const hasLoadedCloudData = useRef(false); // 防止重复加载云端数据
   const [activeModelTab, setActiveModelTab] = useState<string>(currentModel);
   const [imageScale, setImageScale] = useState(1);
   const [showOverlay, setShowOverlay] = useState(true);
@@ -228,9 +229,12 @@ const App: React.FC = () => {
     }
   }, [isCheckingAuth, user]);
 
-  // 用户登录后，加载云端会话数据
+  // 用户登录后，加载云端会话数据（只执行一次）
   useEffect(() => {
     if (!user || !cloudSyncEnabled) return;
+    // 防止因 user 对象更新（如配额变化）而重复加载
+    if (hasLoadedCloudData.current) return;
+    hasLoadedCloudData.current = true;
 
     const loadCloudData = async () => {
       try {
@@ -1172,6 +1176,7 @@ const App: React.FC = () => {
   const handleLogout = useCallback(async () => {
     await signOutUser();
     setUser(null);
+    hasLoadedCloudData.current = false; // 重置，下次登录时重新加载
     // 跳转到落地页
     window.location.href = '/';
   }, []);
