@@ -10,10 +10,11 @@ export default {
       return handleAPI(request, env);
     }
 
-    // SPA 路由 - 直接返回 index.html
-    const spaRoutes = ['/config', '/reports', '/home'];
-    if (spaRoutes.some(route => url.pathname === route || url.pathname.startsWith(route + '/'))) {
-      return env.ASSETS.fetch(new Request(new URL('/', request.url), request));
+    // SPA 路由 - 这些路由都是 React App 的路由，重定向到 /app/index.html
+    // /app/:productId, /config, /reports, /home 等
+    const appRoutes = ['/app/', '/config', '/reports', '/home'];
+    if (appRoutes.some(route => url.pathname.startsWith(route))) {
+      return env.ASSETS.fetch(new Request(new URL('/app/', request.url), request));
     }
 
     try {
