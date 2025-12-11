@@ -236,22 +236,26 @@ const App: React.FC = () => {
       try {
         setIsLoadingFromCloud(true);
 
-        // 尝试从 localStorage 加载上次的 sessionId
+        // 优先从 URL 获取产品 ID
+        const urlMatch = window.location.pathname.match(/\/app\/(.+)/);
+        const urlProductId = urlMatch ? urlMatch[1] : null;
         const storedSessionId = localStorage.getItem('currentSessionId');
 
         let sid: string;
-        if (storedSessionId) {
+        const targetSessionId = urlProductId || storedSessionId;
+
+        if (targetSessionId) {
           // 验证 session 是否存在
-          const { session } = await loadSessionFromCloud(user.uid, storedSessionId);
+          const { session } = await loadSessionFromCloud(user.uid, targetSessionId);
           if (session) {
-            sid = storedSessionId;
+            sid = targetSessionId;
           } else {
             // Session 不存在，创建新的
             sid = await getOrCreateSession(user.uid, productName);
             localStorage.setItem('currentSessionId', sid);
           }
         } else {
-          // 没有存储的 sessionId，创建新的
+          // 没有 sessionId，创建新的
           sid = await getOrCreateSession(user.uid, productName);
           localStorage.setItem('currentSessionId', sid);
         }
@@ -305,6 +309,12 @@ const App: React.FC = () => {
           }
           setManualSourceFields(session.qilFields || []);
           console.log(`Loaded ${cloudImages.length} images from cloud`);
+        }
+
+        // 如果 URL 中有产品 ID，确保停留在 analysis 视图
+        if (urlProductId) {
+          setCurrentViewState('analysis');
+          localStorage.setItem('currentSessionId', sid);
         }
 
         // 加载历史会话列表
