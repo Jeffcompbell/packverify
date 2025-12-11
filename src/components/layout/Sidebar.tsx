@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Search, Settings, FileText, HelpCircle, Bell, LogOut } from 'lucide-react';
+import { Search, Settings, FileText, HelpCircle, LogOut, User } from 'lucide-react';
 
 type AppView = 'products' | 'analysis' | 'detection-config' | 'batch-report' | 'home';
 
@@ -15,15 +15,20 @@ interface SidebarProps {
   };
   onLogout?: () => void;
   onOpenAnnouncement?: () => void;
+  onOpenQuotaModal?: () => void;
+  onOpenUpgradeModal?: () => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
   userQuota,
   user,
   onLogout,
-  onOpenAnnouncement
+  onOpenQuotaModal,
+  onOpenUpgradeModal,
 }) => {
   const location = useLocation();
+  const [showUserMenu, setShowUserMenu] = useState(false);
+  const userMenuRef = useRef<HTMLDivElement>(null);
 
   const menuItems = [
     { id: 'products', path: '/app', label: 'AI视觉分析', icon: Search },
@@ -33,27 +38,36 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   const isActive = (path: string) => {
     const pathname = location.pathname;
-    // /app 或 /app/:id 或 / 都算 AI视觉分析
     if (path === '/app' && (pathname === '/app' || pathname.startsWith('/app/') || pathname === '/' || pathname === '')) {
       return true;
     }
     return pathname === path || pathname.startsWith(path + '/');
   };
 
+  const used = userQuota ? userQuota.total - userQuota.remaining : 0;
+
+  // 点击外部关闭菜单
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (userMenuRef.current && !userMenuRef.current.contains(e.target as Node)) {
+        setShowUserMenu(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
   return (
-    <div className="w-52 bg-white border-r border-gray-200 flex flex-col h-full">
-      {/* Logo - 点击返回落地页 */}
-      <a
-        href="/"
-        className="h-14 flex items-center px-4 hover:bg-gray-50 transition-colors w-full"
-      >
+    <div className="w-52 bg-surface-0 border-r border-border flex flex-col h-full">
+      {/* Logo */}
+      <a href="/" className="h-14 flex items-center px-4 hover:bg-surface-50 transition-colors">
         <div className="flex items-center gap-2">
-          <div className="w-7 h-7 bg-gradient-to-br from-purple-500 to-purple-700 rounded-lg flex items-center justify-center">
+          <div className="w-7 h-7 bg-text-primary rounded-lg flex items-center justify-center">
             <svg className="w-3.5 h-3.5 text-white" fill="currentColor" viewBox="0 0 20 20">
               <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"/>
             </svg>
           </div>
-          <span className="text-sm font-semibold text-gray-900">PackVerify</span>
+          <span className="text-sm font-semibold text-text-primary">PackVerify</span>
         </div>
       </a>
 
@@ -63,18 +77,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
           {menuItems.map((item) => {
             const Icon = item.icon;
             const active = isActive(item.path);
-
             return (
               <Link
                 key={item.id}
                 to={item.path}
                 className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors ${
                   active
-                    ? 'bg-purple-50 text-purple-700 font-medium'
-                    : 'text-gray-700 hover:bg-gray-50'
+                    ? 'bg-surface-100 text-text-primary font-medium'
+                    : 'text-text-secondary hover:bg-surface-50'
                 }`}
               >
-                <Icon size={16} className={active ? 'text-purple-600' : 'text-gray-400'} />
+                <Icon size={16} className={active ? 'text-text-primary' : 'text-text-muted'} />
                 <span>{item.label}</span>
               </Link>
             );
@@ -82,88 +95,80 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </div>
       </nav>
 
-      {/* Bottom Section */}
-      <div className="px-3 pb-3 space-y-2">
-        {/* Help Link */}
-        <a
-          href="/help"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-gray-600 hover:bg-gray-50 transition-colors"
-        >
-          <HelpCircle size={16} className="text-gray-400" />
-          <span>帮助文档</span>
-        </a>
-
-        {/* Quota Display - Compact */}
+      {/* Bottom */}
+      <div className="px-3 pb-3 space-y-3">
+        {/* Quota */}
         {userQuota && (
-          <div className="px-3 py-2 bg-gray-50 rounded-lg">
-            <div className="flex items-center justify-between mb-1">
-              <span className="text-[10px] text-gray-500">剩余额度</span>
-              <span className="text-sm font-semibold text-gray-900 tabular-nums">
-                {userQuota.remaining}
-              </span>
+          <div className="px-1">
+            <div className="flex items-center justify-between text-xs text-text-muted mb-1.5">
+              <button
+                onClick={onOpenQuotaModal}
+                className="hover:text-text-primary transition-colors"
+              >
+                已使用 {used} / {userQuota.total}
+              </button>
+              <button
+                onClick={onOpenUpgradeModal}
+                className="text-text-secondary hover:text-text-primary transition-colors"
+              >
+                升级
+              </button>
             </div>
-            <div className="w-full bg-gray-200 rounded-full h-0.5 overflow-hidden">
+            <div className="w-full bg-surface-100 rounded-full h-1 overflow-hidden">
               <div
-                className="bg-purple-600 h-0.5 rounded-full transition-all"
-                style={{ width: `${(userQuota.remaining / userQuota.total) * 100}%` }}
+                className="bg-text-muted h-1 rounded-full transition-all"
+                style={{ width: `${(used / userQuota.total) * 100}%` }}
               />
             </div>
           </div>
         )}
 
-        {/* User Section */}
+        {/* Help */}
+        <a
+          href="/help"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-text-secondary hover:bg-surface-50 transition-colors"
+        >
+          <HelpCircle size={16} className="text-text-muted" />
+          <span>帮助文档</span>
+        </a>
+
+        {/* User with dropdown */}
         {user && (
-          <div className="pt-2 border-t border-gray-100">
-            <div className="flex items-center gap-2 px-2 py-1.5">
-              {/* Avatar */}
-              <div className="w-7 h-7 rounded-full bg-gray-200 overflow-hidden flex-shrink-0">
+          <div ref={userMenuRef} className="relative">
+            <button
+              onClick={() => setShowUserMenu(!showUserMenu)}
+              className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-surface-50 transition-colors"
+            >
+              <div className="w-6 h-6 rounded-full bg-surface-100 overflow-hidden flex-shrink-0">
                 {user.photoURL ? (
                   <img src={user.photoURL} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                 ) : (
-                  <div className="w-full h-full flex items-center justify-center text-xs font-medium text-gray-600">
+                  <div className="w-full h-full flex items-center justify-center text-xs text-text-muted">
                     {(user.displayName || user.email || 'U')[0].toUpperCase()}
                   </div>
                 )}
               </div>
+              <span className="text-sm text-text-primary truncate">{user.displayName || '用户'}</span>
+            </button>
 
-              {/* User Info */}
-              <div className="flex-1 min-w-0">
-                <div className="text-xs font-medium text-gray-900 truncate">
-                  {user.displayName || '用户'}
+            {/* Dropdown Menu */}
+            {showUserMenu && (
+              <div className="absolute bottom-full left-0 right-0 mb-1 bg-white border border-border rounded-lg shadow-lg overflow-hidden z-50">
+                <div className="px-3 py-2 border-b border-border">
+                  <p className="text-xs font-medium text-text-primary truncate">{user.displayName || '用户'}</p>
+                  {user.email && <p className="text-[10px] text-text-muted truncate">{user.email}</p>}
                 </div>
-                <div className="text-[10px] text-gray-500 truncate">
-                  {user.email}
-                </div>
+                <button
+                  onClick={() => { setShowUserMenu(false); onLogout?.(); }}
+                  className="w-full flex items-center gap-2 px-3 py-2 text-sm text-text-secondary hover:bg-surface-50 transition-colors"
+                >
+                  <LogOut size={14} />
+                  <span>退出登录</span>
+                </button>
               </div>
-
-              {/* Actions */}
-              <div className="flex items-center gap-0.5">
-                {/* Notification */}
-                {onOpenAnnouncement && (
-                  <button
-                    onClick={onOpenAnnouncement}
-                    className="relative p-1.5 hover:bg-gray-100 rounded transition-colors"
-                    title="系统公告"
-                  >
-                    <Bell size={14} className="text-gray-500" />
-                    <span className="absolute top-0.5 right-0.5 w-1.5 h-1.5 bg-red-500 rounded-full"></span>
-                  </button>
-                )}
-
-                {/* Logout */}
-                {onLogout && (
-                  <button
-                    onClick={onLogout}
-                    className="p-1.5 hover:bg-gray-100 rounded transition-colors"
-                    title="退出登录"
-                  >
-                    <LogOut size={14} className="text-gray-500" />
-                  </button>
-                )}
-              </div>
-            </div>
+            )}
           </div>
         )}
       </div>

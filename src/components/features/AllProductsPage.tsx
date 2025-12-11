@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useRef } from 'react';
-import { Loader2, Search, Calendar, Image as ImageIcon, Plus, MoreVertical, Pencil, Trash2, Upload, Sparkles } from 'lucide-react';
+import { Loader2, Search, Calendar, Image as ImageIcon, Plus, MoreVertical, Pencil, Trash2 } from 'lucide-react';
 
 interface CloudSession {
   id: string;
@@ -85,10 +85,12 @@ export const AllProductsPage: React.FC<AllProductsPageProps> = ({
     <div className="flex-1 flex flex-col bg-surface-50 overflow-hidden">
       {/* 产品列表 */}
       <div className="flex-1 overflow-y-auto p-6">
-        {/* 上传引导卡片 */}
+        {/* 上传区域 */}
         <div
-          className={`mb-6 p-8 rounded-2xl border-2 border-dashed transition-all cursor-pointer ${
-            isDragging ? 'border-purple-500 bg-purple-50' : 'border-border hover:border-purple-400 bg-gradient-to-br from-purple-50/50 to-blue-50/50'
+          className={`mb-6 py-12 rounded-xl border border-dashed cursor-pointer transition-all ${
+            isDragging
+              ? 'border-text-muted bg-surface-100'
+              : 'border-surface-200 hover:border-surface-300 hover:bg-surface-0'
           }`}
           onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
           onDragLeave={() => setIsDragging(false)}
@@ -103,17 +105,7 @@ export const AllProductsPage: React.FC<AllProductsPageProps> = ({
             className="hidden"
             onChange={(e) => e.target.files && onUploadImages?.(e.target.files)}
           />
-          <div className="flex flex-col items-center text-center">
-            <div className="w-16 h-16 rounded-full bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center mb-4">
-              <Sparkles size={28} className="text-white" />
-            </div>
-            <h3 className="text-lg font-semibold text-text-primary mb-2">开始 AI 视觉分析</h3>
-            <p className="text-sm text-text-muted mb-4">拖拽图片到这里，或点击上传</p>
-            <div className="flex items-center gap-2 text-xs text-text-muted">
-              <Upload size={14} />
-              <span>支持 JPG、PNG、HEIC 格式，最多 30 张</span>
-            </div>
-          </div>
+          <p className="text-center text-text-muted">粘贴 · 拖拽 · 点击上传</p>
         </div>
 
         {/* 搜索和排序 */}
@@ -128,7 +120,7 @@ export const AllProductsPage: React.FC<AllProductsPageProps> = ({
                   placeholder="搜索..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-8 pr-3 py-1.5 text-xs border border-border rounded-md focus:outline-none focus:ring-1 focus:ring-primary-400 w-36 bg-white"
+                  className="pl-8 pr-3 py-1.5 text-xs border border-border rounded-md focus:outline-none focus:ring-1 focus:ring-surface-300 w-36 bg-white"
                 />
               </div>
               <select
@@ -145,7 +137,7 @@ export const AllProductsPage: React.FC<AllProductsPageProps> = ({
         )}
         {isLoading ? (
           <div className="flex items-center justify-center h-full">
-            <Loader2 size={24} className="animate-spin text-primary-400" />
+            <Loader2 size={24} className="animate-spin text-text-muted" />
           </div>
         ) : filteredAndSortedSessions.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-text-muted">
@@ -156,7 +148,7 @@ export const AllProductsPage: React.FC<AllProductsPageProps> = ({
             {filteredAndSortedSessions.map((s) => (
               <div
                 key={s.id}
-                className="bg-white border border-border rounded-lg overflow-hidden hover:border-primary-400 hover:shadow-md transition-all text-left group relative"
+                className="bg-white border border-border rounded-lg overflow-hidden hover:border-surface-300 hover:shadow-sm transition-all text-left group relative"
               >
                 <button onClick={() => onSelectSession(s)} className="w-full text-left">
                   {/* 缩略图区域 */}
@@ -206,10 +198,10 @@ export const AllProductsPage: React.FC<AllProductsPageProps> = ({
                         }}
                         onClick={(e) => e.stopPropagation()}
                         autoFocus
-                        className="w-full text-sm font-medium border border-primary-400 rounded px-1 py-0.5 focus:outline-none"
+                        className="w-full text-sm font-medium border border-surface-300 rounded px-1 py-0.5 focus:outline-none"
                       />
                     ) : (
-                      <div className="text-sm font-medium text-text-primary truncate mb-1 group-hover:text-primary-500 transition-colors">
+                      <div className="text-sm font-medium text-text-primary truncate mb-1 group-hover:text-text-secondary transition-colors">
                         {s.productName}
                       </div>
                     )}

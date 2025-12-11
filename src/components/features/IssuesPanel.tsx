@@ -145,14 +145,14 @@ export const IssuesPanel: React.FC<IssuesPanelProps> = ({
       {/* 标题栏 */}
       <div className="px-3 py-2 border-b border-border flex items-center justify-between bg-white">
         <div className="flex items-center gap-1.5">
-          <AlertTriangle size={14} className="text-primary-400" />
+          <AlertTriangle size={14} className="text-text-muted" />
           <span className="text-xs font-medium text-text-primary">检测问题</span>
         </div>
         <div className="flex items-center gap-1">
           {analyzedModels.length > 1 && (
             <button
               onClick={() => setShowCompareModal(true)}
-              className="p-1 rounded text-text-muted hover:text-primary-400 hover:bg-surface-100 transition-colors"
+              className="p-1 rounded text-text-muted hover:text-text-primary hover:bg-surface-100 transition-colors"
               title="对比模型结果"
             >
               <Columns size={12} />
@@ -161,7 +161,7 @@ export const IssuesPanel: React.FC<IssuesPanelProps> = ({
           {availableModelsToAdd.length > 0 && (
             <button
               onClick={() => setShowModelMenu(!showModelMenu)}
-              className="p-1 rounded text-text-muted hover:text-primary-400 hover:bg-surface-100 transition-colors"
+              className="p-1 rounded text-text-muted hover:text-text-primary hover:bg-surface-100 transition-colors"
               title="添加模型"
             >
               <Plus size={12} />
@@ -170,7 +170,7 @@ export const IssuesPanel: React.FC<IssuesPanelProps> = ({
           <button
             onClick={() => onRetryAnalysis(activeModelTab)}
             disabled={isCurrentProcessing || !currentImage}
-            className="p-1 text-text-muted hover:text-primary-400 hover:bg-surface-100 rounded transition-colors disabled:opacity-50"
+            className="p-1 text-text-muted hover:text-text-primary hover:bg-surface-100 rounded transition-colors disabled:opacity-50"
             title="重新分析"
           >
             <RefreshCw size={12} className={isCurrentProcessing ? 'animate-spin' : ''} />
@@ -201,7 +201,7 @@ export const IssuesPanel: React.FC<IssuesPanelProps> = ({
               {isProcessing && <Loader2 size={10} className="animate-spin" />}
               <span>{displayName}</span>
               {issueCount > 0 && (
-                <span className="bg-primary-500 text-white text-[9px] px-1.5 rounded-full">{issueCount}</span>
+                <span className="bg-text-primary text-white text-[9px] px-1.5 rounded-full">{issueCount}</span>
               )}
             </button>
           );
@@ -282,7 +282,7 @@ export const IssuesPanel: React.FC<IssuesPanelProps> = ({
                           className="p-1 rounded hover:bg-surface-100 transition-colors opacity-0 group-hover:opacity-100 ml-auto"
                           title="复制"
                         >
-                          {copiedId === issue.id ? <CheckCheck size={12} className="text-primary-500" /> : <Copy size={12} className="text-text-muted" />}
+                          {copiedId === issue.id ? <CheckCheck size={12} className="text-success" /> : <Copy size={12} className="text-text-muted" />}
                         </button>
                       </div>
                       <p className="text-xs text-text-primary mb-1">{issue.description}</p>
@@ -327,7 +327,7 @@ export const IssuesPanel: React.FC<IssuesPanelProps> = ({
                           className="p-1 rounded hover:bg-surface-100 transition-colors opacity-0 group-hover:opacity-100 ml-auto"
                           title="复制"
                         >
-                          {copiedId === issue.id ? <CheckCheck size={12} className="text-primary-500" /> : <Copy size={12} className="text-text-muted" />}
+                          {copiedId === issue.id ? <CheckCheck size={12} className="text-success" /> : <Copy size={12} className="text-text-muted" />}
                         </button>
                       </div>
 
@@ -338,7 +338,7 @@ export const IssuesPanel: React.FC<IssuesPanelProps> = ({
                       )}
 
                       {issue.suggestion && (
-                        <p className="text-[11px] text-primary-600">→ {issue.suggestion}</p>
+                        <p className="text-[11px] text-text-secondary">→ {issue.suggestion}</p>
                       )}
                     </div>
                   );

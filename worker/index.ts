@@ -14,7 +14,7 @@ export default {
     // /app/:productId, /config, /reports, /home 等
     const appRoutes = ['/app/', '/config', '/reports', '/home'];
     if (appRoutes.some(route => url.pathname.startsWith(route))) {
-      return env.ASSETS.fetch(new Request(new URL('/app/', request.url), request));
+      return env.ASSETS.fetch(new Request(new URL('/app/index.html', request.url), request));
     }
 
     try {

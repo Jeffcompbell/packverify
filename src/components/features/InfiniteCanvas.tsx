@@ -1,6 +1,6 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { CanvasTransform, DiagnosisIssue, DiffResult, ViewLayers, BoundingBox, ImageItem } from '../../types/types';
-import { AlertCircle, CheckCircle, Info, XCircle, ImagePlus, Loader2, Trash2, FileText, AlertTriangle, RefreshCw, Copy, CheckCheck, Upload, GripVertical, Eye, FileSearch, CheckSquare } from 'lucide-react';
+import { AlertCircle, CheckCircle, Info, XCircle, Loader2, Trash2, FileText, AlertTriangle, RefreshCw, Copy, CheckCheck, GripVertical, Eye, FileSearch, CheckSquare } from 'lucide-react';
 
 interface InfiniteCanvasProps {
   images: ImageItem[];
@@ -459,24 +459,13 @@ export const InfiniteCanvas: React.FC<InfiniteCanvasProps> = ({
             );
           })}
 
-          {/* 添加新图片的空白卡片 - 默认粘贴，点击按钮上传 */}
+          {/* 添加图片 */}
           {images.length < 8 && (
             <div
-              className="w-[420px] min-h-[500px] bg-slate-800/20 transition-all flex flex-col items-center justify-center border-2 border-slate-700/50 border-dashed rounded-xl group shrink-0 hover:border-indigo-500/50 hover:bg-slate-800/30"
+              onClick={() => fileInputRef.current?.click()}
+              className="w-[420px] min-h-[500px] flex items-center justify-center border border-dashed border-slate-600 rounded-xl cursor-pointer shrink-0 hover:border-slate-500 hover:bg-slate-800/20 transition-all"
             >
-              <div className="p-5 bg-slate-800/50 rounded-full mb-4 group-hover:scale-105 transition-all">
-                <ImagePlus className="text-slate-400" size={40} />
-              </div>
-              <p className="text-slate-400 font-medium text-base">Ctrl+V 粘贴图片</p>
-              <p className="text-slate-600 text-sm mt-2">或拖拽图片到任意位置</p>
-              <button
-                onClick={() => fileInputRef.current?.click()}
-                className="mt-6 px-4 py-2 bg-indigo-600/80 hover:bg-indigo-600 text-white text-sm font-medium rounded-lg transition-colors flex items-center gap-2"
-              >
-                <Upload size={16} />
-                选择文件上传
-              </button>
-              <p className="text-slate-700 text-xs mt-4">{images.length}/8 张</p>
+              <p className="text-slate-500">粘贴 · 拖拽 · 点击上传</p>
             </div>
           )}
         </div>
