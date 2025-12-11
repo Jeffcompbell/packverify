@@ -22,7 +22,7 @@ interface UseImageAnalysisReturn {
   processingStep: number;
   streamText: string;
   isSyncing: boolean;
-  processFile: (file: File, images: ImageItem[], currentModel: string) => Promise<ImageItem | null>;
+  processFile: (file: File, images: ImageItem[], currentModel: string, existingImageId?: string) => Promise<ImageItem | null>;
   retryAnalysis: (image: ImageItem, images: ImageItem[]) => Promise<void>;
   addModelAnalysis: (image: ImageItem, modelId: string) => Promise<Record<string, any> | null>;
 }
@@ -38,7 +38,7 @@ export function useImageAnalysis({
   const [streamText, setStreamText] = useState('');
   const [isSyncing, setIsSyncing] = useState(false);
 
-  const processFile = useCallback(async (file: File, images: ImageItem[], currentModel: string): Promise<ImageItem | null> => {
+  const processFile = useCallback(async (file: File, images: ImageItem[], currentModel: string, existingImageId?: string): Promise<ImageItem | null> => {
     if (!user) { onShowLogin(); return null; }
 
     const isHeic = file.name.toLowerCase().endsWith('.heic') || file.name.toLowerCase().endsWith('.heif');
@@ -55,7 +55,7 @@ export function useImageAnalysis({
       return null;
     }
 
-    const newImageId = `img-${Date.now()}`;
+    const newImageId = existingImageId || `img-${Date.now()}`;
     let processedFile = file;
 
     try {

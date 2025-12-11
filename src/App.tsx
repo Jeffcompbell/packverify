@@ -374,10 +374,32 @@ const App: React.FC = () => {
 
   // --- Handlers ---
   const handleImageUpload = useCallback(async (file: File) => {
-    const result = await processFile(file, images, currentModel);
+    // 立即创建占位图片，快速显示预览
+    const placeholderId = `img-${Date.now()}`;
+    const url = URL.createObjectURL(file);
+    const placeholderImage: ImageItem = {
+      id: placeholderId,
+      src: url,
+      base64: '',
+      file,
+      specs: [],
+      issues: [],
+      diffs: [],
+      issuesByModel: {}
+    };
+
+    // 立即添加图片并选中（使用函数式更新避免闭包问题）
+    setImages(prev => [...prev, placeholderImage]);
+    setCurrentImageIndex(images.length);
+
+    // 后台进行 AI 分析，传入占位 ID
+    const result = await processFile(file, images, currentModel, placeholderId);
     if (result) {
-      setImages(prev => [...prev, result]);
-      setCurrentImageIndex(images.length);
+      // 用分析结果替换占位图片
+      setImages(prev => prev.map(img => img.id === placeholderId ? result : img));
+    } else {
+      // 分析失败，移除占位图片
+      setImages(prev => prev.filter(img => img.id !== placeholderId));
     }
   }, [processFile, images, currentModel]);
 
@@ -1037,6 +1059,11 @@ const App: React.FC = () => {
           >
             返回首页
           </button>
+        </div>
+      ) : isLoadingFromCloud ? (
+        <div className="flex-1 flex flex-col items-center justify-center bg-surface-50">
+          <Loader2 size={32} className="animate-spin text-text-muted mb-3" />
+          <span className="text-text-muted text-sm">正在加载产品数据...</span>
         </div>
       ) : (
         <>
