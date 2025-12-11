@@ -551,8 +551,19 @@ const App: React.FC = () => {
         (async () => {
           try {
             setIsSyncing(true);
+            // 1. 先上传图片文件
             await saveImageToCloud(user.uid, sessionId, finalImage);
             console.log('✓ Image synced to cloud:', newImageId);
+            // 2. 再更新分析结果
+            await updateImageInCloud(user.uid, sessionId, newImageId, {
+              description: diagResult.description,
+              ocrText: diagResult.ocrText,
+              specs: imageSpecs,
+              issues: diagResult.issues,
+              deterministicIssues: diagResult.deterministicIssues,
+              diffs: diffs
+            });
+            console.log('✓ Analysis results synced:', newImageId);
           } catch (syncError) {
             console.error('✗ Cloud sync failed:', syncError);
           } finally {
