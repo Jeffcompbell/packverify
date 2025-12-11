@@ -1,16 +1,16 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import imageCompression from 'browser-image-compression';
-import { diagnoseImage, fileToGenerativePart, parseSourceText, AVAILABLE_MODELS, getModelId, setModelId, parseQILImage, localDiffSpecs, extractOcrOnly } from './services/openaiService';
+import { localDiffSpecs, getModelId, setModelId, extractOcrOnly } from './services/openaiService';
 import { signInWithGoogle, signOutUser, onAuthChange } from './services/firebase';
 import {
   getOrCreateUser, getUserData, useQuotaFirebase, UserData,
-  getOrCreateSession, saveImageToCloud, updateImageInCloud, deleteImageFromCloud, saveQilToCloud,
+  getOrCreateSession, updateImageInCloud, deleteImageFromCloud, saveQilToCloud,
   loadSessionFromCloud, clearSessionInCloud, CloudImageData, CloudSession,
-  getUserSessions, createNewSession, updateSessionProductName, deleteSession, getQuotaUsageHistory, QuotaUsageRecord,
-  updateImageStatusInCloud
+  getUserSessions, createNewSession, updateSessionProductName, deleteSession, getQuotaUsageHistory, QuotaUsageRecord
 } from './services/cloudflare';
-import { DiagnosisIssue, SourceField, DiffResult, ImageItem, ImageSpec, BoundingBox, DeterministicCheck, IndustryType } from './types/types';
+import { SourceField, DiffResult, ImageItem, ImageSpec, BoundingBox, IndustryType } from './types/types';
+import { useImageAnalysis } from './hooks/useImageAnalysis';
+import { DiffSummary } from './components/features/DiffSummary';
 import {
   Table, Zap, AlertCircle, XCircle, ChevronDown, ChevronLeft, ChevronRight,
   ImagePlus, Trash2, RefreshCw, Copy, CheckCheck, Upload, Eye, EyeOff,
@@ -134,15 +134,8 @@ const App: React.FC = () => {
   const [isCreatingProduct, setIsCreatingProduct] = useState(false);
 
   // 云同步状态
-  const [isSyncing, setIsSyncing] = useState(false);
   const [isLoadingFromCloud, setIsLoadingFromCloud] = useState(false);
   const [cloudSyncEnabled, setCloudSyncEnabled] = useState(true);
-
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [processingImageId, setProcessingImageId] = useState<string | null>(null);
-  const [processingModelId, setProcessingModelId] = useState<string | null>(null);
-  const [processingStep, setProcessingStep] = useState<number>(1);
-  const [streamText, setStreamText] = useState<string>(''); // 流式输出文本
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   // Data
@@ -153,14 +146,15 @@ const App: React.FC = () => {
 
   // UI State
   const [selectedIssueId, setSelectedIssueId] = useState<string | null>(null);
-  const [currentModel, setCurrentModel] = useState(getModelId());
-  const [showModelSelector, setShowModelSelector] = useState(false);
   const [industry, setIndustry] = useState<IndustryType>('general');
+  const [showModelSelector, setShowModelSelector] = useState(false);
   const [showIndustryMenu, setShowIndustryMenu] = useState(false);
+  const [qilProcessing, setQilProcessing] = useState(false);
 
   // Refs for click-outside detection
   const industryMenuRef = useRef<HTMLDivElement>(null);
   const hasLoadedCloudData = useRef(false); // 防止重复加载云端数据
+  const [currentModel, setCurrentModel] = useState(getModelId());
   const [activeModelTab, setActiveModelTab] = useState<string>(currentModel);
   const [imageScale, setImageScale] = useState(1);
   const [showOverlay, setShowOverlay] = useState(true);
@@ -181,6 +175,17 @@ const App: React.FC = () => {
 
   // Current image
   const currentImage = images[currentImageIndex] || null;
+
+  // Image analysis hook
+  const {
+    isProcessing, processingImageId, processingModelId, processingStep, isSyncing,
+    processFile, retryAnalysis, addModelAnalysis
+  } = useImageAnalysis({
+    user, sessionId, cloudSyncEnabled, industry, manualSourceFields,
+    onShowLogin: () => setShowLoginModal(true),
+    onError: setErrorMessage,
+    onUserUpdate: setUser
+  });
 
   // 计算当前图片与 QIL 的对比结果
   const currentDiffResults = useMemo(() => {
@@ -364,480 +369,30 @@ const App: React.FC = () => {
   };
 
   // --- Handlers ---
-  const processFile = useCallback(async (file: File) => {
-    // 未登录时弹出登录框
-    if (!user) {
-      setShowLoginModal(true);
-      return;
-    }
-
-    // 检查是否是图片文件（包括 HEIC/HEIF）
-    const isHeic = file.name.toLowerCase().endsWith('.heic') || file.name.toLowerCase().endsWith('.heif');
-    if (!file.type.startsWith('image/') && !isHeic) {
-      setErrorMessage("请上传图片文件");
-      return;
-    }
-
-    if (images.length >= 30) {
-      setErrorMessage("每个产品最多支持 30 张图片");
-      return;
-    }
-
-    // 检查配额
-    if (user.used >= user.quota) {
-      setErrorMessage(`配额已用完（${user.used}/${user.quota}），请联系管理员`);
-      return;
-    }
-
-    const newImageId = `img-${Date.now()}`;
-
-    try {
-      console.log("Processing file:", file.name, `(${(file.size / 1024 / 1024).toFixed(2)} MB)`);
-
-      let processedFile = file;
-      const maxSizeMB = 10;
-      const fileSizeMB = file.size / 1024 / 1024;
-
-      // 处理 HEIC/HEIF 格式或大文件压缩
-      if (isHeic || file.type === 'image/heic' || file.type === 'image/heif' || fileSizeMB > maxSizeMB) {
-        const action = isHeic ? '转换 HEIC 格式' : `压缩图片 (${fileSizeMB.toFixed(1)}MB → ${maxSizeMB}MB)`;
-        setErrorMessage(`正在${action}...`);
-
-        try {
-          const options = {
-            maxSizeMB: maxSizeMB,
-            maxWidthOrHeight: 4096,
-            useWebWorker: true,
-            fileType: 'image/jpeg' as const,
-            initialQuality: 0.9
-          };
-
-          processedFile = await imageCompression(file, options);
-          const newSizeMB = processedFile.size / 1024 / 1024;
-          console.log(`Image processed: ${fileSizeMB.toFixed(2)}MB → ${newSizeMB.toFixed(2)}MB`);
-          setErrorMessage(null);
-        } catch (err) {
-          console.error('Image processing failed:', err);
-          if (isHeic) {
-            setErrorMessage('HEIC 格式转换失败。建议：\n1. iPhone: 设置 > 相机 > 格式 > 选择"最兼容"\n2. 使用在线工具转换: heictojpg.com\n3. 或直接上传 JPG/PNG 格式');
-          } else {
-            setErrorMessage(`图片处理失败（${fileSizeMB.toFixed(1)}MB）。请尝试：\n1. 使用图片编辑工具压缩后上传\n2. 或上传小于 ${maxSizeMB}MB 的图片`);
-          }
-          return;
-        }
-      }
-
-      const url = URL.createObjectURL(processedFile);
-      const base64 = await fileToGenerativePart(processedFile);
-
-      const newImage: ImageItem = {
-        id: newImageId,
-        src: url,
-        base64: base64,
-        file: processedFile,
-        specs: [],
-        issues: [],
-        diffs: [],
-        issuesByModel: {}
-      };
-
-      setImages(prev => [...prev, newImage]);
+  const handleImageUpload = useCallback(async (file: File) => {
+    const result = await processFile(file, images, currentModel);
+    if (result) {
+      setImages(prev => [...prev, result]);
       setCurrentImageIndex(images.length);
-
-      setIsProcessing(true);
-      setProcessingImageId(newImageId);
-      setProcessingModelId(currentModel);
-      setErrorMessage(null);
-
-      // 直接进行完整分析（已移除预检）
-      console.log('Starting full analysis...');
-
-      // 添加超时机制：60秒超时，自动重试一次
-      let diagResult;
-      let retryCount = 0;
-      const maxRetries = 1;
-      const timeoutMs = 60000; // 60秒超时
-
-      while (retryCount <= maxRetries) {
-        try {
-          // 使用 Promise.race 实现超时
-          setStreamText(''); // 清空流式文本
-          diagResult = await Promise.race([
-            diagnoseImage(base64, file.type, (step) => {
-              setProcessingStep(step);
-            }, industry, false, (chunk) => {
-              // 流式输出回调
-              setStreamText(prev => prev + chunk);
-            }),  // ✅ 默认不包含 OCR（快速模式）
-            new Promise<never>((_, reject) =>
-              setTimeout(() => reject(new Error('分析超时')), timeoutMs)
-            )
-          ]);
-          break; // 成功，跳出循环
-        } catch (error: any) {
-          retryCount++;
-          if (error.message === '分析超时' && retryCount <= maxRetries) {
-            console.log(`Analysis timeout, retrying (${retryCount}/${maxRetries})...`);
-            continue; // 重试
-          }
-          // 超时且重试次数用完，或其他错误
-          throw error;
-        }
-      }
-
-      if (!diagResult) {
-        throw new Error('分析失败');
-      }
-
-      // 转换 specs 格式
-      const imageSpecs: ImageSpec[] = diagResult.specs.map(s => ({
-        key: s.key,
-        value: s.value,
-        category: s.category
-      }));
-
-      const usedModelId = getModelId();
-      setImages(prev => prev.map(img =>
-        img.id === newImageId ? {
-          ...img,
-          issues: diagResult.issues,
-          description: diagResult.description,
-          ocrText: diagResult.ocrText,
-          deterministicIssues: diagResult.deterministicIssues,
-          specs: imageSpecs,
-          issuesByModel: {
-            ...img.issuesByModel,
-            [usedModelId]: {
-              issues: diagResult.issues,
-              deterministicIssues: diagResult.deterministicIssues
-            }
-          }
-        } : img
-      ));
-
-      // Diff if manual fields exist (本地对比，不调用 API)
-      let diffs: DiffResult[] = [];
-      if (manualSourceFields.length > 0) {
-        diffs = localDiffSpecs(manualSourceFields, imageSpecs);
-        setImages(prev => prev.map(img =>
-          img.id === newImageId ? { ...img, diffs } : img
-        ));
-      }
-
-      // ✅ 只有成功完成分析，才消耗配额
-      const tokenUsage = diagResult.tokenUsage ? {
-        promptTokens: diagResult.tokenUsage.promptTokens,
-        completionTokens: diagResult.tokenUsage.completionTokens,
-        totalTokens: diagResult.tokenUsage.totalTokens,
-        model: diagResult.tokenUsage.model
-      } : undefined;
-      await useQuotaFirebase(user.uid, 1, file.name, 'analyze', tokenUsage);
-      const updatedUser = await getUserData(user.uid);
-      if (updatedUser) setUser(updatedUser);
-
-      // ✅ 异步云同步 - 分析完成后在后台上传，不阻塞用户
-      if (cloudSyncEnabled && sessionId) {
-        const finalImage: ImageItem = {
-          id: newImageId,
-          src: url,
-          base64,
-          file: processedFile,
-          description: diagResult.description,
-          ocrText: diagResult.ocrText,
-          specs: imageSpecs,
-          issues: diagResult.issues,
-          deterministicIssues: diagResult.deterministicIssues,
-          diffs: diffs,
-          issuesByModel: {}
-        };
-
-        // 🚀 异步上传，不等待完成
-        (async () => {
-          try {
-            setIsSyncing(true);
-            // 1. 先上传图片文件
-            await saveImageToCloud(user.uid, sessionId, finalImage);
-            console.log('✓ Image synced to cloud:', newImageId);
-            // 2. 再更新分析结果
-            await updateImageInCloud(user.uid, sessionId, newImageId, {
-              description: diagResult.description,
-              ocrText: diagResult.ocrText,
-              specs: imageSpecs,
-              issues: diagResult.issues,
-              deterministicIssues: diagResult.deterministicIssues,
-              diffs: diffs
-            });
-            console.log('✓ Analysis results synced:', newImageId);
-          } catch (syncError) {
-            console.error('✗ Cloud sync failed:', syncError);
-          } finally {
-            setIsSyncing(false);
-          }
-        })();
-      }
-
-    } catch (error: any) {
-      console.error("Processing failed:", error);
-
-      // 🔴 超时错误特殊处理 - 不消耗配额
-      if (error.message === '分析超时') {
-        setErrorMessage("⏱️ 检测超时（已重试）。请点击图片上的重试按钮再次分析，不会消耗额度。");
-        setImages(prev => prev.map(img =>
-          img.id === newImageId ? {
-            ...img,
-            description: '⏱️ 检测超时',
-            ocrText: '分析超时，请重试。提示：如果多次超时，可能是网络问题或图片过大。',
-            issues: [],
-            deterministicIssues: [],
-            specs: [],
-            issuesByModel: {}
-          } : img
-        ));
-      } else {
-        setErrorMessage(error.message || "图片处理失败");
-      }
-    } finally {
-      setIsProcessing(false);
-      setProcessingImageId(null);
-      setProcessingModelId(null);
     }
-  }, [user, images.length, manualSourceFields, cloudSyncEnabled, sessionId, industry, currentModel]);
+  }, [processFile, images, currentModel]);
 
   const handleRetryAnalysis = useCallback(async (imageId: string) => {
-    // 未登录时弹出登录框
-    if (!user) {
-      setShowLoginModal(true);
-      return;
-    }
-
     const image = images.find(img => img.id === imageId);
-    if (!image) return;
+    if (image) await retryAnalysis(image, images);
+  }, [images, retryAnalysis]);
 
-    // 检查配额
-    if (user.used >= user.quota) {
-      setErrorMessage(`配额已用完（${user.used}/${user.quota}），请联系管理员`);
-      return;
-    }
-
-    try {
-      const usedModelId = getModelId();
-      setIsProcessing(true);
-      setProcessingImageId(imageId);
-      setProcessingModelId(usedModelId);
-      setErrorMessage(null);
-
-      // 添加超时机制：60秒超时，自动重试一次
-      let diagResult;
-      let retryCount = 0;
-      const maxRetries = 1;
-      const timeoutMs = 60000;
-
-      while (retryCount <= maxRetries) {
-        try {
-          diagResult = await Promise.race([
-            diagnoseImage(image.base64, image.file.type, (step) => {
-              setProcessingStep(step);
-            }, industry, manualSourceFields.length > 0),  // 有 QIL 时包含 OCR
-            new Promise<never>((_, reject) =>
-              setTimeout(() => reject(new Error('分析超时')), timeoutMs)
-            )
-          ]);
-          break;
-        } catch (error: any) {
-          retryCount++;
-          if (error.message === '分析超时' && retryCount <= maxRetries) {
-            console.log(`Retry timeout, retrying (${retryCount}/${maxRetries})...`);
-            continue;
-          }
-          throw error;
-        }
-      }
-
-      if (!diagResult) {
-        throw new Error('重新分析失败');
-      }
-
-      // 转换 specs 格式
-      const imageSpecs: ImageSpec[] = diagResult.specs.map(s => ({
-        key: s.key,
-        value: s.value,
-        category: s.category
-      }));
-
-      // Diff if manual fields exist (本地对比，不调用 API)
-      let diffs: DiffResult[] = [];
-      if (manualSourceFields.length > 0) {
-        diffs = localDiffSpecs(manualSourceFields, imageSpecs);
-      }
-
-      const analysisDuration = image.analyzingStartedAt ? Date.now() - image.analyzingStartedAt : undefined;
-      setImages(prev => prev.map(img =>
-        img.id === imageId ? {
-          ...img,
-          issues: diagResult.issues,
-          description: diagResult.description,
-          ocrText: diagResult.ocrText,
-          deterministicIssues: diagResult.deterministicIssues,
-          specs: imageSpecs,
-          diffs: diffs,
-          analysisDuration,
-          issuesByModel: {
-            ...img.issuesByModel,
-            [usedModelId]: {
-              issues: diagResult.issues,
-              deterministicIssues: diagResult.deterministicIssues
-            }
-          }
-        } : img
-      ));
-
-      // ✅ 只有成功完成，才消耗配额
-      const tokenUsage = diagResult.tokenUsage ? {
-        promptTokens: diagResult.tokenUsage.promptTokens,
-        completionTokens: diagResult.tokenUsage.completionTokens,
-        totalTokens: diagResult.tokenUsage.totalTokens,
-        model: diagResult.tokenUsage.model
-      } : undefined;
-      await useQuotaFirebase(user.uid, 1, image.file.name, 'retry', tokenUsage);
-      const updatedUser = await getUserData(user.uid);
-      if (updatedUser) setUser(updatedUser);
-
-      // ✅ 异步云同步 - 分析完成后在后台更新
-      if (cloudSyncEnabled && sessionId) {
-        const existingImage = images.find(img => img.id === imageId);
-        const newIssuesByModel = {
-          ...existingImage?.issuesByModel,
-          [usedModelId]: {
-            issues: diagResult.issues,
-            deterministicIssues: diagResult.deterministicIssues
-          }
-        };
-
-        // 🚀 异步更新，不等待
-        (async () => {
-          try {
-            await updateImageInCloud(user.uid, sessionId, imageId, {
-              description: diagResult.description,
-              ocrText: diagResult.ocrText,
-              specs: imageSpecs,
-              issues: diagResult.issues,
-              deterministicIssues: diagResult.deterministicIssues,
-              diffs: diffs,
-              issuesByModel: newIssuesByModel
-            });
-            console.log('✓ Image updated in cloud:', imageId);
-          } catch (syncError) {
-            console.error('✗ Cloud sync failed:', syncError);
-          }
-        })();
-      }
-
-    } catch (error: any) {
-      console.error("Retry failed:", error);
-
-      // 🔴 超时错误特殊处理
-      if (error.message === '分析超时') {
-        setErrorMessage("⏱️ 检测超时（已重试）。请稍后再试，不会消耗额度。");
-        setImages(prev => prev.map(img =>
-          img.id === imageId ? {
-            ...img,
-            description: '⏱️ 检测超时',
-            ocrText: '分析超时，请重试。'
-          } : img
-        ));
-      } else {
-        setErrorMessage(error.message || "重新分析失败");
-      }
-    } finally {
-      setIsProcessing(false);
-      setProcessingImageId(null);
-      setProcessingModelId(null);
-    }
-  }, [user, images, manualSourceFields, cloudSyncEnabled, sessionId, industry]);
-
-  // 添加新模型分析（将结果存储到 issuesByModel）
   const handleAddModelAnalysis = useCallback(async (imageId: string, modelId: string) => {
-    if (!user) {
-      setShowLoginModal(true);
-      return;
-    }
-
     const image = images.find(img => img.id === imageId);
     if (!image) return;
-
-    if (user.used >= user.quota) {
-      setErrorMessage(`配额已用完（${user.used}/${user.quota}）`);
-      return;
-    }
-
-    // 立即创建新 tab（空数据，显示 loading）
     setImages(prev => prev.map(img =>
-      img.id === imageId ? {
-        ...img,
-        issuesByModel: {
-          ...img.issuesByModel,
-          [modelId]: { issues: [], deterministicIssues: [] }
-        }
-      } : img
+      img.id === imageId ? { ...img, issuesByModel: { ...img.issuesByModel, [modelId]: { issues: [], deterministicIssues: [] } } } : img
     ));
-
-    try {
-      setIsProcessing(true);
-      setProcessingImageId(imageId);
-      setProcessingModelId(modelId);
-      setErrorMessage(null);
-
-      // 临时切换模型
-      const previousModel = getModelId();
-      setModelId(modelId);
-
-      const diagResult = await diagnoseImage(image.base64, image.file.type, (step) => {
-        setProcessingStep(step);
-      }, industry, manualSourceFields.length > 0);  // 有 QIL 时包含 OCR
-
-      // 恢复之前的模型
-      setModelId(previousModel);
-
-      // 更新分析结果
-      const newIssuesByModel = {
-        ...image.issuesByModel,
-        [modelId]: {
-          issues: diagResult.issues,
-          deterministicIssues: diagResult.deterministicIssues
-        }
-      };
-      setImages(prev => prev.map(img =>
-        img.id === imageId ? { ...img, issuesByModel: newIssuesByModel } : img
-      ));
-
-      // 消耗配额（包含 token 使用统计）
-      const tokenUsage = diagResult.tokenUsage ? {
-        promptTokens: diagResult.tokenUsage.promptTokens,
-        completionTokens: diagResult.tokenUsage.completionTokens,
-        totalTokens: diagResult.tokenUsage.totalTokens,
-        model: diagResult.tokenUsage.model
-      } : undefined;
-      await useQuotaFirebase(user.uid, 1, image.file.name, 'analyze', tokenUsage);
-      const updatedUser = await getUserData(user.uid);
-      if (updatedUser) setUser(updatedUser);
-
-      // 云同步
-      if (cloudSyncEnabled && sessionId) {
-        try {
-          await updateImageInCloud(user.uid, sessionId, imageId, { issuesByModel: newIssuesByModel });
-        } catch (syncError) {
-          console.error('Cloud sync failed:', syncError);
-        }
-      }
-
-    } catch (error: any) {
-      setErrorMessage(error.message || "模型分析失败");
-    } finally {
-      setIsProcessing(false);
-      setProcessingImageId(null);
-      setProcessingModelId(null);
+    const result = await addModelAnalysis(image, modelId);
+    if (result) {
+      setImages(prev => prev.map(img => img.id === imageId ? { ...img, issuesByModel: result } : img));
     }
-  }, [user, images, cloudSyncEnabled, sessionId]);
+  }, [images, addModelAnalysis]);
 
   const handleUpdateQilFields = useCallback(async (fields: SourceField[], rawText: string) => {
     setManualSourceFields(fields);
@@ -860,42 +415,15 @@ const App: React.FC = () => {
         // 轻量级 OCR 提取（只提取文字，不重复分析）
         for (const img of imagesNeedOcr) {
           try {
-            setIsProcessing(true);
-            setProcessingImageId(img.id);
-
-            // ✅ 使用轻量级 OCR（5-10秒，~500-1000 tokens）
             const ocrResult = await extractOcrOnly(img.base64, img.file.type);
-
-            // 更新图片数据（只更新 ocrText）
             setImages(prev => prev.map(image =>
-              image.id === img.id ? {
-                ...image,
-                ocrText: ocrResult.ocrText,
-              } : image
+              image.id === img.id ? { ...image, ocrText: ocrResult.ocrText } : image
             ));
-
-            // 消耗配额（OCR 操作）
-            if (user) {
-              const tokenUsage = ocrResult.tokenUsage ? {
-                promptTokens: ocrResult.tokenUsage.promptTokens,
-                completionTokens: ocrResult.tokenUsage.completionTokens,
-                totalTokens: ocrResult.tokenUsage.totalTokens,
-                model: ocrResult.tokenUsage.model
-              } : undefined;
-              await useQuotaFirebase(user.uid, 1, img.file.name, 'ocr', tokenUsage);
-              const updatedUser = await getUserData(user.uid);
-              if (updatedUser) setUser(updatedUser);
-            }
-
-            // 云同步
             if (cloudSyncEnabled && sessionId && user) {
               await updateImageInCloud(user.uid, sessionId, img.id, { ocrText: ocrResult.ocrText });
             }
           } catch (error) {
             console.error(`Failed to extract OCR for image ${img.id}:`, error);
-          } finally {
-            setIsProcessing(false);
-            setProcessingImageId(null);
           }
         }
       }
@@ -1119,7 +647,7 @@ const App: React.FC = () => {
             if (isQilFocused && qilPanelRef.current) {
               qilPanelRef.current.handleQilImageFile(file);
             } else {
-              processFile(file);
+              handleImageUpload(file);
             }
           }
           break;
@@ -1128,20 +656,20 @@ const App: React.FC = () => {
     };
     window.addEventListener('paste', handlePaste);
     return () => window.removeEventListener('paste', handlePaste);
-  }, [processFile]);
+  }, [handleImageUpload]);
 
   // Global Drag & Drop
   const onDragOver = useCallback((e: React.DragEvent) => e.preventDefault(), []);
   const onDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
-    const files = Array.from(e.dataTransfer.files || []);
+    const files = Array.from(e.dataTransfer.files || []) as File[];
     files.forEach(file => {
       const isHeic = file.name.toLowerCase().endsWith('.heic') || file.name.toLowerCase().endsWith('.heif');
       if (file.type.startsWith('image/') || isHeic) {
-        processFile(file);
+        handleImageUpload(file);
       }
     });
-  }, [processFile]);
+  }, [handleImageUpload]);
 
   // Resize handler for bottom panel
   const handleResizeStart = useCallback((e: React.MouseEvent) => {
@@ -1202,7 +730,7 @@ const App: React.FC = () => {
     return (
       <div className="min-h-screen bg-surface-50 flex items-center justify-center">
         <div className="flex items-center gap-3">
-          <Loader2 size={24} className="animate-spin text-primary-400" />
+          <Loader2 size={24} className="animate-spin text-text-muted" />
           <span className="text-text-muted">加载中...</span>
         </div>
       </div>
@@ -1223,6 +751,8 @@ const App: React.FC = () => {
         } : undefined}
         onLogout={user ? handleLogout : undefined}
         onOpenAnnouncement={() => setShowAnnouncementModal(true)}
+        onOpenQuotaModal={() => setShowQuotaModal(true)}
+        onOpenUpgradeModal={() => setShowUpgradeModal(true)}
       />
 
       {/* Main Content Area */}
@@ -1468,7 +998,7 @@ const App: React.FC = () => {
           <div className="text-text-muted mb-6">页面不存在</div>
           <button
             onClick={() => { navigate('/'); setCurrentViewState('products'); }}
-            className="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-500 transition-colors"
+            className="px-4 py-2 bg-text-primary text-white rounded-md hover:bg-text-secondary transition-colors"
           >
             返回首页
           </button>
@@ -1482,12 +1012,12 @@ const App: React.FC = () => {
             图片列表
           </div>
           {/* 移动端添加图片按钮 */}
-          <label className="md:hidden flex items-center justify-center gap-1.5 px-3 py-2 mb-2 bg-primary-600 hover:bg-primary-500 text-text-primary text-xs font-medium rounded cursor-pointer transition-colors">
+          <label className="md:hidden flex items-center justify-center gap-1.5 px-3 py-2 mb-2 bg-text-primary hover:bg-text-secondary text-white text-xs font-medium rounded cursor-pointer transition-colors">
             <ImagePlus size={14} />
             <span>添加图片</span>
             <input type="file" accept="image/*" className="hidden" onChange={(e) => {
               if (e.target.files?.[0]) {
-                processFile(e.target.files[0]);
+                handleImageUpload(e.target.files[0]);
                 setMobileTab('viewer');
               }
             }} />
@@ -1501,7 +1031,7 @@ const App: React.FC = () => {
                   setMobileTab('viewer');
                 }}
                 className={`relative group cursor-pointer rounded-lg overflow-hidden border-2 transition-all aspect-square md:aspect-auto ${
-                  currentImageIndex === idx ? 'border-primary-500' : 'border-transparent hover:border-border-hover'
+                  currentImageIndex === idx ? 'border-text-primary' : 'border-transparent hover:border-border-hover'
                 }`}
               >
                 <img src={img.src} alt="" className="w-full h-full md:h-20 object-cover" />
@@ -1522,7 +1052,7 @@ const App: React.FC = () => {
                 </button>
                 {processingImageId === img.id && (
                   <div className="absolute inset-0 bg-white/80 flex items-center justify-center">
-                    <Loader2 size={14} className="animate-spin text-primary-400" />
+                    <Loader2 size={14} className="animate-spin text-text-muted" />
                   </div>
                 )}
               </div>
@@ -1536,10 +1066,10 @@ const App: React.FC = () => {
           </div>
 
           {/* 添加图片按钮 - 桌面端底部 */}
-          <label className="hidden md:flex items-center justify-center gap-2 px-3 py-2 mt-2 bg-primary-600 hover:bg-primary-500 text-white text-xs font-medium rounded-lg cursor-pointer transition-colors">
+          <label className="hidden md:flex items-center justify-center gap-2 px-3 py-2 mt-2 bg-text-primary hover:bg-text-secondary text-white text-xs font-medium rounded-lg cursor-pointer transition-colors">
             <ImagePlus size={14} />
             <span>添加图片</span>
-            <input type="file" accept="image/*" className="hidden" onChange={(e) => e.target.files?.[0] && processFile(e.target.files[0])} />
+            <input type="file" accept="image/*" className="hidden" onChange={(e) => e.target.files?.[0] && handleImageUpload(e.target.files[0])} />
           </label>
         </div>
 
@@ -1580,28 +1110,28 @@ const App: React.FC = () => {
                         className="absolute left-0 right-0 h-0.5 pointer-events-none z-20"
                         style={{
                           animation: 'scanLine 2.5s ease-in-out infinite',
-                          background: 'linear-gradient(90deg, transparent, rgba(99, 102, 241, 0.8), rgba(129, 140, 248, 1), rgba(99, 102, 241, 0.8), transparent)',
-                          boxShadow: '0 0 15px 3px rgba(99, 102, 241, 0.6), 0 0 30px 6px rgba(99, 102, 241, 0.3)'
+                          background: 'linear-gradient(90deg, transparent, rgba(113, 113, 122, 0.8), rgba(161, 161, 170, 1), rgba(113, 113, 122, 0.8), transparent)',
+                          boxShadow: '0 0 15px 3px rgba(113, 113, 122, 0.6), 0 0 30px 6px rgba(113, 113, 122, 0.3)'
                         }}
                       />
                       {/* 扫描线上的状态文字 */}
                       <div
-                        className="absolute left-1/2 -translate-x-1/2 pointer-events-none z-30 flex items-center gap-2 px-3 py-1 bg-white/90 backdrop-blur-sm rounded-full border border-primary-500/50 text-[10px] text-indigo-300 whitespace-nowrap"
+                        className="absolute left-1/2 -translate-x-1/2 pointer-events-none z-30 flex items-center gap-2 px-3 py-1 bg-white/90 backdrop-blur-sm rounded-full border border-surface-300 text-[10px] text-text-secondary whitespace-nowrap"
                         style={{
                           animation: 'scanLine 2.5s ease-in-out infinite',
                         }}
                       >
-                        <span className="w-1.5 h-1.5 bg-primary-400 rounded-full animate-pulse" />
+                        <span className="w-1.5 h-1.5 bg-text-muted rounded-full animate-pulse" />
                         {processingStep === 1 ? 'AI 视觉分析' : '规则检测'}
                       </div>
                       {/* 顶部和底部边缘发光 */}
-                      <div className="absolute top-0 left-0 right-0 h-8 bg-gradient-to-b from-primary-500/20 to-transparent pointer-events-none z-10" />
-                      <div className="absolute bottom-0 left-0 right-0 h-8 bg-gradient-to-t from-primary-500/20 to-transparent pointer-events-none z-10" />
+                      <div className="absolute top-0 left-0 right-0 h-8 bg-gradient-to-b from-surface-300/30 to-transparent pointer-events-none z-10" />
+                      <div className="absolute bottom-0 left-0 right-0 h-8 bg-gradient-to-t from-surface-300/30 to-transparent pointer-events-none z-10" />
                       {/* 四角标记 */}
-                      <div className="absolute top-2 left-2 w-4 h-4 border-l-2 border-t-2 border-primary-400 pointer-events-none z-10" />
-                      <div className="absolute top-2 right-2 w-4 h-4 border-r-2 border-t-2 border-primary-400 pointer-events-none z-10" />
-                      <div className="absolute bottom-2 left-2 w-4 h-4 border-l-2 border-b-2 border-primary-400 pointer-events-none z-10" />
-                      <div className="absolute bottom-2 right-2 w-4 h-4 border-r-2 border-b-2 border-primary-400 pointer-events-none z-10" />
+                      <div className="absolute top-2 left-2 w-4 h-4 border-l-2 border-t-2 border-text-muted pointer-events-none z-10" />
+                      <div className="absolute top-2 right-2 w-4 h-4 border-r-2 border-t-2 border-text-muted pointer-events-none z-10" />
+                      <div className="absolute bottom-2 left-2 w-4 h-4 border-l-2 border-b-2 border-text-muted pointer-events-none z-10" />
+                      <div className="absolute bottom-2 right-2 w-4 h-4 border-r-2 border-b-2 border-text-muted pointer-events-none z-10" />
                     </>
                   )}
 
@@ -1612,7 +1142,7 @@ const App: React.FC = () => {
                         onClick={() => setSelectedIssueId(issue.id)}
                         className={`absolute rounded cursor-pointer transition-all ${
                           selectedIssueId === issue.id
-                            ? 'border-2 border-primary-400 bg-primary-400/30 shadow-[0_0_20px_rgba(99,102,241,0.6)] z-10'
+                            ? 'border-2 border-text-primary bg-text-primary/20 shadow-[0_0_20px_rgba(24,24,27,0.3)] z-10'
                             : issue.severity === 'high'
                               ? 'border-2 border-red-500 bg-red-500/20 hover:bg-red-500/40'
                               : 'border-2 border-amber-400 bg-amber-400/20 hover:bg-amber-400/40'
@@ -1658,7 +1188,7 @@ const App: React.FC = () => {
               <label className="inline-flex items-center gap-2 px-4 py-2 bg-surface-100 hover:bg-surface-200 text-text-primary text-sm font-medium rounded-lg cursor-pointer transition-colors border border-border">
                 <Upload size={16} />
                 选择文件
-                <input type="file" accept="image/*" className="hidden" onChange={(e) => e.target.files?.[0] && processFile(e.target.files[0])} />
+                <input type="file" accept="image/*" className="hidden" onChange={(e) => e.target.files?.[0] && handleImageUpload(e.target.files[0])} />
               </label>
               {!user && (
                 <p className="text-text-muted text-xs mt-4">上传图片需要先登录</p>
@@ -1706,7 +1236,7 @@ const App: React.FC = () => {
         {/* 拖动调整高度的把手区域 */}
         <div
           onMouseDown={handleResizeStart}
-          className={`hidden md:flex items-center justify-center h-6 cursor-ns-resize hover:bg-primary-500/10 transition-colors relative ${isResizing ? 'bg-primary-500/20' : ''}`}
+          className={`hidden md:flex items-center justify-center h-6 cursor-ns-resize hover:bg-surface-100 transition-colors relative ${isResizing ? 'bg-surface-200' : ''}`}
         >
           <div className="absolute inset-x-0 top-0 h-1 bg-border"></div>
           <button
@@ -1714,7 +1244,7 @@ const App: React.FC = () => {
               e.stopPropagation();
               setBottomHeight(prev => prev <= 24 ? 280 : 24);
             }}
-            className="bg-white hover:bg-primary-50 border border-border rounded-full w-6 h-6 text-text-muted hover:text-primary-600 transition-colors flex items-center justify-center shadow-sm z-10"
+            className="bg-white hover:bg-surface-50 border border-border rounded-full w-6 h-6 text-text-muted hover:text-text-primary transition-colors flex items-center justify-center shadow-sm z-10"
             title={bottomHeight <= 24 ? '展开 QIL 面板' : '收起 QIL 面板'}
           >
             <span className="text-[12px]">{bottomHeight <= 24 ? '▲' : '▼'}</span>
@@ -1728,8 +1258,8 @@ const App: React.FC = () => {
             manualSourceFields={manualSourceFields}
             onFieldsUpdate={handleUpdateQilFields}
             onError={setErrorMessage}
-            isProcessing={isProcessing}
-            onProcessingChange={setIsProcessing}
+            isProcessing={qilProcessing}
+            onProcessingChange={setQilProcessing}
           />
 
           {/* Specs Table */}
@@ -1740,7 +1270,7 @@ const App: React.FC = () => {
                 onClick={() => setSpecsTab('qil')}
                 className={`px-3 py-1 text-[10px] font-bold uppercase tracking-wider rounded transition-all shrink-0 ${
                   specsTab === 'qil'
-                    ? 'bg-primary-500/20 text-primary-400 border border-primary-500/50'
+                    ? 'bg-surface-200 text-text-primary border border-surface-300'
                     : 'text-text-muted hover:text-text-secondary hover:bg-surface-100'
                 }`}
               >
@@ -1752,7 +1282,7 @@ const App: React.FC = () => {
                   onClick={() => setSpecsTab(img.id)}
                   className={`px-3 py-1 text-[10px] font-medium rounded transition-all shrink-0 truncate max-w-[120px] ${
                     specsTab === img.id
-                      ? 'bg-primary-500/20 text-primary-400 border border-primary-500/50'
+                      ? 'bg-surface-200 text-text-primary border border-surface-300'
                       : 'text-text-muted hover:text-text-secondary hover:bg-surface-100'
                   }`}
                   title={img.file.name}
@@ -1764,7 +1294,7 @@ const App: React.FC = () => {
                 onClick={() => setSpecsTab('diff')}
                 className={`px-3 py-1 text-[10px] font-bold uppercase tracking-wider rounded transition-all shrink-0 ${
                   specsTab === 'diff'
-                    ? 'bg-primary-500/20 text-primary-400 border border-primary-500/50'
+                    ? 'bg-surface-200 text-text-primary border border-surface-300'
                     : 'text-text-muted hover:text-text-secondary hover:bg-surface-100'
                 }`}
               >
@@ -1810,205 +1340,12 @@ const App: React.FC = () => {
                   </div>
                 )
               ) : specsTab === 'diff' ? (
-                (() => {
-                  if (images.length === 0 || manualSourceFields.length === 0) {
-                    return (
-                      <div className="h-full flex flex-col items-center justify-center text-slate-700">
-                        <GitCompare size={24} className="mb-2 opacity-30" />
-                        <span className="text-xs">暂无对比数据</span>
-                        <span className="text-[10px] text-slate-600 mt-1">
-                          {images.length === 0 ? '请上传包装图片' : '请输入 QIL 数据'}
-                        </span>
-                      </div>
-                    );
-                  }
-
-                  const allResults = manualSourceFields.map(field => {
-                    const imageResults = images.map(img => {
-                      if (!img.specs?.length) return { value: '-', status: 'pending' };
-                      const matchingSpec = img.specs.find(spec =>
-                        spec.key === field.key ||
-                        spec.key.includes(field.key) ||
-                        field.key.includes(spec.key)
-                      );
-                      if (!matchingSpec) return { value: '(未找到)', status: 'error' };
-
-                      const qilValue = field.value.trim().toLowerCase();
-                      const imgValue = matchingSpec.value.trim().toLowerCase();
-
-                      if (qilValue === imgValue) {
-                        return { value: matchingSpec.value, status: 'match' };
-                      } else if (imgValue.includes(qilValue) || qilValue.includes(imgValue)) {
-                        return { value: matchingSpec.value, status: 'warning' };
-                      } else {
-                        return { value: matchingSpec.value, status: 'error' };
-                      }
-                    });
-                    const hasError = imageResults.some(r => r.status === 'error');
-                    const hasWarning = imageResults.some(r => r.status === 'warning');
-                    return { field, imageResults, hasError, hasWarning };
-                  });
-
-                  const sortedResults = [...allResults].sort((a, b) => {
-                    if (a.hasError && !b.hasError) return -1;
-                    if (!a.hasError && b.hasError) return 1;
-                    if (a.hasWarning && !b.hasWarning) return -1;
-                    if (!a.hasWarning && b.hasWarning) return 1;
-                    return 0;
-                  });
-
-                  const errorCount = allResults.filter(r => r.hasError).length;
-                  const warningCount = allResults.filter(r => r.hasWarning && !r.hasError).length;
-                  const matchCount = allResults.length - errorCount - warningCount;
-                  const allPass = errorCount === 0 && warningCount === 0;
-
-                  // 只显示差异项开关
-                  const [showOnlyDiff, setShowOnlyDiff] = useState(false);
-                  const displayResults = showOnlyDiff
-                    ? sortedResults.filter(r => r.hasError || r.hasWarning)
-                    : sortedResults;
-
-                  return (
-                    <div className="flex flex-col h-full">
-                      {/* 汇总统计 */}
-                      <div className={`px-4 py-3 mb-3 rounded-lg flex items-center justify-between border-2 ${
-                        allPass
-                          ? 'bg-emerald-500/10 border-emerald-500/30'
-                          : errorCount > 0
-                            ? 'bg-red-500/10 border-red-500/30'
-                            : 'bg-amber-500/10 border-amber-500/30'
-                      }`}>
-                        <div className="flex items-center gap-3">
-                          <span className={`text-sm font-bold ${
-                            allPass ? 'text-emerald-400' : errorCount > 0 ? 'text-red-400' : 'text-amber-400'
-                          }`}>
-                            {allPass ? '✓ 全部通过' : errorCount > 0 ? `✗ 发现 ${errorCount} 处差异` : `⚠ ${warningCount} 处警告`}
-                          </span>
-                          <div className="flex items-center gap-2 text-[10px]">
-                            <span className="px-2 py-0.5 bg-emerald-500/20 text-emerald-400 rounded">{matchCount} 匹配</span>
-                            {warningCount > 0 && <span className="px-2 py-0.5 bg-amber-500/20 text-amber-400 rounded">{warningCount} 警告</span>}
-                            {errorCount > 0 && <span className="px-2 py-0.5 bg-red-500/20 text-red-400 rounded">{errorCount} 差异</span>}
-                          </div>
-                        </div>
-                        <button
-                          onClick={() => setShowOnlyDiff(!showOnlyDiff)}
-                          className={`px-3 py-1.5 text-[10px] font-medium rounded-lg transition-all ${
-                            showOnlyDiff
-                              ? 'bg-primary-600 text-text-primary'
-                              : 'bg-surface-100 text-text-muted hover:bg-surface-200'
-                          }`}
-                        >
-                          {showOnlyDiff ? '显示全部' : '只看差异'}
-                        </button>
-                      </div>
-
-                      {/* 对比表格 */}
-                      <div className="flex-1 overflow-auto">
-                        <div className="space-y-2">{displayResults.map(({ field, imageResults, hasError, hasWarning }, idx) => (
-                            <div
-                              key={idx}
-                              className={`rounded-lg border-2 transition-all ${
-                                hasError
-                                  ? 'bg-red-500/5 border-red-500/30 shadow-lg shadow-red-500/10'
-                                  : hasWarning
-                                    ? 'bg-amber-500/5 border-amber-500/30'
-                                    : 'bg-surface-100/30 border-border/50'
-                              }`}
-                            >
-                              {/* 字段名 */}
-                              <div className="px-3 py-2 border-b border-border/50 flex items-center justify-between">
-                                <div className="flex items-center gap-2">
-                                  <span className={`w-2 h-2 rounded-full ${
-                                    hasError ? 'bg-red-500' : hasWarning ? 'bg-amber-500' : 'bg-emerald-500'
-                                  }`}></span>
-                                  <span className="text-xs font-medium text-text-primary">{field.key}</span>
-                                </div>
-                                {(hasError || hasWarning) && (
-                                  <span className={`text-[9px] font-bold uppercase px-2 py-0.5 rounded ${
-                                    hasError
-                                      ? 'bg-red-500/20 text-red-400'
-                                      : 'bg-amber-500/20 text-amber-400'
-                                  }`}>
-                                    {hasError ? '差异' : '警告'}
-                                  </span>
-                                )}
-                              </div>
-
-                              {/* 对比内容 */}
-                              <div className="p-3 grid grid-cols-2 gap-3">
-                                {/* QIL 值 */}
-                                <div>
-                                  <div className="text-[9px] text-text-muted uppercase tracking-wider mb-1 flex items-center gap-1">
-                                    <FileSpreadsheet size={10} />
-                                    QIL 标准
-                                  </div>
-                                  <div
-                                    onClick={() => handleCopy(field.value, `qil-${idx}`)}
-                                    className="group relative text-xs font-mono bg-primary-500/10 text-indigo-300 px-3 py-2 rounded-lg cursor-pointer hover:bg-primary-500/20 transition-all border border-primary-500/30"
-                                  >
-                                    <div className="pr-6">{field.value}</div>
-                                    <Copy
-                                      size={12}
-                                      className="absolute right-2 top-1/2 -translate-y-1/2 text-primary-400 opacity-0 group-hover:opacity-100 transition-opacity"
-                                    />
-                                    {copiedId === `qil-${idx}` && (
-                                      <div className="absolute -top-6 right-0 bg-emerald-500 text-text-primary text-[9px] px-2 py-0.5 rounded">
-                                        已复制
-                                      </div>
-                                    )}
-                                  </div>
-                                </div>
-
-                                {/* 图片值 */}
-                                <div>
-                                  <div className="text-[9px] text-text-muted uppercase tracking-wider mb-1 flex items-center gap-1">
-                                    <Image size={10} />
-                                    图片实际
-                                  </div>
-                                  <div className="space-y-1.5">
-                                    {imageResults.map((result, imgIdx) => (
-                                      <div
-                                        key={imgIdx}
-                                        onClick={() => handleCopy(result.value, `img-${idx}-${imgIdx}`)}
-                                        className={`group relative text-xs font-mono px-3 py-2 rounded-lg cursor-pointer transition-all border ${
-                                          result.status === 'match'
-                                            ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30 hover:bg-emerald-500/20'
-                                            : result.status === 'warning'
-                                              ? 'bg-amber-500/10 text-amber-300 border-amber-500/30 hover:bg-amber-500/20'
-                                              : result.status === 'error'
-                                                ? 'bg-red-500/10 text-red-300 border-red-500/30 hover:bg-red-500/20'
-                                                : 'bg-surface-100/50 text-text-muted border-border/50'
-                                        }`}
-                                      >
-                                        <div className="flex items-center gap-2 pr-6">
-                                          <span className="text-[8px] text-slate-600">#{imgIdx + 1}</span>
-                                          <span className="flex-1">{result.value}</span>
-                                        </div>
-                                        <Copy
-                                          size={12}
-                                          className={`absolute right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity ${
-                                            result.status === 'match' ? 'text-emerald-400' :
-                                            result.status === 'warning' ? 'text-amber-400' :
-                                            result.status === 'error' ? 'text-red-400' : 'text-text-muted'
-                                          }`}
-                                        />
-                                        {copiedId === `img-${idx}-${imgIdx}` && (
-                                          <div className="absolute -top-6 right-0 bg-emerald-500 text-text-primary text-[9px] px-2 py-0.5 rounded">
-                                            已复制
-                                          </div>
-                                        )}
-                                      </div>
-                                    ))}
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })()
+                <DiffSummary
+                  images={images}
+                  manualSourceFields={manualSourceFields}
+                  copiedId={copiedId}
+                  onCopy={handleCopy}
+                />
               ) : (
                 (() => {
                   const currentOcrText = images.find(img => img.id === specsTab)?.ocrText || '';
@@ -2052,13 +1389,13 @@ const App: React.FC = () => {
         <button
           onClick={() => setMobileTab('images')}
           className={`relative flex flex-col items-center justify-center gap-0.5 py-1.5 px-3 rounded-lg transition-colors ${
-            mobileTab === 'images' ? 'text-primary-400 bg-surface-100' : 'text-text-muted'
+            mobileTab === 'images' ? 'text-text-primary bg-surface-100' : 'text-text-muted'
           }`}
         >
           <List size={18} />
           <span className="text-[9px]">图片</span>
           {images.length > 0 && (
-            <span className="absolute -top-0.5 -right-0.5 min-w-4 h-4 px-1 bg-primary-500 text-text-primary text-[8px] rounded-full flex items-center justify-center">
+            <span className="absolute -top-0.5 -right-0.5 min-w-4 h-4 px-1 bg-text-primary text-white text-[8px] rounded-full flex items-center justify-center">
               {images.length}
             </span>
           )}
@@ -2066,7 +1403,7 @@ const App: React.FC = () => {
         <button
           onClick={() => setMobileTab('viewer')}
           className={`flex flex-col items-center justify-center gap-0.5 py-1.5 px-3 rounded-lg transition-colors ${
-            mobileTab === 'viewer' ? 'text-primary-400 bg-surface-100' : 'text-text-muted'
+            mobileTab === 'viewer' ? 'text-text-primary bg-surface-100' : 'text-text-muted'
           }`}
         >
           <Eye size={18} />
@@ -2075,7 +1412,7 @@ const App: React.FC = () => {
         <button
           onClick={() => setMobileTab('issues')}
           className={`relative flex flex-col items-center justify-center gap-0.5 py-1.5 px-3 rounded-lg transition-colors ${
-            mobileTab === 'issues' ? 'text-primary-400 bg-surface-100' : 'text-text-muted'
+            mobileTab === 'issues' ? 'text-text-primary bg-surface-100' : 'text-text-muted'
           }`}
         >
           <AlertTriangle size={18} />
@@ -2093,7 +1430,7 @@ const App: React.FC = () => {
         <button
           onClick={() => setMobileTab('qil')}
           className={`relative flex flex-col items-center justify-center gap-0.5 py-1.5 px-3 rounded-lg transition-colors ${
-            mobileTab === 'qil' ? 'text-primary-400 bg-surface-100' : 'text-text-muted'
+            mobileTab === 'qil' ? 'text-text-primary bg-surface-100' : 'text-text-muted'
           }`}
         >
           <Table size={18} />
