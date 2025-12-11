@@ -762,17 +762,21 @@ const App: React.FC = () => {
   // 加载中状态
   if (isCheckingAuth) {
     return (
-      <div className="min-h-screen bg-surface-50 flex items-center justify-center">
-        <div className="flex items-center gap-3">
-          <Loader2 size={24} className="animate-spin text-text-muted" />
-          <span className="text-text-muted">加载中...</span>
+      <div className="min-h-screen gradient-bg flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-10 h-10 rounded-lg bg-text-primary flex items-center justify-center animate-pulse">
+            <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"/>
+            </svg>
+          </div>
+          <span className="text-text-muted text-sm">加载中...</span>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="h-screen w-screen bg-surface-50 flex font-sans text-text-primary overflow-hidden">
+    <div className="h-screen w-screen gradient-bg flex font-sans text-text-primary overflow-hidden">
       {/* Sidebar - 始终显示 */}
       <Sidebar
         currentView={currentView}
@@ -832,159 +836,119 @@ const App: React.FC = () => {
         onClose={() => setShowAnnouncementModal(false)}
       />
 
-      {/* TOP BAR - 简化版，仅在分析视图显示 */}
+      {/* TOP BAR - 分析视图显示 */}
       {currentView === 'analysis' && (
-      <div className="h-12 border-b border-gray-100 bg-white flex items-center px-4 shrink-0 gap-4 relative z-50">
-        {/* Left: 云同步状态 + 产品名称 + 模式切换胶囊 */}
-        <div className="flex items-center gap-3 min-w-0">
-          {/* 云同步状态 */}
-          {user && (
-            <div className="flex items-center gap-1.5" title={cloudSyncEnabled ? '云同步已开启' : '云同步已关闭'}>
-              {isSyncing || isLoadingFromCloud ? (
-                <Loader2 size={12} className="animate-spin text-gray-400" />
-              ) : (
-                <Cloud size={12} className="text-gray-400" />
-              )}
-            </div>
-          )}
+      <div className="border-b border-border bg-white shrink-0 relative z-50">
+        {/* 第一行：产品名 + 模式切换 */}
+        <div className="h-11 flex items-center justify-between px-4">
+          {/* Left: 产品名称 */}
+          <div className="flex items-center gap-2 min-w-0">
+            {isEditingProductName ? (
+              <input
+                type="text"
+                value={productName}
+                onChange={(e) => setProductName(e.target.value)}
+                onBlur={() => { setIsEditingProductName(false); handleProductNameChange(productName); }}
+                onKeyDown={(e) => e.key === 'Enter' && (setIsEditingProductName(false), handleProductNameChange(productName))}
+                className="bg-surface-50 border border-border rounded-full px-3 py-1 text-sm text-text-primary w-44 focus:outline-none focus:border-text-muted"
+                autoFocus
+              />
+            ) : (
+              <button
+                onClick={() => user && setIsEditingProductName(true)}
+                className="text-sm font-medium text-text-primary hover:bg-surface-50 transition-colors truncate max-w-[200px] px-3 py-1 rounded-full flex items-center gap-2"
+                title="点击编辑产品名称"
+              >
+                {productName}
+                {user && (isSyncing || isLoadingFromCloud ? (
+                  <Loader2 size={12} className="animate-spin text-text-muted flex-shrink-0" />
+                ) : (
+                  <Cloud size={12} className="text-text-muted flex-shrink-0" />
+                ))}
+              </button>
+            )}
+          </div>
 
-          {/* 当前产品名称（可编辑） */}
-          {isEditingProductName ? (
-            <input
-              type="text"
-              value={productName}
-              onChange={(e) => setProductName(e.target.value)}
-              onBlur={() => {
-                setIsEditingProductName(false);
-                handleProductNameChange(productName);
-              }}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  setIsEditingProductName(false);
-                  handleProductNameChange(productName);
-                }
-              }}
-              className="bg-white border border-gray-300 rounded px-2 py-1 text-sm text-gray-900 w-40 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500"
-              autoFocus
-            />
-          ) : (
-            <button
-              onClick={() => user && setIsEditingProductName(true)}
-              className="text-sm font-medium text-gray-700 hover:text-gray-900 transition-colors truncate max-w-[200px] px-2 py-1 rounded hover:bg-gray-50"
-              title="点击编辑产品名称"
-            >
-              {productName}
-            </button>
-          )}
-
-          {/* 模式切换胶囊 */}
-          <div className="flex items-center bg-gray-100 rounded-full p-0.5">
+          {/* Center: 模式切换胶囊 */}
+          <div className="absolute left-1/2 -translate-x-1/2 flex items-center bg-surface-100 rounded-full p-1">
             <button
               onClick={() => setAnalysisMode('detection')}
-              className={`px-3 py-1 text-xs font-medium rounded-full transition-all ${
-                analysisMode === 'detection'
-                  ? 'bg-white text-gray-900 shadow-sm'
-                  : 'text-gray-500 hover:text-gray-700'
+              className={`px-4 py-1.5 text-xs font-medium rounded-full transition-all ${
+                analysisMode === 'detection' ? 'bg-white text-text-primary shadow-sm' : 'text-text-muted hover:text-text-secondary'
               }`}
             >
               AI 图片检测
             </button>
             <button
               onClick={() => setAnalysisMode('comparison')}
-              className={`px-3 py-1 text-xs font-medium rounded-full transition-all ${
-                analysisMode === 'comparison'
-                  ? 'bg-white text-gray-900 shadow-sm'
-                  : 'text-gray-500 hover:text-gray-700'
+              className={`px-4 py-1.5 text-xs font-medium rounded-full transition-all ${
+                analysisMode === 'comparison' ? 'bg-white text-text-primary shadow-sm' : 'text-text-muted hover:text-text-secondary'
               }`}
             >
               AI 参数对比
             </button>
           </div>
-        </div>
 
-        {/* Center: 图片工具 - 仅在检测模式显示 */}
-        {analysisMode === 'detection' && (
-        <div className="absolute left-1/2 -translate-x-1/2 flex items-center gap-3">
-          {/* 行业选择 */}
-          <div ref={industryMenuRef} className="relative">
-            <button
-              onClick={() => setShowIndustryMenu(!showIndustryMenu)}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-50 hover:bg-gray-100 text-gray-700 text-xs rounded-lg transition-colors"
-            >
-              <Package size={14} />
-              <span>{{ cosmetics: '化妆品', food: '食品', pharma: '药品', general: '通用' }[industry]}</span>
-              <ChevronDown size={12} className={`transition-transform ${showIndustryMenu ? 'rotate-180' : ''}`} />
-            </button>
-            {showIndustryMenu && (
-              <div className="absolute top-full left-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-xl overflow-hidden z-[100]">
-                {(['cosmetics', 'food', 'pharma', 'general'] as IndustryType[]).map((ind) => (
-                  <button
-                    key={ind}
-                    onClick={() => { setIndustry(ind); setShowIndustryMenu(false); }}
-                    className={`w-full px-4 py-2 text-left text-sm transition-colors ${industry === ind ? 'bg-purple-50 text-purple-700 font-medium' : 'text-gray-700 hover:bg-gray-50'}`}
-                  >
-                    {{ cosmetics: '化妆品场景', food: '食品场景', pharma: '药品场景', general: '通用场景' }[ind]}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-          {currentImage && (
-            <div className="hidden md:flex items-center gap-1.5 px-3 py-1.5 bg-gray-50 rounded-lg">
+          {/* Right: 行业选择 */}
+          {analysisMode === 'detection' && (
+            <div ref={industryMenuRef} className="relative">
               <button
-                onClick={() => setShowOverlay(!showOverlay)}
-                className={`p-1 rounded hover:bg-white transition-colors ${showOverlay ? 'text-purple-600' : 'text-gray-400'}`}
-                title="标注"
+                onClick={() => setShowIndustryMenu(!showIndustryMenu)}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-text-secondary text-xs rounded-full hover:bg-surface-50 transition-colors"
               >
-                {showOverlay ? <Eye size={16} /> : <EyeOff size={16} />}
+                <span>{{ cosmetics: '化妆品', food: '食品', pharma: '药品', general: '通用' }[industry]}</span>
+                <ChevronDown size={12} className={`transition-transform ${showIndustryMenu ? 'rotate-180' : ''}`} />
               </button>
-
-              <button
-                onClick={() => setImageScale(s => Math.max(0.3, s / 1.2))}
-                className="p-1 text-gray-600 hover:text-gray-900 hover:bg-white rounded transition-colors"
-                title="缩小"
-              >
-                <ZoomOut size={16} />
-              </button>
-              <span className="text-xs text-gray-600 font-medium min-w-[42px] text-center">
-                {Math.round(imageScale * 100)}%
-              </span>
-              <button
-                onClick={() => setImageScale(s => Math.min(3, s * 1.2))}
-                className="p-1 text-gray-600 hover:text-gray-900 hover:bg-white rounded transition-colors"
-                title="放大"
-              >
-                <ZoomIn size={16} />
-              </button>
-
-              <button
-                onClick={() => setImages(imgs => imgs.map((img, i) => i === currentImageIndex ? { ...img, rotation: (img.rotation || 0) - 90 } : img))}
-                className="p-1 text-gray-600 hover:text-gray-900 hover:bg-white rounded transition-colors"
-                title="逆时针"
-              >
-                <RotateCcw size={16} />
-              </button>
-              <button
-                onClick={() => setImages(imgs => imgs.map((img, i) => i === currentImageIndex ? { ...img, rotation: (img.rotation || 0) + 90 } : img))}
-                className="p-1 text-gray-600 hover:text-gray-900 hover:bg-white rounded transition-colors"
-                title="顺时针"
-              >
-                <RotateCw size={16} />
-              </button>
-
-              <button
-                onClick={() => {
-                  setImageScale(1);
-                  setImages(imgs => imgs.map((img, i) => i === currentImageIndex ? { ...img, rotation: 0 } : img));
-                }}
-                className="p-1 text-gray-600 hover:text-gray-900 hover:bg-white rounded transition-colors"
-                title="重置"
-              >
-                <Maximize2 size={16} />
-              </button>
+              {showIndustryMenu && (
+                <div className="absolute top-full right-0 mt-1 bg-white rounded-lg shadow-lg overflow-hidden z-[100] border border-border min-w-[100px] py-1">
+                  {(['cosmetics', 'food', 'pharma', 'general'] as IndustryType[]).map((ind) => (
+                    <button
+                      key={ind}
+                      onClick={() => { setIndustry(ind); setShowIndustryMenu(false); }}
+                      className={`w-full px-3 py-1.5 text-left text-xs transition-colors ${industry === ind ? 'bg-surface-100 text-text-primary font-medium' : 'text-text-secondary hover:bg-surface-50'}`}
+                    >
+                      {{ cosmetics: '化妆品', food: '食品', pharma: '药品', general: '通用' }[ind]}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           )}
+          {analysisMode === 'comparison' && <div />}
         </div>
+
+        {/* 第二行：图片工具（仅检测模式且有图片时显示） */}
+        {analysisMode === 'detection' && currentImage && (
+          <div className="h-9 flex items-center justify-center gap-1 border-t border-border">
+            <button
+              onClick={() => setShowOverlay(!showOverlay)}
+              className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs transition-colors ${showOverlay ? 'bg-surface-100 text-text-primary' : 'text-text-muted hover:bg-surface-50'}`}
+            >
+              {showOverlay ? <Eye size={13} /> : <EyeOff size={13} />}
+              <span>标注</span>
+            </button>
+            <div className="flex items-center gap-0.5 px-2 py-1 rounded-full bg-surface-50">
+              <button onClick={() => setImageScale(s => Math.max(0.3, s / 1.2))} className="p-1 text-text-muted hover:text-text-primary rounded-full transition-colors">
+                <ZoomOut size={13} />
+              </button>
+              <span className="text-[11px] text-text-secondary min-w-[36px] text-center tabular-nums">{Math.round(imageScale * 100)}%</span>
+              <button onClick={() => setImageScale(s => Math.min(3, s * 1.2))} className="p-1 text-text-muted hover:text-text-primary rounded-full transition-colors">
+                <ZoomIn size={13} />
+              </button>
+            </div>
+            <div className="flex items-center gap-0.5 px-2 py-1 rounded-full bg-surface-50">
+              <button onClick={() => setImages(imgs => imgs.map((img, i) => i === currentImageIndex ? { ...img, rotation: (img.rotation || 0) - 90 } : img))} className="p-1 text-text-muted hover:text-text-primary rounded-full transition-colors">
+                <RotateCcw size={13} />
+              </button>
+              <button onClick={() => setImages(imgs => imgs.map((img, i) => i === currentImageIndex ? { ...img, rotation: (img.rotation || 0) + 90 } : img))} className="p-1 text-text-muted hover:text-text-primary rounded-full transition-colors">
+                <RotateCw size={13} />
+              </button>
+            </div>
+            <button onClick={() => { setImageScale(1); setImages(imgs => imgs.map((img, i) => i === currentImageIndex ? { ...img, rotation: 0 } : img)); }} className="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs text-text-muted hover:bg-surface-50 transition-colors">
+              <Maximize2 size={13} />
+              <span>重置</span>
+            </button>
+          </div>
         )}
       </div>
       )}
@@ -1052,19 +1016,19 @@ const App: React.FC = () => {
           onBack={() => setCurrentView('batch-report')}
         />
       ) : currentView === '404' ? (
-        <div className="flex-1 flex flex-col items-center justify-center bg-surface-50">
-          <div className="text-6xl mb-4">404</div>
+        <div className="flex-1 flex flex-col items-center justify-center">
+          <div className="text-6xl font-bold text-text-primary mb-4">404</div>
           <div className="text-text-muted mb-6">页面不存在</div>
           <button
             onClick={() => { navigate('/'); setCurrentViewState('products'); }}
-            className="px-4 py-2 bg-text-primary text-white rounded-md hover:bg-text-secondary transition-colors"
+            className="px-5 py-2.5 bg-text-primary text-white rounded-md hover:bg-text-secondary transition-colors"
           >
             返回首页
           </button>
         </div>
       ) : isLoadingFromCloud ? (
-        <div className="flex-1 flex flex-col items-center justify-center bg-surface-50">
-          <Loader2 size={32} className="animate-spin text-text-muted mb-3" />
+        <div className="flex-1 flex flex-col items-center justify-center">
+          <Loader2 size={24} className="animate-spin text-text-muted mb-4" />
           <span className="text-text-muted text-sm">正在加载产品数据...</span>
         </div>
       ) : (
@@ -1082,13 +1046,11 @@ const App: React.FC = () => {
           />
         ) : (
         <div className="flex-1 flex min-h-0 pb-14 md:pb-0">
-        {/* LEFT: Thumbnails - 桌面端显示，移动端通过底部导航切换 */}
-        <div className={`${mobileTab === 'images' ? 'flex' : 'hidden'} md:flex w-full md:w-[140px] border-r border-border bg-surface-50 p-2 overflow-y-auto shrink-0 flex-col`}>
-          <div className="text-[10px] font-bold text-text-muted uppercase tracking-wider mb-2">
-            图片列表
-          </div>
+        {/* LEFT: Thumbnails */}
+        <div className={`${mobileTab === 'images' ? 'flex' : 'hidden'} md:flex w-full md:w-[140px] border-r border-border bg-white p-2 overflow-y-auto shrink-0 flex-col`}>
+          <div className="text-[10px] font-medium text-text-muted uppercase tracking-wider mb-2 px-1">图片</div>
           {/* 移动端添加图片按钮 */}
-          <label className="md:hidden flex items-center justify-center gap-1.5 px-3 py-2 mb-2 bg-text-primary hover:bg-text-secondary text-white text-xs font-medium rounded cursor-pointer transition-colors">
+          <label className="md:hidden flex items-center justify-center gap-1.5 px-3 py-2 mb-2 bg-text-primary hover:bg-text-secondary text-white text-xs font-medium rounded-md cursor-pointer transition-colors">
             <ImagePlus size={14} />
             <span>添加图片</span>
             <input type="file" accept="image/*" className="hidden" onChange={(e) => {
@@ -1098,33 +1060,27 @@ const App: React.FC = () => {
               }
             }} />
           </label>
-          <div className="grid grid-cols-3 gap-2 md:flex md:flex-col md:space-y-2 md:gap-0 overflow-y-auto">
+          <div className="grid grid-cols-3 gap-2 md:flex md:flex-col md:space-y-1.5 md:gap-0 overflow-y-auto flex-1">
             {images.map((img, idx) => (
               <div
                 key={img.id}
-                onClick={() => {
-                  setCurrentImageIndex(idx);
-                  setMobileTab('viewer');
-                }}
-                className={`relative group cursor-pointer rounded-lg overflow-hidden border-2 transition-all aspect-square md:aspect-auto ${
+                onClick={() => { setCurrentImageIndex(idx); setMobileTab('viewer'); }}
+                className={`relative group cursor-pointer rounded-md overflow-hidden transition-all aspect-square md:aspect-auto border ${
                   currentImageIndex === idx ? 'border-text-primary' : 'border-transparent hover:border-border-hover'
                 }`}
               >
-                <img src={img.src} alt="" className="w-full h-full md:h-20 object-cover" />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+                <img src={img.src} alt="" className="w-full h-full md:h-[72px] object-cover" />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
                 <div className="absolute bottom-1 left-1 right-1 flex items-center justify-between">
-                  <span className="text-[8px] text-text-primary truncate max-w-[60px]">{img.file.name}</span>
+                  <span className="text-[8px] text-white truncate max-w-[50px]">{img.file.name}</span>
                   {img.issues.length > 0 ? (
-                    <span className="text-[8px] bg-red-500 text-text-primary px-1 rounded">{img.issues.length}</span>
+                    <span className="text-[8px] bg-error text-white px-1 rounded">{img.issues.length}</span>
                   ) : img.description && (
-                    <span className="text-[8px] bg-emerald-500 text-text-primary px-1 rounded">✓</span>
+                    <span className="text-[8px] bg-success text-white px-1 rounded">✓</span>
                   )}
                 </div>
-                <button
-                  onClick={(e) => { e.stopPropagation(); handleRemoveImage(img.id); }}
-                  className="absolute top-1 right-1 p-0.5 bg-red-500/80 rounded opacity-0 group-hover:opacity-100 transition-opacity"
-                >
-                  <Trash2 size={10} className="text-text-primary" />
+                <button onClick={(e) => { e.stopPropagation(); handleRemoveImage(img.id); }} className="absolute top-1 right-1 p-0.5 bg-black/40 hover:bg-error rounded opacity-0 group-hover:opacity-100 transition-opacity">
+                  <Trash2 size={10} className="text-white" />
                 </button>
                 {processingImageId === img.id && (
                   <div className="absolute inset-0 bg-white/80 flex items-center justify-center">
@@ -1134,28 +1090,27 @@ const App: React.FC = () => {
               </div>
             ))}
             {images.length === 0 && (
-              <div className="col-span-3 p-4 border-2 border-dashed border-border rounded-lg text-center">
-                <ImagePlus size={20} className="mx-auto text-slate-700 mb-1" />
-                <span className="text-[9px] text-slate-600">点击下方按钮添加图片</span>
+              <div className="col-span-3 p-3 border border-dashed border-border rounded-md text-center">
+                <ImagePlus size={18} className="mx-auto text-text-muted mb-1" />
+                <span className="text-[9px] text-text-muted">添加图片</span>
               </div>
             )}
           </div>
-
           {/* 添加图片按钮 - 桌面端底部 */}
-          <label className="hidden md:flex items-center justify-center gap-2 px-3 py-2 mt-2 bg-text-primary hover:bg-text-secondary text-white text-xs font-medium rounded-lg cursor-pointer transition-colors">
+          <label className="hidden md:flex items-center justify-center gap-1.5 px-3 py-2 mt-2 bg-text-primary hover:bg-text-secondary text-white text-xs font-medium rounded-md cursor-pointer transition-colors">
             <ImagePlus size={14} />
-            <span>添加图片</span>
+            <span>添加</span>
             <input type="file" accept="image/*" className="hidden" onChange={(e) => e.target.files?.[0] && handleImageUpload(e.target.files[0])} />
           </label>
         </div>
 
         {/* CENTER: Image Viewer */}
-        <div className={`${mobileTab === 'viewer' ? 'flex' : 'hidden'} md:flex flex-1 relative bg-white overflow-hidden items-center justify-center group/canvas`}>
+        <div className={`${mobileTab === 'viewer' ? 'flex' : 'hidden'} md:flex flex-1 relative overflow-hidden items-center justify-center group/canvas bg-surface-50`}>
           {/* Grid Background */}
           <div
-            className="absolute inset-0 opacity-10 pointer-events-none"
+            className="absolute inset-0 opacity-[0.04] pointer-events-none"
             style={{
-              backgroundImage: 'radial-gradient(#475569 1px, transparent 1px)',
+              backgroundImage: 'radial-gradient(#94a3b8 1px, transparent 1px)',
               backgroundSize: '20px 20px',
             }}
           />
@@ -1240,22 +1195,22 @@ const App: React.FC = () => {
                   <button
                     onClick={() => setCurrentImageIndex(i => Math.max(0, i - 1))}
                     disabled={currentImageIndex === 0}
-                    className="absolute left-4 top-1/2 -translate-y-1/2 p-2 bg-white/80 rounded-full disabled:opacity-30 hover:bg-surface-100 transition-all opacity-0 group-hover/canvas:opacity-100 shadow-sm border border-border"
+                    className="absolute left-4 top-1/2 -translate-y-1/2 p-2 bg-white rounded-md border border-border disabled:opacity-30 hover:bg-surface-50 transition-colors opacity-0 group-hover/canvas:opacity-100"
                   >
-                    <ChevronLeft size={20} className="text-text-secondary" />
+                    <ChevronLeft size={18} className="text-text-secondary" />
                   </button>
                   <button
                     onClick={() => setCurrentImageIndex(i => Math.min(images.length - 1, i + 1))}
                     disabled={currentImageIndex === images.length - 1}
-                    className="absolute right-4 top-1/2 -translate-y-1/2 p-2 bg-white/80 rounded-full disabled:opacity-30 hover:bg-surface-100 transition-all opacity-0 group-hover/canvas:opacity-100 shadow-sm border border-border"
+                    className="absolute right-4 top-1/2 -translate-y-1/2 p-2 bg-white rounded-md border border-border disabled:opacity-30 hover:bg-surface-50 transition-colors opacity-0 group-hover/canvas:opacity-100"
                   >
-                    <ChevronRight size={20} className="text-text-secondary" />
+                    <ChevronRight size={18} className="text-text-secondary" />
                   </button>
                 </>
               )}
             </>
           ) : (
-            <div className="text-center">
+            <div className="text-center relative z-10">
               <button
                 onClick={async () => {
                   try {
@@ -1274,14 +1229,14 @@ const App: React.FC = () => {
                     alert('无法读取剪贴板，请使用 Ctrl+V 粘贴');
                   }
                 }}
-                className="p-5 bg-surface-50 hover:bg-surface-100 rounded-2xl mb-4 inline-block cursor-pointer transition-colors"
+                className="p-5 bg-white hover:bg-surface-50 rounded-lg mb-4 inline-block cursor-pointer transition-colors border-2 border-dashed border-border hover:border-border-hover group"
               >
-                <ImagePlus className="text-text-muted" size={40} />
+                <ImagePlus className="text-text-muted group-hover:text-text-secondary transition-colors" size={36} />
               </button>
-              <p className="text-text-secondary font-medium mb-1">点击上方粘贴图片</p>
-              <p className="text-text-muted text-sm mb-4">或 Ctrl+V / 拖拽图片</p>
-              <label className="inline-flex items-center gap-2 px-4 py-2 bg-surface-100 hover:bg-surface-200 text-text-primary text-sm font-medium rounded-lg cursor-pointer transition-colors border border-border">
-                <Upload size={16} />
+              <p className="text-text-secondary text-sm font-medium mb-1">点击上方粘贴图片</p>
+              <p className="text-text-muted text-xs mb-4">或 Ctrl+V / 拖拽图片</p>
+              <label className="inline-flex items-center gap-2 px-4 py-2 bg-text-primary hover:bg-text-secondary text-white text-sm font-medium rounded-md cursor-pointer transition-colors">
+                <Upload size={14} />
                 选择文件
                 <input type="file" accept="image/*" className="hidden" onChange={(e) => e.target.files?.[0] && handleImageUpload(e.target.files[0])} />
               </label>
@@ -1328,15 +1283,15 @@ const App: React.FC = () => {
       )}
 
       {/* Mobile Bottom Navigation */}
-      <div className="md:hidden fixed bottom-0 left-0 right-0 h-14 bg-white border-t border-border flex items-center justify-around px-2 z-40">
+      <div className="md:hidden fixed bottom-0 left-0 right-0 h-14 bg-white border-t border-border flex items-center justify-around px-3 z-40">
         <button
           onClick={() => setMobileTab('images')}
-          className={`relative flex flex-col items-center justify-center gap-0.5 py-1.5 px-3 rounded-lg transition-colors ${
+          className={`relative flex flex-col items-center justify-center gap-0.5 py-2 px-4 rounded-md transition-colors ${
             mobileTab === 'images' ? 'text-text-primary bg-surface-100' : 'text-text-muted'
           }`}
         >
           <List size={18} />
-          <span className="text-[9px]">图片</span>
+          <span className="text-[9px] font-medium">图片</span>
           {images.length > 0 && (
             <span className="absolute -top-0.5 -right-0.5 min-w-4 h-4 px-1 bg-text-primary text-white text-[8px] rounded-full flex items-center justify-center">
               {images.length}
@@ -1345,26 +1300,26 @@ const App: React.FC = () => {
         </button>
         <button
           onClick={() => setMobileTab('viewer')}
-          className={`flex flex-col items-center justify-center gap-0.5 py-1.5 px-3 rounded-lg transition-colors ${
+          className={`flex flex-col items-center justify-center gap-0.5 py-2 px-4 rounded-md transition-colors ${
             mobileTab === 'viewer' ? 'text-text-primary bg-surface-100' : 'text-text-muted'
           }`}
         >
           <Eye size={18} />
-          <span className="text-[9px]">预览</span>
+          <span className="text-[9px] font-medium">预览</span>
         </button>
         <button
           onClick={() => setMobileTab('issues')}
-          className={`relative flex flex-col items-center justify-center gap-0.5 py-1.5 px-3 rounded-lg transition-colors ${
+          className={`relative flex flex-col items-center justify-center gap-0.5 py-2 px-4 rounded-md transition-colors ${
             mobileTab === 'issues' ? 'text-text-primary bg-surface-100' : 'text-text-muted'
           }`}
         >
           <AlertTriangle size={18} />
-          <span className="text-[9px]">问题</span>
+          <span className="text-[9px] font-medium">问题</span>
           {currentImage && (() => {
             const modelData = currentImage.issuesByModel?.[activeModelTab];
             const count = (modelData?.issues?.length || currentImage.issues.length) + (modelData?.deterministicIssues?.length || currentImage.deterministicIssues?.length || 0);
             return count > 0 && (
-              <span className="absolute -top-0.5 -right-0.5 min-w-4 h-4 px-1 bg-red-500 text-text-primary text-[8px] rounded-full flex items-center justify-center">
+              <span className="absolute -top-0.5 -right-0.5 min-w-4 h-4 px-1 bg-error text-white text-[8px] rounded-full flex items-center justify-center">
                 {count}
               </span>
             );
@@ -1372,14 +1327,14 @@ const App: React.FC = () => {
         </button>
         <button
           onClick={() => setMobileTab('qil')}
-          className={`relative flex flex-col items-center justify-center gap-0.5 py-1.5 px-3 rounded-lg transition-colors ${
+          className={`relative flex flex-col items-center justify-center gap-0.5 py-2 px-4 rounded-md transition-colors ${
             mobileTab === 'qil' ? 'text-text-primary bg-surface-100' : 'text-text-muted'
           }`}
         >
           <Table size={18} />
-          <span className="text-[9px]">QIL</span>
+          <span className="text-[9px] font-medium">QIL</span>
           {manualSourceFields.length > 0 && (
-            <span className="absolute -top-0.5 -right-0.5 min-w-4 h-4 px-1 bg-emerald-500 text-text-primary text-[8px] rounded-full flex items-center justify-center">
+            <span className="absolute -top-0.5 -right-0.5 min-w-4 h-4 px-1 bg-success text-white text-[8px] rounded-full flex items-center justify-center">
               {manualSourceFields.length}
             </span>
           )}
@@ -1390,11 +1345,11 @@ const App: React.FC = () => {
 
       {/* Error Toast */}
       {errorMessage && (
-        <div className="absolute top-20 left-1/2 -translate-x-1/2 bg-red-500/90 text-text-primary px-6 py-3 rounded-lg shadow-2xl z-50 text-sm font-medium flex items-center gap-3 backdrop-blur-sm border border-red-400/50">
-          <AlertCircle size={20} />
+        <div className="absolute top-16 left-1/2 -translate-x-1/2 bg-white text-error px-4 py-2.5 rounded-md shadow-lg z-50 text-sm flex items-center gap-2 border border-border">
+          <AlertCircle size={16} />
           <span>{errorMessage}</span>
-          <button onClick={() => setErrorMessage(null)} className="ml-2 hover:bg-white/20 p-1 rounded">
-            <XCircle size={16} />
+          <button onClick={() => setErrorMessage(null)} className="ml-1 hover:bg-surface-100 p-1 rounded transition-colors">
+            <XCircle size={14} />
           </button>
         </div>
       )}
