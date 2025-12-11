@@ -1,7 +1,11 @@
 export interface Env {
   DB: D1Database;
   IMAGES: R2Bucket;
+  R2: R2Bucket;
   FIREBASE_PROJECT_ID: string;
+  AI_API_URL: string;
+  AI_API_KEY: string;
+  AI_MODEL?: string;
 }
 
 export async function verifyFirebaseToken(request: Request, env: Env): Promise<string | null> {

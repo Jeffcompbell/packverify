@@ -388,9 +388,11 @@ const App: React.FC = () => {
       issuesByModel: {}
     };
 
-    // 立即添加图片并选中（使用函数式更新避免闭包问题）
-    setImages(prev => [...prev, placeholderImage]);
-    setCurrentImageIndex(images.length);
+    // 立即添加图片并选中
+    setImages(prev => {
+      setCurrentImageIndex(prev.length); // 新图片的索引 = 当前数组长度
+      return [...prev, placeholderImage];
+    });
 
     // 后台进行 AI 分析，传入占位 ID
     const result = await processFile(file, images, currentModel, placeholderId);

@@ -4,7 +4,7 @@ import { handleCreateSession, handleGetSession, handleListSessions, handleUpdate
 import { handleUploadImage, handleUpdateImage, handleDeleteImage, handleGetImageData, handleGetImagePublic } from './handlers/images';
 import { handleUseQuota, handleGetQuotaHistory } from './handlers/quota';
 import { handleCreateConfig, handleListConfigs, handleGetConfig, handleUpdateConfig, handleDeleteConfig } from './handlers/detection-configs';
-import { handleCreateReport, handleListReports, handleGetReport, handleUpdateReport, handleDeleteReport, handleAddReportImage, handleUpdateReportImage } from './handlers/batch-reports';
+import { handleCreateReport, handleListReports, handleGetReport, handleUpdateReport, handleDeleteReport, handleAddReportImage, handleUpdateReportImage, handleAnalyzeReport } from './handlers/batch-reports';
 
 export async function handleAPI(request: Request, env: Env): Promise<Response> {
   const url = new URL(request.url);
@@ -173,6 +173,12 @@ export async function handleAPI(request: Request, env: Env): Promise<Response> {
       const reportId = path.split('/')[3];
       const imageId = path.split('/')[5];
       const response = await requireAuth((req, env, uid) => handleUpdateReportImage(req, env, uid, reportId, imageId))(request, env);
+      return addCorsHeaders(response, corsHeaders);
+    }
+
+    if (path.match(/^\/api\/batch-reports\/[^/]+\/analyze$/) && method === 'POST') {
+      const reportId = path.split('/')[3];
+      const response = await requireAuth((req, env, uid) => handleAnalyzeReport(req, env, uid, reportId))(request, env);
       return addCorsHeaders(response, corsHeaders);
     }
 

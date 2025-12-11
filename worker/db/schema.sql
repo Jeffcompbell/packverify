@@ -92,11 +92,11 @@ CREATE TABLE IF NOT EXISTS batch_report_images (
   id TEXT PRIMARY KEY,
   report_id TEXT NOT NULL,
   image_id TEXT NOT NULL,
+  storage_key TEXT,
   status TEXT DEFAULT 'pending',
   result TEXT,
   created_at INTEGER NOT NULL,
-  FOREIGN KEY (report_id) REFERENCES batch_reports(id) ON DELETE CASCADE,
-  FOREIGN KEY (image_id) REFERENCES images(id) ON DELETE CASCADE
+  FOREIGN KEY (report_id) REFERENCES batch_reports(id) ON DELETE CASCADE
 );
 
 -- 索引

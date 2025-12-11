@@ -602,3 +602,40 @@ export const analyzeBatchWithCustomPrompt = async (reportId: string, imageIds: s
     return false;
   }
 };
+
+// 上传图片到批量报告
+export const uploadImageToBatchReport = async (reportId: string, file: File): Promise<string | null> => {
+  try {
+    const token = await getAuthToken();
+    if (!token) return null;
+
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('reportId', reportId);
+
+    const response = await fetch(`${API_BASE_URL}/api/batch-reports/${reportId}/images`, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${token}` },
+      body: formData
+    });
+
+    if (!response.ok) return null;
+    const data = await response.json();
+    return data.imageId;
+  } catch (error) {
+    return null;
+  }
+};
+
+// 更新批量报告状态
+export const updateBatchReportStatus = async (reportId: string, status: BatchReport['status']): Promise<boolean> => {
+  try {
+    await apiRequest(`/api/batch-reports/${reportId}`, {
+      method: 'PUT',
+      body: JSON.stringify({ status })
+    });
+    return true;
+  } catch (error) {
+    return false;
+  }
+};

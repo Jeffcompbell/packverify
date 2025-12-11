@@ -1,5 +1,5 @@
-import React, { useState, useMemo, useRef } from 'react';
-import { Loader2, Search, Calendar, Image as ImageIcon, Plus, MoreVertical, Pencil, Trash2 } from 'lucide-react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
+import { Loader2, Search, Calendar, Image as ImageIcon, Plus, MoreVertical, Pencil, Trash2, Upload, Clipboard } from 'lucide-react';
 
 interface CloudSession {
   id: string;
@@ -41,6 +41,31 @@ export const AllProductsPage: React.FC<AllProductsPageProps> = ({
   const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState('');
+
+  // 粘贴事件监听
+  useEffect(() => {
+    const handlePaste = async (e: ClipboardEvent) => {
+      const items = e.clipboardData?.items;
+      if (!items) return;
+
+      const imageFiles: File[] = [];
+      for (let i = 0; i < items.length; i++) {
+        if (items[i].type.startsWith('image/')) {
+          const file = items[i].getAsFile();
+          if (file) imageFiles.push(file);
+        }
+      }
+
+      if (imageFiles.length > 0 && onUploadImages) {
+        const dt = new DataTransfer();
+        imageFiles.forEach(f => dt.items.add(f));
+        onUploadImages(dt.files);
+      }
+    };
+
+    window.addEventListener('paste', handlePaste);
+    return () => window.removeEventListener('paste', handlePaste);
+  }, [onUploadImages]);
 
   // 搜索和排序
   const filteredAndSortedSessions = useMemo(() => {
@@ -87,10 +112,10 @@ export const AllProductsPage: React.FC<AllProductsPageProps> = ({
       <div className="flex-1 overflow-y-auto p-6">
         {/* 上传区域 */}
         <div
-          className={`mb-6 py-12 rounded-xl border border-dashed cursor-pointer transition-all ${
+          className={`mb-6 py-10 rounded-2xl border-2 border-dashed cursor-pointer transition-all ${
             isDragging
-              ? 'border-text-muted bg-surface-100'
-              : 'border-surface-200 hover:border-surface-300 hover:bg-surface-0'
+              ? 'border-blue-400 bg-blue-50'
+              : 'border-gray-300 hover:border-blue-400 hover:bg-blue-50/50'
           }`}
           onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
           onDragLeave={() => setIsDragging(false)}
@@ -105,7 +130,23 @@ export const AllProductsPage: React.FC<AllProductsPageProps> = ({
             className="hidden"
             onChange={(e) => e.target.files && onUploadImages?.(e.target.files)}
           />
-          <p className="text-center text-text-muted">粘贴 · 拖拽 · 点击上传</p>
+          <div className="flex flex-col items-center gap-3">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center">
+                <Upload size={24} className="text-blue-500" />
+              </div>
+            </div>
+            <div className="text-center">
+              <p className="text-sm font-medium text-gray-700 mb-1">上传包装图片开始检测</p>
+              <p className="text-xs text-gray-500">
+                <span className="inline-flex items-center gap-1"><Clipboard size={12} /> Ctrl+V 粘贴</span>
+                <span className="mx-2">·</span>
+                <span>拖拽文件</span>
+                <span className="mx-2">·</span>
+                <span>点击选择</span>
+              </p>
+            </div>
+          </div>
         </div>
 
         {/* 搜索和排序 */}
