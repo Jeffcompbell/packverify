@@ -1227,11 +1227,30 @@ const App: React.FC = () => {
             </>
           ) : (
             <div className="text-center">
-              <div className="p-5 bg-surface-50 rounded-2xl mb-4 inline-block">
+              <button
+                onClick={async () => {
+                  try {
+                    const items = await navigator.clipboard.read();
+                    for (const item of items) {
+                      const imageType = item.types.find(t => t.startsWith('image/'));
+                      if (imageType) {
+                        const blob = await item.getType(imageType);
+                        const file = new File([blob], `paste-${Date.now()}.png`, { type: imageType });
+                        handleImageUpload(file);
+                        return;
+                      }
+                    }
+                    alert('剪贴板中没有图片');
+                  } catch {
+                    alert('无法读取剪贴板，请使用 Ctrl+V 粘贴');
+                  }
+                }}
+                className="p-5 bg-surface-50 hover:bg-surface-100 rounded-2xl mb-4 inline-block cursor-pointer transition-colors"
+              >
                 <ImagePlus className="text-text-muted" size={40} />
-              </div>
-              <p className="text-text-secondary font-medium mb-1">Ctrl+V 粘贴图片</p>
-              <p className="text-text-muted text-sm mb-4">或拖拽图片到此处</p>
+              </button>
+              <p className="text-text-secondary font-medium mb-1">点击上方粘贴图片</p>
+              <p className="text-text-muted text-sm mb-4">或 Ctrl+V / 拖拽图片</p>
               <label className="inline-flex items-center gap-2 px-4 py-2 bg-surface-100 hover:bg-surface-200 text-text-primary text-sm font-medium rounded-lg cursor-pointer transition-colors border border-border">
                 <Upload size={16} />
                 选择文件
