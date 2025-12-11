@@ -11,6 +11,7 @@ import {
 import { SourceField, DiffResult, ImageItem, ImageSpec, BoundingBox, IndustryType } from './types/types';
 import { useImageAnalysis } from './hooks/useImageAnalysis';
 import { DiffSummary } from './components/features/DiffSummary';
+import { ComparisonPanel } from './components/features/ComparisonPanel';
 import {
   Table, Zap, AlertCircle, XCircle, ChevronDown, ChevronLeft, ChevronRight,
   ImagePlus, Trash2, RefreshCw, Copy, CheckCheck, Upload, Eye, EyeOff,
@@ -166,6 +167,9 @@ const App: React.FC = () => {
 
   // Specs tab
   const [specsTab, setSpecsTab] = useState<string>('qil');
+
+  // 顶部模式切换：AI图片检测 / AI参数对比
+  const [analysisMode, setAnalysisMode] = useState<'detection' | 'comparison'>('detection');
 
   // Mobile view tab
   const [mobileTab, setMobileTab] = useState<'images' | 'viewer' | 'issues' | 'qil'>('viewer');
@@ -801,7 +805,7 @@ const App: React.FC = () => {
       {/* TOP BAR - 简化版，仅在分析视图显示 */}
       {currentView === 'analysis' && (
       <div className="h-12 border-b border-gray-100 bg-white flex items-center px-4 shrink-0 gap-4 relative z-50">
-        {/* Left: 云同步状态 + 产品名称 */}
+        {/* Left: 云同步状态 + 产品名称 + 模式切换胶囊 */}
         <div className="flex items-center gap-3 min-w-0">
           {/* 云同步状态 */}
           {user && (
@@ -843,14 +847,42 @@ const App: React.FC = () => {
             </button>
           )}
 
+          {/* 模式切换胶囊 */}
+          <div className="flex items-center bg-gray-100 rounded-full p-0.5">
+            <button
+              onClick={() => setAnalysisMode('detection')}
+              className={`px-3 py-1 text-xs font-medium rounded-full transition-all ${
+                analysisMode === 'detection'
+                  ? 'bg-white text-gray-900 shadow-sm'
+                  : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              AI 图片检测
+            </button>
+            <button
+              onClick={() => setAnalysisMode('comparison')}
+              className={`px-3 py-1 text-xs font-medium rounded-full transition-all ${
+                analysisMode === 'comparison'
+                  ? 'bg-white text-gray-900 shadow-sm'
+                  : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              AI 参数对比
+            </button>
+          </div>
+        </div>
+
+        {/* Center: 图片工具 - 仅在检测模式显示 */}
+        {analysisMode === 'detection' && (
+        <div className="absolute left-1/2 -translate-x-1/2 flex items-center gap-3">
           {/* 行业选择 */}
           <div ref={industryMenuRef} className="relative">
             <button
               onClick={() => setShowIndustryMenu(!showIndustryMenu)}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-50 hover:bg-gray-100 text-gray-700 text-sm rounded-lg transition-colors"
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-50 hover:bg-gray-100 text-gray-700 text-xs rounded-lg transition-colors"
             >
               <Package size={14} />
-              <span>{{ cosmetics: '化妆品场景', food: '食品场景', pharma: '药品场景', general: '通用场景' }[industry]}</span>
+              <span>{{ cosmetics: '化妆品', food: '食品', pharma: '药品', general: '通用' }[industry]}</span>
               <ChevronDown size={12} className={`transition-transform ${showIndustryMenu ? 'rotate-180' : ''}`} />
             </button>
             {showIndustryMenu && (
@@ -867,10 +899,6 @@ const App: React.FC = () => {
               </div>
             )}
           </div>
-        </div>
-
-        {/* Center: 图片工具 */}
-        <div className="absolute left-1/2 -translate-x-1/2 flex items-center gap-3">
           {currentImage && (
             <div className="hidden md:flex items-center gap-1.5 px-3 py-1.5 bg-gray-50 rounded-lg">
               <button
@@ -927,6 +955,7 @@ const App: React.FC = () => {
             </div>
           )}
         </div>
+        )}
       </div>
       )}
 
@@ -1005,6 +1034,18 @@ const App: React.FC = () => {
         </div>
       ) : (
         <>
+        {/* AI 参数对比模式 */}
+        {analysisMode === 'comparison' ? (
+          <ComparisonPanel
+            images={images}
+            manualSourceFields={manualSourceFields}
+            copiedId={copiedId}
+            onCopy={handleCopy}
+            onFieldsUpdate={handleUpdateQilFields}
+            onError={setErrorMessage}
+            onImageUpload={handleImageUpload}
+          />
+        ) : (
         <div className="flex-1 flex min-h-0 pb-14 md:pb-0">
         {/* LEFT: Thumbnails - 桌面端显示，移动端通过底部导航切换 */}
         <div className={`${mobileTab === 'images' ? 'flex' : 'hidden'} md:flex w-full md:w-[140px] border-r border-border bg-surface-50 p-2 overflow-y-auto shrink-0 flex-col`}>
@@ -1230,159 +1271,7 @@ const App: React.FC = () => {
           onActiveModelChange={setActiveModelTab}
         />
       </div>
-
-      {/* BOTTOM PANEL - QIL (桌面端显示，移动端通过导航切换全屏) */}
-      <div style={{ height: mobileTab === 'qil' ? 'auto' : bottomHeight }} className={`${mobileTab === 'qil' ? 'flex absolute inset-0 top-12 bottom-14 z-30' : 'hidden'} md:flex md:static md:z-auto border-t border-border bg-surface-50 flex-col shrink-0 relative`}>
-        {/* 拖动调整高度的把手区域 */}
-        <div
-          onMouseDown={handleResizeStart}
-          className={`hidden md:flex items-center justify-center h-6 cursor-ns-resize hover:bg-surface-100 transition-colors relative ${isResizing ? 'bg-surface-200' : ''}`}
-        >
-          <div className="absolute inset-x-0 top-0 h-1 bg-border"></div>
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              setBottomHeight(prev => prev <= 24 ? 280 : 24);
-            }}
-            className="bg-white hover:bg-surface-50 border border-border rounded-full w-6 h-6 text-text-muted hover:text-text-primary transition-colors flex items-center justify-center shadow-sm z-10"
-            title={bottomHeight <= 24 ? '展开 QIL 面板' : '收起 QIL 面板'}
-          >
-            <span className="text-[12px]">{bottomHeight <= 24 ? '▲' : '▼'}</span>
-          </button>
-        </div>
-
-        <div className="flex-1 flex flex-col md:flex-row min-h-0 overflow-hidden">
-          {/* QIL Input Panel */}
-          <QilPanel
-            ref={qilPanelRef}
-            manualSourceFields={manualSourceFields}
-            onFieldsUpdate={handleUpdateQilFields}
-            onError={setErrorMessage}
-            isProcessing={qilProcessing}
-            onProcessingChange={setQilProcessing}
-          />
-
-          {/* Specs Table */}
-          <div className="flex-1 flex flex-col min-w-0">
-            <div className="px-3 py-2 bg-white border-b border-border flex items-center gap-1 overflow-x-auto shrink-0">
-              <FileSpreadsheet size={12} className="text-emerald-400 shrink-0 mr-1" />
-              <button
-                onClick={() => setSpecsTab('qil')}
-                className={`px-3 py-1 text-[10px] font-bold uppercase tracking-wider rounded transition-all shrink-0 ${
-                  specsTab === 'qil'
-                    ? 'bg-surface-200 text-text-primary border border-surface-300'
-                    : 'text-text-muted hover:text-text-secondary hover:bg-surface-100'
-                }`}
-              >
-                QIL ({manualSourceFields.length})
-              </button>
-              {images.map((img, idx) => (
-                <button
-                  key={img.id}
-                  onClick={() => setSpecsTab(img.id)}
-                  className={`px-3 py-1 text-[10px] font-medium rounded transition-all shrink-0 truncate max-w-[120px] ${
-                    specsTab === img.id
-                      ? 'bg-surface-200 text-text-primary border border-surface-300'
-                      : 'text-text-muted hover:text-text-secondary hover:bg-surface-100'
-                  }`}
-                  title={img.file.name}
-                >
-                  图片{idx + 1} OCR
-                </button>
-              ))}
-              <button
-                onClick={() => setSpecsTab('diff')}
-                className={`px-3 py-1 text-[10px] font-bold uppercase tracking-wider rounded transition-all shrink-0 ${
-                  specsTab === 'diff'
-                    ? 'bg-surface-200 text-text-primary border border-surface-300'
-                    : 'text-text-muted hover:text-text-secondary hover:bg-surface-100'
-                }`}
-              >
-                对比汇总
-              </button>
-            </div>
-
-            <div className="flex-1 overflow-auto p-3">
-              {specsTab === 'qil' ? (
-                !qilRawText && manualSourceFields.length === 0 ? (
-                  <div className="h-full flex flex-col items-center justify-center text-slate-700">
-                    <Table size={24} className="mb-2 opacity-30" />
-                    <span className="text-xs">暂无 QIL 数据</span>
-                    <span className="text-[10px] text-slate-600 mt-1">左侧输入文本或上传图片后解析</span>
-                  </div>
-                ) : (
-                  <div className="h-full flex flex-col">
-                    <div className="flex items-center justify-between mb-2 px-1">
-                      <span className="text-[10px] font-bold text-text-muted uppercase tracking-wider">
-                        QIL 源数据 {manualSourceFields.length > 0 && `(已解析 ${manualSourceFields.length} 个字段)`}
-                      </span>
-                      {qilRawText && (
-                        <button
-                          onClick={() => handleCopy(qilRawText, 'qil-raw-text')}
-                          className="p-1 rounded hover:bg-surface-100 transition-colors"
-                          title="复制全部"
-                        >
-                          {copiedId === 'qil-raw-text' ? <CheckCheck size={12} className="text-emerald-400" /> : <Copy size={12} className="text-text-muted" />}
-                        </button>
-                      )}
-                    </div>
-                    {qilRawText ? (
-                      <pre className="flex-1 text-xs text-text-secondary font-mono bg-surface-100/50 p-3 rounded-lg whitespace-pre-wrap leading-relaxed border border-border/50 overflow-y-auto">
-                        {qilRawText}
-                      </pre>
-                    ) : (
-                      <div className="flex-1 text-center py-8 text-slate-600">
-                        <FileSpreadsheet size={24} className="mx-auto mb-2 opacity-30" />
-                        <p className="text-xs">已通过图片解析 {manualSourceFields.length} 个字段</p>
-                        <p className="text-[10px] text-slate-700 mt-1">使用文本输入可查看原文</p>
-                      </div>
-                    )}
-                  </div>
-                )
-              ) : specsTab === 'diff' ? (
-                <DiffSummary
-                  images={images}
-                  manualSourceFields={manualSourceFields}
-                  copiedId={copiedId}
-                  onCopy={handleCopy}
-                />
-              ) : (
-                (() => {
-                  const currentOcrText = images.find(img => img.id === specsTab)?.ocrText || '';
-
-                  return (
-                    <div className="h-full">
-                      {!currentOcrText ? (
-                        <div className="h-full flex flex-col items-center justify-center text-slate-700">
-                          <Type size={24} className="mb-2 opacity-30" />
-                          <span className="text-xs">暂无 OCR 数据</span>
-                          <span className="text-[10px] text-slate-600 mt-1">图片分析后自动提取</span>
-                        </div>
-                      ) : (
-                        <div className="h-full flex flex-col">
-                          <div className="flex items-center justify-between mb-2 px-1">
-                            <span className="text-[10px] font-bold text-text-muted uppercase tracking-wider">OCR 原文</span>
-                            <button
-                              onClick={() => handleCopy(currentOcrText, 'ocr-text')}
-                              className="p-1 rounded hover:bg-surface-100 transition-colors"
-                              title="复制全部"
-                            >
-                              {copiedId === 'ocr-text' ? <CheckCheck size={12} className="text-emerald-400" /> : <Copy size={12} className="text-text-muted" />}
-                            </button>
-                          </div>
-                          <pre className="flex-1 text-xs text-text-secondary font-mono bg-surface-100/50 p-3 rounded-lg whitespace-pre-wrap leading-relaxed border border-border/50 overflow-y-auto">
-                            {currentOcrText}
-                          </pre>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })()
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
+      )}
 
       {/* Mobile Bottom Navigation */}
       <div className="md:hidden fixed bottom-0 left-0 right-0 h-14 bg-white border-t border-border flex items-center justify-around px-2 z-40">
