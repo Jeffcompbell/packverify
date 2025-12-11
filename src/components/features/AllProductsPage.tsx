@@ -1,5 +1,5 @@
-import React, { useState, useMemo } from 'react';
-import { Loader2, Search, Calendar, Image as ImageIcon, Plus, MoreVertical, Pencil, Trash2 } from 'lucide-react';
+import React, { useState, useMemo, useRef } from 'react';
+import { Loader2, Search, Calendar, Image as ImageIcon, Plus, MoreVertical, Pencil, Trash2, Upload, Sparkles } from 'lucide-react';
 
 interface CloudSession {
   id: string;
@@ -20,6 +20,7 @@ interface AllProductsPageProps {
   isCreatingProduct?: boolean;
   onRenameSession?: (sessionId: string, newName: string) => void;
   onDeleteSession?: (sessionId: string) => void;
+  onUploadImages?: (files: FileList) => void;
 }
 
 export const AllProductsPage: React.FC<AllProductsPageProps> = ({
@@ -31,8 +32,10 @@ export const AllProductsPage: React.FC<AllProductsPageProps> = ({
   onCreateNew,
   isCreatingProduct,
   onRenameSession,
-  onDeleteSession
+  onDeleteSession,
+  onUploadImages
 }) => {
+  const [isDragging, setIsDragging] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<'date' | 'name' | 'count'>('date');
   const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
@@ -68,50 +71,78 @@ export const AllProductsPage: React.FC<AllProductsPageProps> = ({
 
   if (!isOpen) return null;
 
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    if (e.dataTransfer.files.length > 0 && onUploadImages) {
+      onUploadImages(e.dataTransfer.files);
+    }
+  };
+
   return (
     <div className="flex-1 flex flex-col bg-surface-50 overflow-hidden">
-      {/* Header */}
-      <div className="h-14 border-b border-border bg-white flex items-center justify-between px-6 shrink-0">
-        <h2 className="text-base font-semibold text-text-primary">AI视觉分析</h2>
-
-        {/* 搜索、排序和新建 */}
-        <div className="flex items-center gap-3">
-          <div className="relative">
-            <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-text-muted" />
-            <input
-              type="text"
-              placeholder="搜索产品..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-8 pr-3 py-1.5 text-xs border border-border rounded-md focus:outline-none focus:ring-1 focus:ring-primary-400 w-48"
-            />
-          </div>
-
-          <select
-            value={sortBy}
-            onChange={(e) => setSortBy(e.target.value as any)}
-            className="px-3 py-1.5 text-xs border border-border rounded-md focus:outline-none focus:ring-1 focus:ring-primary-400 bg-white"
-          >
-            <option value="date">最近更新</option>
-            <option value="name">名称排序</option>
-            <option value="count">图片数量</option>
-          </select>
-
-          {onCreateNew && (
-            <button
-              onClick={onCreateNew}
-              disabled={isCreatingProduct}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white text-xs font-medium rounded-md transition-colors disabled:opacity-50"
-            >
-              {isCreatingProduct ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
-              新建产品
-            </button>
-          )}
-        </div>
-      </div>
-
       {/* 产品列表 */}
       <div className="flex-1 overflow-y-auto p-6">
+        {/* 上传引导卡片 */}
+        <div
+          className={`mb-6 p-8 rounded-2xl border-2 border-dashed transition-all cursor-pointer ${
+            isDragging ? 'border-purple-500 bg-purple-50' : 'border-border hover:border-purple-400 bg-gradient-to-br from-purple-50/50 to-blue-50/50'
+          }`}
+          onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+          onDragLeave={() => setIsDragging(false)}
+          onDrop={handleDrop}
+          onClick={() => fileInputRef.current?.click()}
+        >
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            multiple
+            className="hidden"
+            onChange={(e) => e.target.files && onUploadImages?.(e.target.files)}
+          />
+          <div className="flex flex-col items-center text-center">
+            <div className="w-16 h-16 rounded-full bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center mb-4">
+              <Sparkles size={28} className="text-white" />
+            </div>
+            <h3 className="text-lg font-semibold text-text-primary mb-2">开始 AI 视觉分析</h3>
+            <p className="text-sm text-text-muted mb-4">拖拽图片到这里，或点击上传</p>
+            <div className="flex items-center gap-2 text-xs text-text-muted">
+              <Upload size={14} />
+              <span>支持 JPG、PNG、HEIC 格式，最多 30 张</span>
+            </div>
+          </div>
+        </div>
+
+        {/* 搜索和排序 */}
+        {sessions.length > 0 && (
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-sm font-medium text-text-primary">历史产品</h3>
+            <div className="flex items-center gap-3">
+              <div className="relative">
+                <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-text-muted" />
+                <input
+                  type="text"
+                  placeholder="搜索..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-8 pr-3 py-1.5 text-xs border border-border rounded-md focus:outline-none focus:ring-1 focus:ring-primary-400 w-36 bg-white"
+                />
+              </div>
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value as any)}
+                className="px-2 py-1.5 text-xs border border-border rounded-md focus:outline-none bg-white"
+              >
+                <option value="date">最近</option>
+                <option value="name">名称</option>
+                <option value="count">数量</option>
+              </select>
+            </div>
+          </div>
+        )}
         {isLoading ? (
           <div className="flex items-center justify-center h-full">
             <Loader2 size={24} className="animate-spin text-primary-400" />

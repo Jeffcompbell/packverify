@@ -1409,6 +1409,20 @@ const App: React.FC = () => {
             await deleteSession(user.uid, sessionId);
             setHistorySessions(prev => prev.filter(s => s.id !== sessionId));
           }}
+          onUploadImages={async (files) => {
+            // 先创建新产品，然后进入画布并上传图片
+            await handleCreateNewProduct();
+            const newSid = localStorage.getItem('currentSessionId');
+            if (newSid) {
+              setCurrentView('analysis', newSid);
+              // 延迟一下让画布渲染完成，然后触发上传
+              setTimeout(() => {
+                for (let i = 0; i < files.length; i++) {
+                  handleImageUpload(files[i]);
+                }
+              }, 100);
+            }
+          }}
         />
       ) : currentView === 'detection-config' ? (
         <DetectionConfigPage onBack={() => setCurrentView('products')} />
