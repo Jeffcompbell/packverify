@@ -825,8 +825,6 @@ const App: React.FC = () => {
         isOpen={showUpgradeModal}
         onClose={() => setShowUpgradeModal(false)}
         currentPlan={user?.plan || 'free'}
-        quotaUsed={user?.used || 0}
-        quotaTotal={user?.quota || 10}
       />
 
 
