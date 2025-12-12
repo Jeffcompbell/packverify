@@ -1,0 +1,16 @@
+id,pattern,patternType,domain,market,severity,reason,suggestion,source,sourceUrl,category
+COS-001,cure,keyword,cosmetics,general,P0,化妆品不能宣称治愈功效，会被认定为药品,改为 improve / help with / support,FDA 21 CFR 201.128,https://www.fda.gov/cosmetics/cosmetics-labeling-claims,drug_claim
+COS-002,treat,keyword,cosmetics,general,P0,治疗性宣称属于药品范畴,改为 help / support / suitable for,FDA 21 CFR 201.128,https://www.fda.gov/cosmetics/cosmetics-labeling-claims,drug_claim
+COS-003,heal,keyword,cosmetics,general,P0,愈合宣称属于药品范畴,改为 soothe / comfort / support skin recovery,FDA 21 CFR 201.128,https://www.fda.gov/cosmetics/cosmetics-labeling-claims,drug_claim
+COS-004,FDA approved,keyword,cosmetics,US,P0,FDA 不批准化妆品，此宣称违规且虚假,删除此表述,FDA Cosmetics Guidance,https://www.fda.gov/cosmetics,false_claim
+COS-005,anti-inflammatory,keyword,cosmetics,general,P0,抗炎是药品宣称,改为 soothing / calming / gentle,FDA Drug vs Cosmetic,https://www.fda.gov/cosmetics/cosmetics-labeling-claims,drug_claim
+COS-006,antibacterial,keyword,cosmetics,general,P0,抗菌宣称需要 OTC 药品注册,删除或申请 OTC 注册,FDA OTC Monograph,https://www.fda.gov/drugs/over-counter-otc-drug-monographs,drug_claim
+COS-010,clinically proven,keyword,general,general,P1,需要临床试验证据支持，否则涉嫌虚假广告,删除或提供临床试验报告,FTC Advertising Guidelines,https://www.ftc.gov/business-guidance/advertising-marketing,evidence_required
+COS-013,organic,keyword,cosmetics,US,P1,需要 USDA 有机认证才能使用,确保有 USDA Organic 认证，或改为 made with organic ingredients,USDA Organic Regulations,https://www.usda.gov/topics/organic,certification_required
+COS-015,SPF,keyword,cosmetics,US,P0,防晒产品在美国属于 OTC 药品，需符合 FDA 防晒专论,确保产品已按 OTC 药品注册，标签符合 FDA 防晒专论要求,FDA Sunscreen Monograph,https://www.fda.gov/drugs/understanding-over-counter-medicines/sunscreen-how-help-protect-your-skin-sun,otc_drug
+COS-019,whitening|美白|祛斑,regex,cosmetics,CN,P0,美白祛斑在中国属于特殊化妆品，需要特证,确保已取得特殊化妆品注册证,中国化妆品监督管理条例,https://www.nmpa.gov.cn,special_cosmetic_cn
+FOOD-001,"contains?:? ?(?:peanut|tree nut|milk|egg|wheat|soy|fish|shellfish|sesame)",regex,food,US,P0,美国 FDA 要求标注 9 大过敏原,确保在 Contains 声明中完整列出所有过敏原,FDA FALCPA + FASTER Act,https://www.fda.gov/food/food-allergensgluten-free-guidance-documents-regulatory-information/food-allergen-labeling-and-consumer-protection-act-2004-falcpa,allergen
+FOOD-010,organic,keyword,food,US,P0,需要 USDA 有机认证才能使用 organic 标签,确保有 USDA Organic 认证,USDA Organic Regulations,https://www.usda.gov/topics/organic,certification_required
+FOOD-011,"prevents? (?:disease|cancer|heart disease|diabetes)",regex,food,general,P0,食品不能宣称预防疾病，属于药品宣称,删除疾病预防宣称,FDA Health Claims,https://www.fda.gov/food/food-labeling-nutrition/label-claims-conventional-foods-and-dietary-supplements,drug_claim
+GEN-001,"#1|number one|best selling",regex,general,general,P1,排名宣称需要有数据支持,提供数据来源和时间范围，或删除,FTC Advertising Guidelines,https://www.ftc.gov/business-guidance/advertising-marketing,evidence_required
+SUPP-003,FDA disclaimer|not been evaluated,regex,supplement,US,P0,膳食补充剂必须包含 FDA 免责声明,"添加: This statement has not been evaluated by the FDA. This product is not intended to diagnose, treat, cure, or prevent any disease.",FDA DSHEA,https://www.fda.gov/food/dietary-supplements,required_statement

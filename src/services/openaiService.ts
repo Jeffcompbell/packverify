@@ -1,5 +1,6 @@
 import OpenAI from 'openai';
-import { DiagnosisIssue, DiffResult, SourceField, DiagnosisResult, DeterministicCheck, TokenUsage } from "../types/types";
+import { DiagnosisIssue, DiffResult, SourceField, DiagnosisResult, DeterministicCheck, TokenUsage, LexiconIssue } from "../types/types";
+import { matchLexicon, lexiconHitsToIssues } from './lexiconService';
 
 // Helper to convert file to base64
 export const fileToGenerativePart = async (file: File): Promise<string> => {
@@ -741,11 +742,23 @@ export const diagnoseImage = async (
         const deterministicIssues = runDeterministicChecks(aiResult.ocrText);
         console.log("Deterministic checks found:", deterministicIssues.length, "issues");
 
+        // Step 3: 词库匹配（本地，确定性，0 token）
+        const domainMap: Record<string, string> = {
+            cosmetics: 'cosmetics',
+            food: 'food',
+            pharma: 'pharma',
+            general: 'general'
+        };
+        const lexiconHits = matchLexicon(aiResult.ocrText, domainMap[industry] || 'general');
+        const lexiconIssues = lexiconHitsToIssues(lexiconHits) as LexiconIssue[];
+        console.log("Lexicon matches found:", lexiconIssues.length, "issues");
+
         return {
             description: aiResult.description,
             ocrText: aiResult.ocrText,
             issues: aiResult.issues,
             deterministicIssues,
+            lexiconIssues,
             specs: aiResult.specs,
             tokenUsage: aiResult.tokenUsage
         };

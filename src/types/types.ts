@@ -43,6 +43,24 @@ export interface DeterministicCheck {
   severity: 'high' | 'medium';
 }
 
+// 词库命中结果
+export interface LexiconIssue {
+  id: string;
+  type: 'lexicon';
+  original: string;      // 命中的原文
+  problem: string;       // 风险原因
+  suggestion: string;    // 修改建议
+  severity: 'high' | 'medium' | 'low';
+  confidence: 'certain'; // 词库命中是确定性的
+  context: string;       // 上下文
+  ruleHits: Array<{
+    type: 'lexicon';
+    id: string;          // 规则 ID
+    source?: string;     // 来源（如 FDA 21 CFR）
+    sourceUrl?: string;  // 来源链接
+  }>;
+}
+
 export interface SourceField {
   key: string;
   value: string;
@@ -126,6 +144,7 @@ export interface DiagnosisResult {
   ocrText: string;      // OCR 原文
   issues: DiagnosisIssue[];
   deterministicIssues: DeterministicCheck[]; // 确定性问题
+  lexiconIssues?: LexiconIssue[];  // 词库命中问题
   specs: SourceField[]; // 产品规格（从单次 AI 调用中提取）
   tokenUsage?: TokenUsage; // Token 使用统计
 }
