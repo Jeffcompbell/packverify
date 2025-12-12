@@ -122,7 +122,7 @@ export function useImageAnalysis({
         deterministicIssues: diagResult.deterministicIssues,
         specs: imageSpecs,
         diffs,
-        issuesByModel: { [usedModelId]: { issues: diagResult.issues, deterministicIssues: diagResult.deterministicIssues } }
+        issuesByModel: { [usedModelId]: { issues: diagResult.issues, deterministicIssues: diagResult.deterministicIssues, lexiconIssues: diagResult.lexiconIssues } }
       };
 
       // 消耗配额
@@ -219,7 +219,7 @@ export function useImageAnalysis({
       if (cloudSyncEnabled && sessionId) {
         const newIssuesByModel = {
           ...image.issuesByModel,
-          [usedModelId]: { issues: diagResult.issues, deterministicIssues: diagResult.deterministicIssues }
+          [usedModelId]: { issues: diagResult.issues, deterministicIssues: diagResult.deterministicIssues, lexiconIssues: diagResult.lexiconIssues }
         };
         (async () => {
           try {
@@ -265,7 +265,7 @@ export function useImageAnalysis({
 
       const newIssuesByModel = {
         ...image.issuesByModel,
-        [modelId]: { issues: diagResult.issues, deterministicIssues: diagResult.deterministicIssues }
+        [modelId]: { issues: diagResult.issues, deterministicIssues: diagResult.deterministicIssues, lexiconIssues: diagResult.lexiconIssues }
       };
 
       const tokenUsage = diagResult.tokenUsage ? {

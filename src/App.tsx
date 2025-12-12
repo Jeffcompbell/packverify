@@ -32,6 +32,7 @@ import { HomePage } from './components/features/HomePage';
 import { DetectionConfigPage } from './components/features/DetectionConfigPage';
 import { BatchReportPage } from './components/features/BatchReportPage';
 import { BatchReportView } from './components/features/BatchReportView';
+// LexiconManager 已集成到 DetectionConfigPage
 import { base64ToBlobUrl, createVirtualFile, generateProductName } from './utils/helpers';
 
 type AppView = 'home' | 'products' | 'analysis' | 'detection-config' | 'batch-report' | 'batch-view' | '404';

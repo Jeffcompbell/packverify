@@ -115,6 +115,7 @@ export interface ImageItem {
     [modelId: string]: {
       issues: DiagnosisIssue[];
       deterministicIssues: DeterministicCheck[];
+      lexiconIssues?: LexiconIssue[];
     }
   };
   // 向后兼容（可选）

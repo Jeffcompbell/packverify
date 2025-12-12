@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
-import { AlertTriangle, Type, RefreshCw, FileText, AlertCircle, Loader2, CheckCheck, Copy, Brackets, ShieldAlert, CheckCircle, Plus, X, Columns, ChevronLeft, ChevronRight, ZoomIn, ZoomOut, RotateCw } from 'lucide-react';
-import { ImageItem } from '../../types/types';
+import { AlertTriangle, Type, RefreshCw, FileText, AlertCircle, Loader2, CheckCheck, Copy, Brackets, ShieldAlert, CheckCircle, Plus, X, Columns, ChevronLeft, ChevronRight, ZoomIn, ZoomOut, RotateCw, BookOpen, ExternalLink } from 'lucide-react';
+import { ImageItem, LexiconIssue } from '../../types/types';
 import { AVAILABLE_MODELS } from '../../services/openaiService';
 
 interface IssuesPanelProps {
@@ -82,7 +82,8 @@ export const IssuesPanel: React.FC<IssuesPanelProps> = ({
   // 获取当前 tab 的检测结果
   const currentTabData = currentImage?.issuesByModel?.[activeModelTab] || {
     issues: currentImage?.issues || [],
-    deterministicIssues: currentImage?.deterministicIssues || []
+    deterministicIssues: currentImage?.deterministicIssues || [],
+    lexiconIssues: []
   };
 
   // 可添加的模型列表（排除已分析的）
@@ -182,7 +183,7 @@ export const IssuesPanel: React.FC<IssuesPanelProps> = ({
         {analyzedModels.map((modelId) => {
           const model = AVAILABLE_MODELS.find(m => m.id === modelId);
           const modelData = currentImage?.issuesByModel?.[modelId];
-          const issueCount = (modelData?.issues.length || 0) + (modelData?.deterministicIssues?.length || 0);
+          const issueCount = (modelData?.issues.length || 0) + (modelData?.deterministicIssues?.length || 0) + (modelData?.lexiconIssues?.length || 0);
           const displayName = model?.name || (modelId.includes('gemini') ? 'Gemini 3 Pro' : modelId);
 
           const isProcessing = isCurrentProcessing && processingModelId === modelId;
@@ -293,6 +294,63 @@ export const IssuesPanel: React.FC<IssuesPanelProps> = ({
               </div>
             )}
 
+            {currentTabData.lexiconIssues && currentTabData.lexiconIssues.length > 0 && (
+              <div>
+                <div className="flex items-center gap-2 px-3 py-2 text-[10px] font-medium text-text-muted bg-surface-50 border-b border-border/50">
+                  <BookOpen size={10} />
+                  词库命中
+                  <span className="ml-auto text-[9px] text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded">确定性</span>
+                </div>
+                {currentTabData.lexiconIssues.map((issue: LexiconIssue) => {
+                  const ruleHit = issue.ruleHits?.[0];
+                  const copyText = `命中词: ${issue.original}\n风险: ${issue.problem}\n建议: ${issue.suggestion}\n来源: ${ruleHit?.source || ''}`;
+                  return (
+                    <div key={issue.id} className="px-3 py-2 border-b border-border/50 last:border-b-0 bg-white group">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+                          issue.severity === 'high' ? 'bg-red-500' : issue.severity === 'medium' ? 'bg-amber-500' : 'bg-surface-300'
+                        }`}></span>
+                        <span className={`text-[10px] font-medium ${
+                          issue.severity === 'high' ? 'text-red-600' : issue.severity === 'medium' ? 'text-amber-600' : 'text-text-muted'
+                        }`}>
+                          {issue.severity === 'high' ? 'P0' : issue.severity === 'medium' ? 'P1' : 'P2'}
+                        </span>
+                        <span className="text-[9px] text-text-muted font-mono">{ruleHit?.id}</span>
+                        <button
+                          onClick={() => onCopy(copyText, issue.id)}
+                          className="p-1 rounded hover:bg-surface-100 transition-colors opacity-0 group-hover:opacity-100 ml-auto"
+                          title="复制"
+                        >
+                          {copiedId === issue.id ? <CheckCheck size={12} className="text-success" /> : <Copy size={12} className="text-text-muted" />}
+                        </button>
+                      </div>
+                      <p className="text-xs text-text-primary mb-1">
+                        <span className="bg-red-100 text-red-700 px-1 rounded font-medium">{issue.original}</span>
+                      </p>
+                      <p className="text-[11px] text-text-secondary mb-1">{issue.problem}</p>
+                      <p className="text-[11px] text-text-secondary">→ {issue.suggestion}</p>
+                      {ruleHit?.source && (
+                        <div className="flex items-center gap-1 mt-2 text-[10px] text-text-muted">
+                          <span>来源: {ruleHit.source}</span>
+                          {ruleHit.sourceUrl && (
+                            <a
+                              href={ruleHit.sourceUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-primary-600 hover:underline inline-flex items-center gap-0.5"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <ExternalLink size={10} />
+                            </a>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
             {currentTabData.issues.length > 0 && (
               <div>
                 <div className="flex items-center gap-2 px-3 py-2 text-[10px] font-medium text-text-muted bg-surface-50 border-b border-border/50">
@@ -346,7 +404,9 @@ export const IssuesPanel: React.FC<IssuesPanelProps> = ({
               </div>
             )}
 
-            {currentTabData.issues.length === 0 && (!currentTabData.deterministicIssues || currentTabData.deterministicIssues.length === 0) && (
+            {currentTabData.issues.length === 0 &&
+             (!currentTabData.deterministicIssues || currentTabData.deterministicIssues.length === 0) &&
+             (!currentTabData.lexiconIssues || currentTabData.lexiconIssues.length === 0) && (
               <div className="text-center py-12 text-text-muted">
                 <CheckCircle size={24} className="mx-auto mb-2 text-emerald-500/50" />
                 <p className="text-xs">未检测到问题</p>
