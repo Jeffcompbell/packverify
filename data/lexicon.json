@@ -55,6 +55,58 @@
       "category": "false_claim"
     },
     {
+      "id": "COS-050",
+      "pattern": "psoriasis",
+      "patternType": "keyword",
+      "domain": "cosmetics",
+      "market": "US",
+      "severity": "P0",
+      "reason": "化妆品一旦声称治疗或缓解银屑病即被视为药品，需要药品合规审批",
+      "suggestion": "删除该病症词，改为“舒缓干燥肌肤”类描述",
+      "source": "FDA Cosmetics Labeling Claims",
+      "sourceUrl": "https://www.fda.gov/cosmetics/cosmetics-labeling/cosmetics-labeling-claims",
+      "category": "drug_claim"
+    },
+    {
+      "id": "COS-051",
+      "pattern": "eczema",
+      "patternType": "keyword",
+      "domain": "cosmetics",
+      "market": "US",
+      "severity": "P0",
+      "reason": "声称治疗湿疹等疾病会触发药品监管，被认定为未批准新药",
+      "suggestion": "替换为“舒缓敏感肌”“减少干燥感”之类结构/功能描述",
+      "source": "FDA Cosmetics Labeling Claims",
+      "sourceUrl": "https://www.fda.gov/cosmetics/cosmetics-labeling/cosmetics-labeling-claims",
+      "category": "drug_claim"
+    },
+    {
+      "id": "FOOD-020",
+      "pattern": "prevents (?:heart attack|stroke|cancer)",
+      "patternType": "regex",
+      "domain": "food",
+      "market": "EU",
+      "severity": "P0",
+      "reason": "欧盟健康声称法规禁止食品未经授权就宣称预防具体疾病",
+      "suggestion": "改为获批的风险降低声称或结构/功能表述，并注明欧盟注册号",
+      "source": "Regulation (EC) No 1924/2006",
+      "sourceUrl": "https://eur-lex.europa.eu/eli/reg/2006/1924/oj/eng",
+      "category": "eu_health_claim"
+    },
+    {
+      "id": "SUP-010",
+      "pattern": "FDA approved supplement",
+      "patternType": "keyword",
+      "domain": "supplement",
+      "market": "US",
+      "severity": "P0",
+      "reason": "FDA 不预先批准膳食补充剂，声称“FDA 认证”属误导性标签",
+      "suggestion": "删除该表述，并使用 21 CFR 101.93 免责声明",
+      "source": "21 CFR 101.93",
+      "sourceUrl": "https://www.law.cornell.edu/cfr/text/21/101.93",
+      "category": "false_claim"
+    },
+    {
       "id": "COS-005",
       "pattern": "anti-inflammatory",
       "patternType": "keyword",

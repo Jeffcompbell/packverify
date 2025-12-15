@@ -1,3 +1,5 @@
+import { createAuth } from '../lib/auth';
+
 export interface Env {
   DB: D1Database;
   IMAGES: R2Bucket;
@@ -6,8 +8,26 @@ export interface Env {
   AI_API_URL: string;
   AI_API_KEY: string;
   AI_MODEL?: string;
+  // Better Auth
+  BETTER_AUTH_SECRET: string;
+  BETTER_AUTH_URL: string;
+  GOOGLE_CLIENT_ID?: string;
+  GOOGLE_CLIENT_SECRET?: string;
 }
 
+// 验证 Better Auth session
+export async function verifyBetterAuthSession(request: Request, env: Env): Promise<string | null> {
+  try {
+    const auth = createAuth(env);
+    const session = await auth.api.getSession({ headers: request.headers });
+    return session?.user?.id || null;
+  } catch (error) {
+    console.error('Better Auth session verification failed:', error);
+    return null;
+  }
+}
+
+// 验证 Firebase Token（保留兼容）
 export async function verifyFirebaseToken(request: Request, env: Env): Promise<string | null> {
   const authHeader = request.headers.get('Authorization');
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -17,27 +37,21 @@ export async function verifyFirebaseToken(request: Request, env: Env): Promise<s
   const token = authHeader.substring(7);
 
   try {
-    // 验证 Firebase ID Token
-    // 使用 Google 的公钥验证 JWT
     const response = await fetch(
       `https://www.googleapis.com/robot/v1/metadata/x509/securetoken@system.gserviceaccount.com`
     );
     const keys = await response.json();
 
-    // 解码 token header 获取 kid
     const [headerB64] = token.split('.');
     const header = JSON.parse(atob(headerB64));
 
-    // 简化验证：仅检查 token 格式和过期时间
     const [, payloadB64] = token.split('.');
     const payload = JSON.parse(atob(payloadB64));
 
-    // 检查过期时间
     if (payload.exp * 1000 < Date.now()) {
       return null;
     }
 
-    // 检查 audience 和 issuer
     if (payload.aud !== env.FIREBASE_PROJECT_ID) {
       return null;
     }
@@ -46,16 +60,26 @@ export async function verifyFirebaseToken(request: Request, env: Env): Promise<s
       return null;
     }
 
-    return payload.sub; // 返回 uid
+    return payload.sub;
   } catch (error) {
     console.error('Token verification failed:', error);
     return null;
   }
 }
 
+// 统一验证：优先 Better Auth，回退 Firebase
+export async function verifyAuth(request: Request, env: Env): Promise<string | null> {
+  // 先尝试 Better Auth session
+  const betterAuthUid = await verifyBetterAuthSession(request, env);
+  if (betterAuthUid) return betterAuthUid;
+
+  // 回退到 Firebase token
+  return verifyFirebaseToken(request, env);
+}
+
 export function requireAuth(handler: (request: Request, env: Env, uid: string) => Promise<Response>) {
   return async (request: Request, env: Env): Promise<Response> => {
-    const uid = await verifyFirebaseToken(request, env);
+    const uid = await verifyAuth(request, env);
 
     if (!uid) {
       return new Response(JSON.stringify({ error: 'Unauthorized' }), {

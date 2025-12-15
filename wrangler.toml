@@ -13,6 +13,8 @@ bucket_name = "packverify-images"
 
 [vars]
 FIREBASE_PROJECT_ID = "packyverify"
+BETTER_AUTH_URL = "https://packverify.pages.dev"
+# BETTER_AUTH_SECRET, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET 需要通过 wrangler secret put 设置
 
 [build]
 command = "npm run build"

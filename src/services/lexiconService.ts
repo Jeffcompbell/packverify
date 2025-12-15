@@ -158,15 +158,15 @@ export const lexiconHitsToIssues = (hits: LexiconHit[]) => {
 /**
  * 获取词库统计信息
  */
-export const getLexiconStats = () => {
+export const getLexiconStats = (entries: LexiconEntry[] = lexicon) => {
   const stats = {
-    total: lexicon.length,
+    total: entries.length,
     byDomain: {} as Record<string, number>,
     bySeverity: {} as Record<string, number>,
     byMarket: {} as Record<string, number>
   };
 
-  for (const entry of lexicon) {
+  for (const entry of entries) {
     stats.byDomain[entry.domain] = (stats.byDomain[entry.domain] || 0) + 1;
     stats.bySeverity[entry.severity] = (stats.bySeverity[entry.severity] || 0) + 1;
     stats.byMarket[entry.market] = (stats.byMarket[entry.market] || 0) + 1;

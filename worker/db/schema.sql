@@ -4,7 +4,7 @@ CREATE TABLE IF NOT EXISTS users (
   email TEXT NOT NULL,
   display_name TEXT,
   photo_url TEXT,
-  quota INTEGER DEFAULT 50,
+  quota INTEGER DEFAULT 10,
   used INTEGER DEFAULT 0,
   is_admin INTEGER DEFAULT 0,
   created_at INTEGER NOT NULL,

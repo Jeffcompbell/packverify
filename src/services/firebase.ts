@@ -1,5 +1,5 @@
 import { initializeApp } from 'firebase/app';
-import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
+import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged, User as FirebaseUser, signInWithEmailAndPassword, createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
 import { getFirestore, doc, getDoc, setDoc, updateDoc, increment, serverTimestamp, collection, query, orderBy, getDocs, deleteDoc, writeBatch, limit, startAfter } from 'firebase/firestore';
 import { getStorage, ref, uploadString, getDownloadURL, deleteObject } from 'firebase/storage';
 import { ImageItem, DiagnosisIssue, DiffResult, ImageSpec, DeterministicCheck, SourceField } from '../types/types';
@@ -54,6 +54,33 @@ export const signInWithGoogle = async (): Promise<UserData | null> => {
     return userData;
   } catch (error: any) {
     console.error('Google sign in error:', error);
+    throw error;
+  }
+};
+
+// 邮箱密码登录
+export const signInWithEmail = async (email: string, password: string): Promise<UserData | null> => {
+  try {
+    const result = await signInWithEmailAndPassword(auth, email, password);
+    const { getOrCreateUser: getOrCreateUserFromCloudflare } = await import('./cloudflare');
+    return await getOrCreateUserFromCloudflare(result.user);
+  } catch (error: any) {
+    console.error('Email sign in error:', error);
+    throw error;
+  }
+};
+
+// 邮箱密码注册
+export const signUpWithEmail = async (email: string, password: string, displayName?: string): Promise<UserData | null> => {
+  try {
+    const result = await createUserWithEmailAndPassword(auth, email, password);
+    if (displayName) {
+      await updateProfile(result.user, { displayName });
+    }
+    const { getOrCreateUser: getOrCreateUserFromCloudflare } = await import('./cloudflare');
+    return await getOrCreateUserFromCloudflare(result.user);
+  } catch (error: any) {
+    console.error('Email sign up error:', error);
     throw error;
   }
 };

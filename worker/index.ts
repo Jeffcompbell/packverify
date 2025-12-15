@@ -1,9 +1,16 @@
 import { Env } from './middleware/auth';
 import { handleAPI } from './router';
+import { createAuth } from './lib/auth';
 
 export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
+
+    // Better Auth 路由
+    if (url.pathname.startsWith('/api/auth/')) {
+      const auth = createAuth(env);
+      return auth.handler(request);
+    }
 
     // API 路由
     if (url.pathname.startsWith('/api/')) {

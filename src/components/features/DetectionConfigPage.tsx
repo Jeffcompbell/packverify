@@ -1,8 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Loader2, Save, BookOpen, ChevronRight, Search, Plus, Edit2, Trash2, ExternalLink, X, Download } from 'lucide-react';
-import { Button } from '../ui/button';
+import { BookOpen, Search, Plus, Edit2, Trash2, X, Download } from 'lucide-react';
 import lexiconData from '../../../data/lexicon.json';
-import { getLexiconStats } from '../../services/lexiconService';
+import { getLexiconStats, type LexiconEntry } from '../../services/lexiconService';
 
 interface DetectionConfigPageProps {
   onBack: () => void;
@@ -10,6 +9,61 @@ interface DetectionConfigPageProps {
 
 const STORAGE_KEY = 'packverify_custom_prompt';
 const ENABLED_KEY = 'packverify_custom_prompt_enabled';
+const LEXICON_TOGGLE_KEY = 'packverify_lexicon_domain_toggles';
+
+const DOMAIN_ORDER = ['cosmetics', 'food', 'pharma', 'supplement', 'general'];
+const DOMAIN_META: Record<string, { label: string; description: string; accent: string; badge: string }> = {
+  cosmetics: {
+    label: '化妆品',
+    description: '功效宣称、药妆边界',
+    accent: 'bg-rose-50 text-rose-600 border-rose-100',
+    badge: 'bg-rose-100 text-rose-700'
+  },
+  food: {
+    label: '食品',
+    description: '营养成分、功效宣称',
+    accent: 'bg-emerald-50 text-emerald-600 border-emerald-100',
+    badge: 'bg-emerald-100 text-emerald-700'
+  },
+  pharma: {
+    label: '药品',
+    description: '处方/警示文案',
+    accent: 'bg-sky-50 text-sky-600 border-sky-100',
+    badge: 'bg-sky-100 text-sky-700'
+  },
+  supplement: {
+    label: '保健品',
+    description: '结构/功能宣称',
+    accent: 'bg-amber-50 text-amber-600 border-amber-100',
+    badge: 'bg-amber-100 text-amber-700'
+  },
+  general: {
+    label: '通用',
+    description: '所有行业共享规则',
+    accent: 'bg-surface-100 text-text-primary border-border/80',
+    badge: 'bg-surface-200 text-text-secondary'
+  }
+};
+
+const getDomainMeta = (domain: string) => DOMAIN_META[domain] || {
+  label: domain,
+  description: '自定义行业',
+  accent: 'bg-surface-100 text-text-primary border-border/80',
+  badge: 'bg-surface-200 text-text-secondary'
+};
+
+const createEmptyLexiconEntry = (domain?: string | null): LexiconEntry => ({
+  id: `NEW-${Date.now()}`,
+  pattern: '',
+  patternType: 'keyword',
+  domain: domain || 'general',
+  market: 'general',
+  severity: 'P1',
+  reason: '',
+  suggestion: '',
+  source: '',
+  sourceUrl: ''
+});
 
 const DEFAULT_PROMPT = `你是一个专业的印刷品质量检测专家。请仔细检查图片中的以下问题：
 
@@ -21,34 +75,40 @@ const DEFAULT_PROMPT = `你是一个专业的印刷品质量检测专家。请�
 
 请用中文回复，列出发现的所有问题。`;
 
-interface LexiconEntry {
-  id: string;
-  pattern: string;
-  patternType: 'keyword' | 'regex';
-  domain: string;
-  market: string;
-  severity: 'P0' | 'P1' | 'P2';
-  reason: string;
-  suggestion: string;
-  source?: string;
-  sourceUrl?: string;
-}
-
 export const DetectionConfigPage: React.FC<DetectionConfigPageProps> = ({ onBack }) => {
   const [enabled, setEnabled] = useState(false);
   const [prompt, setPrompt] = useState('');
-  const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
 
   // 词库管理状态
-  const [showLexiconPanel, setShowLexiconPanel] = useState(false);
   const [lexiconEntries, setLexiconEntries] = useState<LexiconEntry[]>(lexiconData.entries as LexiconEntry[]);
   const [lexiconSearch, setLexiconSearch] = useState('');
-  const [lexiconFilterDomain, setLexiconFilterDomain] = useState('all');
+  const [activeLexiconDomain, setActiveLexiconDomain] = useState<string | null>(null);
   const [editingEntry, setEditingEntry] = useState<LexiconEntry | null>(null);
   const [isAddingNew, setIsAddingNew] = useState(false);
+  const [domainToggles, setDomainToggles] = useState<Record<string, boolean>>({});
 
-  const lexiconStats = useMemo(() => getLexiconStats(), []);
+  const lexiconStats = useMemo(() => getLexiconStats(lexiconEntries), [lexiconEntries]);
+  const domainList = useMemo(() => {
+    const domainSet = new Set<string>();
+    lexiconEntries.forEach(entry => domainSet.add(entry.domain));
+    const prioritized = DOMAIN_ORDER.filter(domain => domainSet.has(domain));
+    const extras = Array.from(domainSet).filter(domain => !DOMAIN_ORDER.includes(domain)).sort();
+    return [...prioritized, ...extras];
+  }, [lexiconEntries]);
+
+  const domainStats = useMemo(() => {
+    return lexiconEntries.reduce<Record<string, { total: number; severity: Record<'P0' | 'P1' | 'P2', number> }>>((acc, entry) => {
+      if (!acc[entry.domain]) {
+        acc[entry.domain] = {
+          total: 0,
+          severity: { P0: 0, P1: 0, P2: 0 }
+        };
+      }
+      acc[entry.domain].total += 1;
+      acc[entry.domain].severity[entry.severity] += 1;
+      return acc;
+    }, {});
+  }, [lexiconEntries]);
 
   useEffect(() => {
     const storedEnabled = localStorage.getItem(ENABLED_KEY);
@@ -57,36 +117,68 @@ export const DetectionConfigPage: React.FC<DetectionConfigPageProps> = ({ onBack
     setPrompt(storedPrompt || DEFAULT_PROMPT);
   }, []);
 
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem(LEXICON_TOGGLE_KEY);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (parsed && typeof parsed === 'object') {
+          setDomainToggles(parsed);
+        }
+      }
+    } catch (error) {
+      console.warn('Failed to load lexicon toggles', error);
+    }
+  }, []);
+
+  useEffect(() => {
+    setDomainToggles(prev => {
+      let changed = false;
+      const next = { ...prev };
+      domainList.forEach(domain => {
+        if (next[domain] === undefined) {
+          next[domain] = true;
+          changed = true;
+        }
+      });
+      return changed ? next : prev;
+    });
+  }, [domainList]);
+
+  useEffect(() => {
+    if (Object.keys(domainToggles).length === 0) return;
+    localStorage.setItem(LEXICON_TOGGLE_KEY, JSON.stringify(domainToggles));
+  }, [domainToggles]);
+
+  useEffect(() => {
+    setLexiconSearch('');
+  }, [activeLexiconDomain]);
+
   const handleToggle = () => {
     const newEnabled = !enabled;
     setEnabled(newEnabled);
     localStorage.setItem(ENABLED_KEY, String(newEnabled));
   };
 
-  const handleSave = () => {
-    setSaving(true);
-    localStorage.setItem(STORAGE_KEY, prompt);
-    setTimeout(() => {
-      setSaving(false);
-      setSaved(true);
-      setTimeout(() => setSaved(false), 2000);
-    }, 300);
-  };
-
   const handleReset = () => {
     setPrompt(DEFAULT_PROMPT);
   };
 
+  useEffect(() => {
+    if (!enabled) return;
+    localStorage.setItem(STORAGE_KEY, prompt);
+  }, [prompt, enabled]);
+
   // 词库过滤
   const filteredLexicon = useMemo(() => {
+    const keyword = lexiconSearch.trim().toLowerCase();
     return lexiconEntries.filter(entry => {
-      const matchSearch = !lexiconSearch ||
-        entry.pattern.toLowerCase().includes(lexiconSearch.toLowerCase()) ||
-        entry.reason.toLowerCase().includes(lexiconSearch.toLowerCase());
-      const matchDomain = lexiconFilterDomain === 'all' || entry.domain === lexiconFilterDomain;
-      return matchSearch && matchDomain;
+      const matchDomain = activeLexiconDomain ? entry.domain === activeLexiconDomain : true;
+      if (!matchDomain) return false;
+      if (!keyword) return true;
+      return entry.pattern.toLowerCase().includes(keyword) || entry.reason.toLowerCase().includes(keyword);
     });
-  }, [lexiconEntries, lexiconSearch, lexiconFilterDomain]);
+  }, [lexiconEntries, lexiconSearch, activeLexiconDomain]);
 
   const handleExportLexicon = () => {
     const data = { version: lexiconData.version, updatedAt: new Date().toISOString().split('T')[0], entries: lexiconEntries };
@@ -115,171 +207,319 @@ export const DetectionConfigPage: React.FC<DetectionConfigPageProps> = ({ onBack
     }
   };
 
+  const handleToggleDomain = (domain: string) => {
+    setDomainToggles(prev => {
+      const current = prev[domain] ?? true;
+      return {
+        ...prev,
+        [domain]: !current
+      };
+    });
+  };
+
+  const handleOpenDomainPanel = (domain: string) => {
+    setActiveLexiconDomain(domain);
+  };
+
+  const handleCloseDomainPanel = () => {
+    setActiveLexiconDomain(null);
+  };
+
+  const handleAddLexiconEntry = (domain: string) => {
+    setActiveLexiconDomain(domain);
+    setIsAddingNew(true);
+    setEditingEntry(null);
+  };
+
   return (
     <div className="flex-1 flex flex-col bg-surface-50 overflow-hidden">
       <div className="flex-1 overflow-y-auto p-6">
         <div className="max-w-3xl mx-auto space-y-6">
-          {/* 开关 */}
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-text-primary">自定义提示词</p>
-              <p className="text-xs text-text-muted mt-0.5">开启后使用自定义提示词进行检测</p>
+          {/* 自定义提示词卡片 */}
+          <div className="bg-white rounded-xl border border-border overflow-hidden">
+            <div className="px-4 py-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="text-sm font-medium text-text-primary">自定义提示词</p>
+                <p className="text-xs text-text-muted mt-0.5">
+                  根据出口品类定制检测策略，确保符合美国 FDA / 欧盟 EFSA 等指导
+                </p>
+              </div>
+              <button
+                onClick={handleToggle}
+                className={`self-start sm:self-auto relative w-11 h-6 rounded-full transition-colors ${enabled ? 'bg-text-primary' : 'bg-surface-200'}`}
+                title={enabled ? '点击关闭自定义提示词' : '点击开启自定义提示词'}
+              >
+                <span className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-transform ${enabled ? 'left-6' : 'left-1'}`} />
+              </button>
             </div>
-            <button
-              onClick={handleToggle}
-              className={`relative w-11 h-6 rounded-full transition-colors ${enabled ? 'bg-text-primary' : 'bg-surface-200'}`}
-            >
-              <span className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-transform ${enabled ? 'left-6' : 'left-1'}`} />
-            </button>
-          </div>
-
-          {/* 编辑区域 */}
-          {enabled && (
-            <div className="bg-surface-0 rounded-xl border border-border overflow-hidden">
+            <div className="border-t border-border bg-surface-0">
               <textarea
                 value={prompt}
                 onChange={(e) => setPrompt(e.target.value)}
                 placeholder="输入你的自定义提示词..."
-                className="w-full h-64 p-4 text-sm text-text-primary bg-transparent resize-none focus:outline-none"
+                disabled={!enabled}
+                className={`w-full h-64 p-4 text-sm text-text-primary bg-transparent resize-none focus:outline-none ${
+                  enabled ? '' : 'opacity-60 cursor-not-allowed'
+                }`}
               />
-              <div className="border-t border-border px-4 py-3 flex items-center justify-between bg-surface-50">
-                <button onClick={handleReset} className="text-xs text-text-muted hover:text-text-primary transition-colors">
+              <div className="border-t border-border px-4 py-3 flex items-center justify-end bg-surface-50">
+                <button
+                  onClick={handleReset}
+                  disabled={!enabled}
+                  className={`text-xs px-3 py-1.5 rounded-lg border border-border transition ${
+                    enabled ? 'hover:border-text-primary hover:text-text-primary' : 'text-text-muted/60 border-border/60 cursor-not-allowed'
+                  }`}
+                >
                   恢复默认
                 </button>
-                <div className="flex items-center gap-3">
-                  {saved && <span className="text-xs text-success">已保存</span>}
-                  <Button onClick={handleSave} disabled={saving} size="sm">
-                    {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
-                    保存
-                  </Button>
-                </div>
               </div>
             </div>
-          )}
+          </div>
 
-          {/* 敏感词库卡片 */}
-          <div className="bg-white rounded-xl border border-border overflow-hidden">
-            <button
-              onClick={() => setShowLexiconPanel(!showLexiconPanel)}
-              className="w-full px-4 py-3 flex items-center justify-between hover:bg-surface-50 transition-colors"
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-lg bg-amber-100 flex items-center justify-center">
-                  <BookOpen size={16} className="text-amber-600" />
+          {/* 敏感词库配置 */}
+          <div className="space-y-3">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <div className="flex items-center gap-2 text-text-primary">
+                  <BookOpen size={14} />
+                  <p className="text-sm font-medium">敏感词库</p>
                 </div>
-                <div className="text-left">
-                  <p className="text-sm font-medium text-text-primary">敏感词库</p>
-                  <p className="text-xs text-text-muted">
-                    {lexiconStats.total} 条规则 · P0: {lexiconStats.bySeverity['P0'] || 0} · P1: {lexiconStats.bySeverity['P1'] || 0}
-                  </p>
-                </div>
+                <p className="text-xs text-text-muted">
+                  覆盖美国 FDA、欧盟 EFSA、加拿大 HC 等出口法规要点 · 默认全行业启用
+                </p>
+                <p className="text-[11px] text-text-muted">
+                  共 {lexiconStats.total} 条（P0 {lexiconStats.bySeverity['P0'] || 0} · P1 {lexiconStats.bySeverity['P1'] || 0} · P2 {lexiconStats.bySeverity['P2'] || 0}）
+                </p>
               </div>
-              <ChevronRight size={16} className={`text-text-muted transition-transform ${showLexiconPanel ? 'rotate-90' : ''}`} />
-            </button>
+              <button
+                onClick={handleExportLexicon}
+                className="self-start sm:self-auto inline-flex items-center gap-1 px-3 py-1.5 text-xs border border-border rounded-lg text-text-primary hover:bg-surface-50"
+              >
+                <Download size={14} /> 导出全部
+              </button>
+            </div>
 
-            {showLexiconPanel && (
-              <div className="border-t border-border">
-                {/* 搜索和操作栏 */}
-                <div className="px-4 py-3 flex items-center gap-3 bg-surface-50">
-                  <div className="flex-1 relative">
-                    <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
-                    <input
-                      value={lexiconSearch}
-                      onChange={e => setLexiconSearch(e.target.value)}
-                      placeholder="搜索规则..."
-                      className="w-full pl-9 pr-3 py-1.5 text-sm border border-border rounded-lg bg-white"
-                    />
-                  </div>
-                  <select
-                    value={lexiconFilterDomain}
-                    onChange={e => setLexiconFilterDomain(e.target.value)}
-                    className="px-3 py-1.5 text-sm border border-border rounded-lg bg-white"
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {domainList.map(domain => {
+                const stats = domainStats[domain];
+                const meta = getDomainMeta(domain);
+                const enabled = domainToggles[domain] ?? true;
+                return (
+                  <div
+                    key={domain}
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => handleOpenDomainPanel(domain)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        handleOpenDomainPanel(domain);
+                      }
+                    }}
+                    className="group border border-border rounded-lg p-4 transition hover:border-text-primary hover:shadow-sm focus:outline-none focus:border-text-primary focus:shadow-sm cursor-pointer"
+                    aria-label={`查看${meta.label}词库`}
                   >
-                    <option value="all">全部行业</option>
-                    <option value="cosmetics">化妆品</option>
-                    <option value="food">食品</option>
-                    <option value="pharma">药品</option>
-                    <option value="supplement">保健品</option>
-                    <option value="general">通用</option>
-                  </select>
-                  <button
-                    onClick={handleExportLexicon}
-                    className="p-1.5 text-text-muted hover:text-text-primary hover:bg-surface-100 rounded-lg"
-                    title="导出"
-                  >
-                    <Download size={16} />
-                  </button>
-                  <button
-                    onClick={() => { setIsAddingNew(true); setEditingEntry(null); }}
-                    className="flex items-center gap-1 px-3 py-1.5 text-xs bg-text-primary text-white rounded-lg hover:bg-text-secondary"
-                  >
-                    <Plus size={14} /> 新增
-                  </button>
-                </div>
-
-                {/* 规则列表 */}
-                <div className="max-h-80 overflow-y-auto">
-                  {filteredLexicon.slice(0, 20).map(entry => (
-                    <div key={entry.id} className="px-4 py-2.5 border-b border-border/50 last:border-b-0 hover:bg-surface-50 group">
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 mb-1">
-                            <span className={`px-1.5 py-0.5 text-[10px] font-medium rounded ${
-                              entry.severity === 'P0' ? 'bg-red-100 text-red-700' :
-                              entry.severity === 'P1' ? 'bg-amber-100 text-amber-700' : 'bg-gray-100 text-gray-600'
-                            }`}>
-                              {entry.severity}
-                            </span>
-                            <span className="text-[10px] text-text-muted font-mono">{entry.id}</span>
-                            <span className="text-[10px] px-1.5 py-0.5 bg-surface-100 rounded">{entry.domain}</span>
-                          </div>
-                          <p className="text-xs font-mono text-text-primary truncate">
-                            <span className="bg-amber-50 px-1 rounded">{entry.pattern}</span>
-                          </p>
-                          <p className="text-[11px] text-text-muted mt-0.5 truncate">{entry.reason}</p>
-                        </div>
-                        <div className="flex items-center gap-1 ml-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <button
-                            onClick={() => { setEditingEntry(entry); setIsAddingNew(false); }}
-                            className="p-1 text-text-muted hover:text-text-primary hover:bg-surface-100 rounded"
-                          >
-                            <Edit2 size={12} />
-                          </button>
-                          <button
-                            onClick={() => handleDeleteLexiconEntry(entry.id)}
-                            className="p-1 text-text-muted hover:text-red-600 hover:bg-red-50 rounded"
-                          >
-                            <Trash2 size={12} />
-                          </button>
-                        </div>
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-medium text-text-primary">{meta.label}</p>
+                        <p className="text-[11px] text-text-muted">{meta.description}</p>
+                      </div>
+                      <button
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          handleToggleDomain(domain);
+                        }}
+                        className={`relative w-11 h-6 rounded-full transition-colors ${enabled ? 'bg-text-primary' : 'bg-surface-200'}`}
+                        title={enabled ? '点击关闭该行业词库' : '点击开启该行业词库'}
+                      >
+                        <span className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-transform ${enabled ? 'left-6' : 'left-1'}`} />
+                      </button>
+                    </div>
+                    <div className="mt-3 flex items-center gap-4 text-xs text-text-muted">
+                      <div>
+                        <p className="text-[10px] uppercase tracking-wide">规则</p>
+                        <p className="text-base text-text-primary font-semibold">{stats?.total || 0}</p>
+                      </div>
+                      <div>
+                        <p className="text-[10px] uppercase tracking-wide">P0</p>
+                        <p className="text-base text-red-600 font-semibold">{stats?.severity?.P0 || 0}</p>
+                      </div>
+                      <div>
+                        <p className="text-[10px] uppercase tracking-wide">P1</p>
+                        <p className="text-base text-amber-600 font-semibold">{stats?.severity?.P1 || 0}</p>
+                      </div>
+                      <div>
+                        <p className="text-[10px] uppercase tracking-wide">P2</p>
+                        <p className="text-base text-text-muted font-semibold">{stats?.severity?.P2 || 0}</p>
                       </div>
                     </div>
-                  ))}
-                  {filteredLexicon.length > 20 && (
-                    <div className="px-4 py-2 text-center text-xs text-text-muted">
-                      还有 {filteredLexicon.length - 20} 条规则...
+                    <div className="mt-3 text-[11px] text-text-muted flex items-center justify-between">
+                      <span>状态：{enabled ? <span className="text-emerald-600">启用</span> : <span className="text-text-secondary">停用</span>}</span>
+                      <span className="text-text-secondary">点击查看</span>
                     </div>
-                  )}
-                  {filteredLexicon.length === 0 && (
-                    <div className="px-4 py-8 text-center text-xs text-text-muted">
-                      没有找到匹配的规则
-                    </div>
-                  )}
+                  </div>
+                );
+              })}
+              {domainList.length === 0 && (
+                <div className="col-span-full text-center text-xs text-text-muted py-6 border border-dashed border-border rounded-lg">
+                  暂无可用词库，请先导入规则
                 </div>
-              </div>
-            )}
+              )}
+            </div>
           </div>
+
         </div>
       </div>
+
+      {/* 词库详情弹窗 */}
+      {activeLexiconDomain && (
+        <DomainLexiconModal
+          domain={activeLexiconDomain}
+          enabled={domainToggles[activeLexiconDomain] ?? true}
+          stats={domainStats[activeLexiconDomain]}
+          searchValue={lexiconSearch}
+          entries={filteredLexicon}
+          onSearchChange={setLexiconSearch}
+          onAdd={() => handleAddLexiconEntry(activeLexiconDomain)}
+          onEdit={(entry) => { setEditingEntry(entry); setIsAddingNew(false); }}
+          onDelete={handleDeleteLexiconEntry}
+          onClose={handleCloseDomainPanel}
+          onExport={() => handleExportLexicon()}
+        />
+      )}
 
       {/* 编辑弹窗 */}
       {(editingEntry || isAddingNew) && (
         <LexiconEntryForm
           entry={isAddingNew ? null : editingEntry}
+          defaultDomain={isAddingNew ? activeLexiconDomain : editingEntry?.domain}
           onSave={handleSaveLexiconEntry}
           onCancel={() => { setEditingEntry(null); setIsAddingNew(false); }}
         />
       )}
+    </div>
+  );
+};
+
+interface DomainLexiconModalProps {
+  domain: string;
+  enabled: boolean;
+  stats?: { total: number; severity: Record<'P0' | 'P1' | 'P2', number> };
+  searchValue: string;
+  entries: LexiconEntry[];
+  onSearchChange: (value: string) => void;
+  onAdd: () => void;
+  onEdit: (entry: LexiconEntry) => void;
+  onDelete: (id: string) => void;
+  onClose: () => void;
+  onExport: () => void;
+}
+
+const DomainLexiconModal: React.FC<DomainLexiconModalProps> = ({
+  domain,
+  enabled,
+  stats,
+  searchValue,
+  entries,
+  onSearchChange,
+  onAdd,
+  onEdit,
+  onDelete,
+  onClose,
+  onExport
+}) => {
+  const meta = getDomainMeta(domain);
+  return (
+    <div className="fixed inset-0 bg-black/50 z-40 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl w-full max-w-3xl max-h-[90vh] flex flex-col overflow-hidden shadow-2xl">
+        <div className="px-5 py-4 border-b border-border flex items-start justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-2">
+              <p className="text-base font-semibold text-text-primary">{meta.label}词库</p>
+              <span className={`text-[11px] px-2 py-0.5 rounded ${enabled ? 'bg-emerald-50 text-emerald-600' : 'bg-surface-200 text-text-muted'}`}>
+                {enabled ? '已启用' : '已停用'}
+              </span>
+            </div>
+            <p className="text-xs text-text-muted mt-1">
+              当前 {stats?.total || 0} 条规则 · P0 {stats?.severity?.P0 || 0} · P1 {stats?.severity?.P1 || 0} · P2 {stats?.severity?.P2 || 0}
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={onExport}
+              className="p-1.5 text-text-muted hover:text-text-primary hover:bg-surface-100 rounded-lg"
+              title="导出词库"
+            >
+              <Download size={16} />
+            </button>
+            <button
+              onClick={onClose}
+              className="p-1.5 text-text-muted hover:text-text-primary hover:bg-surface-100 rounded-lg"
+              title="关闭"
+            >
+              <X size={16} />
+            </button>
+          </div>
+        </div>
+        <div className="px-5 py-3 border-b border-border flex flex-wrap items-center gap-3">
+          <div className="flex-1 min-w-[220px] relative">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
+            <input
+              value={searchValue}
+              onChange={(e) => onSearchChange(e.target.value)}
+              placeholder={`搜索${meta.label}规则...`}
+              className="w-full pl-9 pr-3 py-1.5 text-sm border border-border rounded-lg bg-white"
+            />
+          </div>
+          <button
+            onClick={onAdd}
+            className="flex items-center gap-1 px-3 py-1.5 text-xs bg-text-primary text-white rounded-lg hover:bg-text-secondary"
+          >
+            <Plus size={14} /> 新增
+          </button>
+        </div>
+        <div className="flex-1 overflow-y-auto divide-y divide-border/60">
+          {entries.slice(0, 50).map(entry => (
+            <div key={entry.id} className="px-5 py-3 flex items-start justify-between gap-3 hover:bg-surface-50">
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className={`px-1.5 py-0.5 text-[10px] font-medium rounded ${
+                    entry.severity === 'P0' ? 'bg-red-100 text-red-700' :
+                    entry.severity === 'P1' ? 'bg-amber-100 text-amber-700' : 'bg-gray-100 text-gray-600'
+                  }`}>
+                    {entry.severity}
+                  </span>
+                  <span className="text-[10px] text-text-muted font-mono">{entry.id}</span>
+                  <span className="text-[10px] px-1.5 py-0.5 bg-surface-100 rounded">{entry.market}</span>
+                </div>
+                <p className="text-xs font-mono text-text-primary break-all mb-1">
+                  <span className="bg-surface-100 px-1 rounded">{entry.pattern}</span>
+                </p>
+                <p className="text-[11px] text-text-muted line-clamp-2">{entry.reason}</p>
+              </div>
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => onEdit(entry)}
+                  className="p-1 text-text-muted hover:text-text-primary hover:bg-surface-100 rounded"
+                >
+                  <Edit2 size={12} />
+                </button>
+                <button
+                  onClick={() => onDelete(entry.id)}
+                  className="p-1 text-text-muted hover:text-red-600 hover:bg-red-50 rounded"
+                >
+                  <Trash2 size={12} />
+                </button>
+              </div>
+            </div>
+          ))}
+          {entries.length === 0 && (
+            <div className="px-5 py-12 text-center text-xs text-text-muted">
+              没有找到匹配的规则
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 };
@@ -289,19 +529,17 @@ const LexiconEntryForm: React.FC<{
   entry: LexiconEntry | null;
   onSave: (e: LexiconEntry) => void;
   onCancel: () => void;
-}> = ({ entry, onSave, onCancel }) => {
-  const [form, setForm] = useState<LexiconEntry>(entry || {
-    id: `NEW-${Date.now()}`,
-    pattern: '',
-    patternType: 'keyword',
-    domain: 'general',
-    market: 'general',
-    severity: 'P1',
-    reason: '',
-    suggestion: '',
-    source: '',
-    sourceUrl: ''
-  });
+  defaultDomain?: string | null;
+}> = ({ entry, onSave, onCancel, defaultDomain }) => {
+  const [form, setForm] = useState<LexiconEntry>(entry || createEmptyLexiconEntry(defaultDomain));
+
+  useEffect(() => {
+    if (entry) {
+      setForm(entry);
+      return;
+    }
+    setForm(createEmptyLexiconEntry(defaultDomain));
+  }, [entry, defaultDomain]);
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">

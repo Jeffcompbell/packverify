@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Mail, Lock } from 'lucide-react';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { signInWithEmail, signUpWithEmail, signInWithGoogle } from '@/services/auth-client';
 
 export const GoogleIcon = () => (
   <svg width="18" height="18" viewBox="0 0 18 18">
@@ -20,16 +21,56 @@ interface LoginModalProps {
 export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLogin }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
 
   const handleGoogleLogin = async () => {
     setIsLoading(true);
     setError(null);
     try {
-      await onLogin();
-      onClose();
+      await signInWithGoogle();
     } catch (err: any) {
-      console.error('Login error:', err);
-      setError(err.message || '登录失败，请重试');
+      console.error('Google login error:', err);
+      try {
+        await onLogin();
+        onClose();
+      } catch (fallbackErr: any) {
+        setError(fallbackErr.message || '登录失败，请重试');
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // 注册即登录：先尝试登录，失败则自动注册
+  const handleEmailAuth = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email || !password) {
+      setError('请填写邮箱和密码');
+      return;
+    }
+    if (password.length < 6) {
+      setError('密码至少需要 6 位');
+      return;
+    }
+
+    setIsLoading(true);
+    setError(null);
+    try {
+      // 先尝试登录
+      const loginResult = await signInWithEmail(email, password);
+      if (loginResult.error) {
+        // 登录失败，尝试注册
+        const signupResult = await signUpWithEmail(email, password, email.split('@')[0]);
+        if (signupResult.error) {
+          throw new Error(signupResult.error.message || '登录失败');
+        }
+      }
+      onClose();
+      window.location.reload();
+    } catch (err: any) {
+      console.error('Email auth error:', err);
+      setError(err.message || '登录失败，请检查邮箱和密码');
     } finally {
       setIsLoading(false);
     }
@@ -56,32 +97,67 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLogin
           </div>
         )}
 
+        {/* 邮箱密码表单 */}
+        <form onSubmit={handleEmailAuth} className="space-y-3">
+          <div className="relative">
+            <Mail size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+            <input
+              type="email"
+              placeholder="邮箱"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="w-full h-10 pl-9 pr-3 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent"
+            />
+          </div>
+          <div className="relative">
+            <Lock size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+            <input
+              type="password"
+              placeholder="密码（新用户自动注册）"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="w-full h-10 pl-9 pr-3 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent"
+            />
+          </div>
+          <button
+            type="submit"
+            disabled={isLoading}
+            className="w-full h-10 bg-violet-600 hover:bg-violet-700 text-white rounded-lg text-sm font-medium disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
+          >
+            {isLoading && <Loader2 size={16} className="animate-spin" />}
+            登录 / 注册
+          </button>
+        </form>
+
+        {/* 分隔线 */}
+        <div className="flex items-center gap-3 my-1">
+          <div className="flex-1 h-px bg-gray-200" />
+          <span className="text-xs text-gray-400">或</span>
+          <div className="flex-1 h-px bg-gray-200" />
+        </div>
+
         {/* Google 登录按钮 */}
         <button
           onClick={handleGoogleLogin}
           disabled={isLoading}
           className="w-full flex items-center justify-center gap-2.5 h-10 px-4 bg-white border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 hover:border-gray-300 disabled:opacity-50 transition-all"
         >
-          {isLoading ? (
-            <Loader2 size={16} className="animate-spin text-gray-500" />
-          ) : (
-            <GoogleIcon />
-          )}
-          {isLoading ? '登录中...' : '使用 Google 登录'}
+          {isLoading ? <Loader2 size={16} className="animate-spin text-gray-500" /> : <GoogleIcon />}
+          使用 Google 登录
         </button>
 
         {/* 提示 */}
         <div className="flex items-center justify-center gap-1.5 text-[11px] text-gray-400">
           <span className="w-1 h-1 rounded-full bg-violet-400"></span>
-          <span>首次登录赠送 50 次分析额度</span>
+          <span>新用户赠送 10 次免费分析</span>
         </div>
 
         {/* 条款 */}
         <p className="text-center text-[10px] text-gray-400 leading-relaxed">
           登录即同意
-          <a href="#" className="text-violet-500 hover:underline mx-0.5">服务条款</a>
+          <a href="/help#terms" className="text-violet-500 hover:underline mx-0.5">服务条款</a>
           和
-          <a href="#" className="text-violet-500 hover:underline ml-0.5">隐私政策</a>
+          <a href="/help#privacy" className="text-violet-500 hover:underline ml-0.5">隐私政策</a>
         </p>
       </DialogContent>
     </Dialog>
