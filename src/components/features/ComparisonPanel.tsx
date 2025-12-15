@@ -74,7 +74,7 @@ export const ComparisonPanel: React.FC<ComparisonPanelProps> = ({
                 <div className="flex items-center gap-2">
                   {expandedImages.has(img.id) ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
                   <span className="text-xs font-medium text-text-primary">图片 {idx + 1}</span>
-                  <span className="text-[10px] text-text-muted truncate max-w-[80px]">{img.file.name}</span>
+                  <span className="text-[10px] text-text-muted truncate max-w-[80px]">{img.file?.name || `image-${idx + 1}`}</span>
                 </div>
                 {img.ocrText ? (
                   <span className="text-[9px] px-1.5 py-0.5 bg-emerald-100 text-emerald-600 rounded">已提取</span>

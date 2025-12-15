@@ -965,8 +965,8 @@ const App: React.FC = () => {
           onClose={() => {}}
           sessions={historySessions}
           isLoading={isLoadingHistory}
-          onSelectSession={(session) => {
-            handleSwitchSession(session);
+          onSelectSession={async (session) => {
+            await handleSwitchSession(session);
             setCurrentView('analysis', session.id);
           }}
           onCreateNew={async () => {
