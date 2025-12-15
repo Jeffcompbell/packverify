@@ -1209,39 +1209,36 @@ const App: React.FC = () => {
               )}
             </>
           ) : (
-            <div className="text-center relative z-10">
-              <button
-                onClick={async () => {
-                  try {
-                    const items = await navigator.clipboard.read();
-                    for (const item of items) {
-                      const imageType = item.types.find(t => t.startsWith('image/'));
-                      if (imageType) {
-                        const blob = await item.getType(imageType);
-                        const file = new File([blob], `paste-${Date.now()}.png`, { type: imageType });
-                        handleImageUpload(file);
-                        return;
-                      }
+            <div
+              className="relative z-10 flex flex-col items-center justify-center px-20 py-12 rounded-xl border-2 border-dashed border-border hover:border-text-muted cursor-pointer transition-colors"
+              onClick={async () => {
+                const now = Date.now();
+                if (now - lastPasteTime.current < 300) return;
+                lastPasteTime.current = now;
+                try {
+                  const items = await navigator.clipboard.read();
+                  for (const item of items) {
+                    const imageType = item.types.find(t => t.startsWith('image/'));
+                    if (imageType) {
+                      const blob = await item.getType(imageType);
+                      const file = new File([blob], `paste-${Date.now()}.png`, { type: imageType });
+                      handleImageUpload(file);
+                      return;
                     }
-                    alert('剪贴板中没有图片');
-                  } catch {
-                    alert('无法读取剪贴板，请使用 Ctrl+V 粘贴');
                   }
-                }}
-                className="p-5 bg-white hover:bg-surface-50 rounded-lg mb-4 inline-block cursor-pointer transition-colors border-2 border-dashed border-border hover:border-border-hover group"
+                } catch {}
+              }}
+            >
+              <label
+                className="group relative px-8 py-4 bg-text-primary text-white rounded-lg cursor-pointer text-base font-medium overflow-hidden transition-all duration-300 hover:scale-105 hover:shadow-lg active:scale-95"
+                onClick={(e) => e.stopPropagation()}
               >
-                <ImagePlus className="text-text-muted group-hover:text-text-secondary transition-colors" size={36} />
-              </button>
-              <p className="text-text-secondary text-sm font-medium mb-1">点击上方粘贴图片</p>
-              <p className="text-text-muted text-xs mb-4">或 Ctrl+V / 拖拽图片</p>
-              <label className="inline-flex items-center gap-2 px-4 py-2 bg-text-primary hover:bg-text-secondary text-white text-sm font-medium rounded-md cursor-pointer transition-colors">
-                <Upload size={14} />
-                选择文件
+                <span className="relative z-10">选择文件</span>
+                <div className="absolute inset-0 bg-gradient-to-r from-text-primary via-text-secondary to-text-primary bg-[length:200%_100%] animate-[shimmer_2s_ease-in-out_infinite]" />
                 <input type="file" accept="image/*" className="hidden" onChange={(e) => e.target.files?.[0] && handleImageUpload(e.target.files[0])} />
               </label>
-              {!user && (
-                <p className="text-text-muted text-xs mt-4">上传图片需要先登录</p>
-              )}
+              <span className="text-text-muted text-sm mt-4">点击空白粘贴 · Ctrl+V · 拖拽上传</span>
+              {!user && <span className="text-text-muted text-xs mt-2">需要先登录</span>}
             </div>
           )}
         </div>

@@ -1,5 +1,5 @@
-import React, { useState, useMemo, useRef, useEffect } from 'react';
-import { Loader2, Search, Calendar, Image as ImageIcon, Plus, MoreVertical, Pencil, Trash2, Upload, Clipboard } from 'lucide-react';
+import React, { useState, useMemo, useEffect } from 'react';
+import { Loader2, Search, Calendar, Image as ImageIcon, Plus, MoreVertical, Pencil, Trash2 } from 'lucide-react';
 
 interface CloudSession {
   id: string;
@@ -96,8 +96,6 @@ export const AllProductsPage: React.FC<AllProductsPageProps> = ({
 
   if (!isOpen) return null;
 
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(false);
@@ -112,41 +110,44 @@ export const AllProductsPage: React.FC<AllProductsPageProps> = ({
       <div className="flex-1 overflow-y-auto p-6">
         {/* 上传区域 */}
         <div
-          className={`mb-6 py-10 rounded-2xl border-2 border-dashed cursor-pointer transition-all ${
+          className={`mb-6 py-12 rounded-xl border-2 border-dashed cursor-pointer transition-all flex flex-col items-center ${
             isDragging
               ? 'border-blue-400 bg-blue-50'
-              : 'border-gray-300 hover:border-blue-400 hover:bg-blue-50/50'
+              : 'border-gray-300 hover:border-gray-400'
           }`}
           onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
           onDragLeave={() => setIsDragging(false)}
           onDrop={handleDrop}
-          onClick={() => fileInputRef.current?.click()}
+          onClick={async () => {
+            try {
+              const items = await navigator.clipboard.read();
+              for (const item of items) {
+                const imageType = item.types.find(t => t.startsWith('image/'));
+                if (imageType) {
+                  const blob = await item.getType(imageType);
+                  const file = new File([blob], `paste-${Date.now()}.png`, { type: imageType });
+                  onUploadImages?.([file] as unknown as FileList);
+                  return;
+                }
+              }
+            } catch {}
+          }}
         >
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/*"
-            multiple
-            className="hidden"
-            onChange={(e) => e.target.files && onUploadImages?.(e.target.files)}
-          />
-          <div className="flex flex-col items-center gap-3">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center">
-                <Upload size={24} className="text-blue-500" />
-              </div>
-            </div>
-            <div className="text-center">
-              <p className="text-sm font-medium text-gray-700 mb-1">上传包装图片开始检测</p>
-              <p className="text-xs text-gray-500">
-                <span className="inline-flex items-center gap-1"><Clipboard size={12} /> Ctrl+V 粘贴</span>
-                <span className="mx-2">·</span>
-                <span>拖拽文件</span>
-                <span className="mx-2">·</span>
-                <span>点击选择</span>
-              </p>
-            </div>
-          </div>
+          <label
+            className="group relative px-8 py-4 bg-gray-900 text-white rounded-lg cursor-pointer text-base font-medium overflow-hidden transition-all duration-300 hover:scale-105 hover:shadow-lg active:scale-95"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <span className="relative z-10">选择文件</span>
+            <div className="absolute inset-0 bg-gradient-to-r from-gray-900 via-gray-700 to-gray-900 bg-[length:200%_100%] animate-[shimmer_2s_ease-in-out_infinite]" />
+            <input
+              type="file"
+              accept="image/*"
+              multiple
+              className="hidden"
+              onChange={(e) => e.target.files && onUploadImages?.(e.target.files)}
+            />
+          </label>
+          <span className="text-sm text-gray-400 mt-4">点击空白粘贴 · Ctrl+V · 拖拽上传</span>
         </div>
 
         {/* 搜索和排序 */}

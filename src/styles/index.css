@@ -97,6 +97,11 @@ body {
   100% { top: 0%; }
 }
 
+@keyframes shimmer {
+  0% { background-position: 100% 0; }
+  100% { background-position: -100% 0; }
+}
+
 * {
   transition-property: background-color, border-color, color, opacity, box-shadow;
   transition-timing-function: ease;

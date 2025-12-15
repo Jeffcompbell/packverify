@@ -84,6 +84,18 @@ export function useImageAnalysis({
         specs: [], issues: [], diffs: [], issuesByModel: {}
       };
 
+      // 立即上传图片到云端（不等待 AI 分析）
+      if (cloudSyncEnabled && sessionId) {
+        try {
+          setIsSyncing(true);
+          await saveImageToCloud(user.uid, sessionId, newImage);
+        } catch (e) {
+          console.error('Image upload failed:', e);
+        } finally {
+          setIsSyncing(false);
+        }
+      }
+
       setIsProcessing(true);
       setProcessingImageId(newImageId);
       setProcessingModelId(currentModel);
@@ -136,19 +148,17 @@ export function useImageAnalysis({
       const updatedUser = await getUserData(user.uid);
       if (updatedUser) onUserUpdate(updatedUser);
 
-      // 异步云同步
+      // 异步更新分析结果（图片已在前面上传）
       if (cloudSyncEnabled && sessionId) {
         (async () => {
           try {
-            setIsSyncing(true);
-            await saveImageToCloud(user.uid, sessionId, finalImage);
             await updateImageInCloud(user.uid, sessionId, newImageId, {
               description: diagResult.description, ocrText: diagResult.ocrText,
               specs: imageSpecs, issues: diagResult.issues,
-              deterministicIssues: diagResult.deterministicIssues, diffs
+              deterministicIssues: diagResult.deterministicIssues, diffs,
+              issuesByModel: finalImage.issuesByModel
             });
           } catch (e) { console.error('Cloud sync failed:', e); }
-          finally { setIsSyncing(false); }
         })();
       }
 
