@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { BookOpen, Search, Plus, Edit2, Trash2, X, Download } from 'lucide-react';
+import { BookOpen, Search, Plus, Edit2, Trash2, X, Download, MoreHorizontal, Link2, Copy, Check } from 'lucide-react';
 import lexiconData from '../../../data/lexicon.json';
 import { getLexiconStats, type LexiconEntry } from '../../services/lexiconService';
+import { Pagination } from '../ui/pagination';
 
 interface DetectionConfigPageProps {
   onBack: () => void;
@@ -11,7 +12,7 @@ const STORAGE_KEY = 'packverify_custom_prompt';
 const ENABLED_KEY = 'packverify_custom_prompt_enabled';
 const LEXICON_TOGGLE_KEY = 'packverify_lexicon_domain_toggles';
 
-const DOMAIN_ORDER = ['cosmetics', 'food', 'pharma', 'supplement', 'general'];
+const DOMAIN_ORDER = ['cosmetics', 'food', 'pharma', 'supplement', 'medical_device', 'infant', 'household', 'general'];
 const DOMAIN_META: Record<string, { label: string; description: string; accent: string; badge: string }> = {
   cosmetics: {
     label: '化妆品',
@@ -36,6 +37,24 @@ const DOMAIN_META: Record<string, { label: string; description: string; accent: 
     description: '结构/功能宣称',
     accent: 'bg-amber-50 text-amber-600 border-amber-100',
     badge: 'bg-amber-100 text-amber-700'
+  },
+  medical_device: {
+    label: '医疗器械',
+    description: '510(k)/CE MDR 监管文本',
+    accent: 'bg-blue-50 text-blue-600 border-blue-100',
+    badge: 'bg-blue-100 text-blue-700'
+  },
+  infant: {
+    label: '婴幼儿配方',
+    description: '配方奶粉/婴食法规',
+    accent: 'bg-lime-50 text-lime-600 border-lime-100',
+    badge: 'bg-lime-100 text-lime-700'
+  },
+  household: {
+    label: '家清消杀',
+    description: 'EPA/FIFRA 宣称约束',
+    accent: 'bg-slate-50 text-slate-600 border-slate-100',
+    badge: 'bg-slate-100 text-slate-700'
   },
   general: {
     label: '通用',
@@ -353,9 +372,8 @@ export const DetectionConfigPage: React.FC<DetectionConfigPageProps> = ({ onBack
                         <p className="text-base text-text-muted font-semibold">{stats?.severity?.P2 || 0}</p>
                       </div>
                     </div>
-                    <div className="mt-3 text-[11px] text-text-muted flex items-center justify-between">
-                      <span>状态：{enabled ? <span className="text-emerald-600">启用</span> : <span className="text-text-secondary">停用</span>}</span>
-                      <span className="text-text-secondary">点击查看</span>
+                    <div className="mt-3 text-[11px] text-text-muted">
+                      状态：{enabled ? <span className="text-emerald-600">启用</span> : <span className="text-text-secondary">停用</span>}
                     </div>
                   </div>
                 );
@@ -429,9 +447,59 @@ const DomainLexiconModal: React.FC<DomainLexiconModalProps> = ({
   onExport
 }) => {
   const meta = getDomainMeta(domain);
+  const [rowMenuId, setRowMenuId] = useState<string | null>(null);
+  const [copiedLinkId, setCopiedLinkId] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 20;
+
+  useEffect(() => {
+    setPage(1);
+    setRowMenuId(null);
+  }, [domain, searchValue]);
+
+  const totalPages = Math.max(1, Math.ceil(entries.length / PAGE_SIZE));
+  const normalizedPage = Math.min(page, totalPages);
+  const startIndex = (normalizedPage - 1) * PAGE_SIZE;
+  const pagedEntries = entries.slice(startIndex, startIndex + PAGE_SIZE);
+
+  const handlePageChange = (nextPage: number) => {
+    if (nextPage < 1 || nextPage > totalPages) return;
+    setPage(nextPage);
+    setRowMenuId(null);
+  };
+
+  const handleCopyLink = async (event: React.MouseEvent, id: string, url?: string) => {
+    event.stopPropagation();
+    event.preventDefault();
+    if (!url || typeof navigator === 'undefined' || !navigator.clipboard) return;
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopiedLinkId(id);
+      setTimeout(() => setCopiedLinkId(current => (current === id ? null : current)), 1500);
+    } catch (error) {
+      console.warn('Failed to copy source link', error);
+    }
+  };
+
+  const toggleRowMenu = (event: React.MouseEvent, id: string) => {
+    event.stopPropagation();
+    event.preventDefault();
+    setRowMenuId(prev => prev === id ? null : id);
+  };
+
   return (
-    <div className="fixed inset-0 bg-black/50 z-40 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl w-full max-w-3xl max-h-[90vh] flex flex-col overflow-hidden shadow-2xl">
+    <div
+      className="fixed inset-0 bg-black/50 z-40 flex items-center justify-center p-4"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) {
+          onClose();
+        }
+      }}
+    >
+      <div
+        className="bg-white rounded-2xl w-full max-w-3xl max-h-[90vh] flex flex-col overflow-hidden shadow-2xl"
+        onMouseDown={(event) => event.stopPropagation()}
+      >
         <div className="px-5 py-4 border-b border-border flex items-start justify-between gap-4">
           <div>
             <div className="flex items-center gap-2">
@@ -478,47 +546,122 @@ const DomainLexiconModal: React.FC<DomainLexiconModalProps> = ({
             <Plus size={14} /> 新增
           </button>
         </div>
-        <div className="flex-1 overflow-y-auto divide-y divide-border/60">
-          {entries.slice(0, 50).map(entry => (
-            <div key={entry.id} className="px-5 py-3 flex items-start justify-between gap-3 hover:bg-surface-50">
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 mb-1">
-                  <span className={`px-1.5 py-0.5 text-[10px] font-medium rounded ${
-                    entry.severity === 'P0' ? 'bg-red-100 text-red-700' :
-                    entry.severity === 'P1' ? 'bg-amber-100 text-amber-700' : 'bg-gray-100 text-gray-600'
-                  }`}>
-                    {entry.severity}
-                  </span>
-                  <span className="text-[10px] text-text-muted font-mono">{entry.id}</span>
-                  <span className="text-[10px] px-1.5 py-0.5 bg-surface-100 rounded">{entry.market}</span>
-                </div>
-                <p className="text-xs font-mono text-text-primary break-all mb-1">
-                  <span className="bg-surface-100 px-1 rounded">{entry.pattern}</span>
-                </p>
-                <p className="text-[11px] text-text-muted line-clamp-2">{entry.reason}</p>
-              </div>
-              <div className="flex items-center gap-1">
-                <button
-                  onClick={() => onEdit(entry)}
-                  className="p-1 text-text-muted hover:text-text-primary hover:bg-surface-100 rounded"
-                >
-                  <Edit2 size={12} />
-                </button>
-                <button
-                  onClick={() => onDelete(entry.id)}
-                  className="p-1 text-text-muted hover:text-red-600 hover:bg-red-50 rounded"
-                >
-                  <Trash2 size={12} />
-                </button>
-              </div>
-            </div>
-          ))}
-          {entries.length === 0 && (
-            <div className="px-5 py-12 text-center text-xs text-text-muted">
-              没有找到匹配的规则
-            </div>
-          )}
+        <div className="flex-1 overflow-y-auto">
+          <table className="w-full text-left text-[11px]">
+            <thead className="sticky top-0 bg-white border-b border-border text-text-muted">
+              <tr>
+                <th className="py-2 px-4 font-medium">风险</th>
+                <th className="py-2 px-4 font-medium">词条 / 模式</th>
+                <th className="py-2 px-4 font-medium">市场</th>
+                <th className="py-2 px-4 font-medium">风险原因</th>
+                <th className="py-2 px-4 font-medium">法规来源</th>
+                <th className="py-2 px-4 font-medium text-right">操作</th>
+              </tr>
+            </thead>
+            <tbody>
+              {pagedEntries.length === 0 && (
+                <tr>
+                  <td colSpan={6} className="py-10 px-4 text-center text-text-muted">
+                    没有找到匹配的规则
+                  </td>
+                </tr>
+              )}
+              {pagedEntries.map(entry => (
+                <tr key={entry.id} className="border-b border-border/60 hover:bg-surface-50">
+                  <td className="py-3 px-4 align-top">
+                    <div className="flex items-center gap-2">
+                      <span className={`px-1.5 py-0.5 text-[10px] font-medium rounded ${
+                        entry.severity === 'P0' ? 'bg-red-100 text-red-700' :
+                        entry.severity === 'P1' ? 'bg-amber-100 text-amber-700' : 'bg-gray-100 text-gray-600'
+                      }`}>
+                        {entry.severity}
+                      </span>
+                      <span className="font-mono text-text-secondary">{entry.id}</span>
+                    </div>
+                  </td>
+                  <td className="py-3 px-4 align-top">
+                    <div className="font-mono text-text-primary text-xs break-all">{entry.pattern}</div>
+                    <div className="mt-1 text-[10px] text-text-muted uppercase">{entry.patternType}</div>
+                  </td>
+                  <td className="py-3 px-4 align-top text-text-muted">
+                    {entry.market.toUpperCase()}
+                  </td>
+                  <td className="py-3 px-4 align-top text-text-muted">
+                    {entry.reason}
+                  </td>
+                  <td className="py-3 px-4 align-top">
+                    {entry.source ? (
+                      <div className="flex items-center gap-1">
+                        <Link2 size={12} className="text-text-muted" />
+                        {entry.sourceUrl ? (
+                          <a
+                            href={entry.sourceUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="underline text-text-primary hover:text-text-secondary truncate max-w-[140px]"
+                          >
+                            {entry.source}
+                          </a>
+                        ) : (
+                          <span className="text-text-muted truncate">{entry.source}</span>
+                        )}
+                        {entry.sourceUrl && (
+                          <button
+                            onClick={(event) => handleCopyLink(event, entry.id, entry.sourceUrl)}
+                            className="p-1 rounded hover:bg-surface-100 text-text-muted"
+                            title="复制链接"
+                          >
+                            {copiedLinkId === entry.id ? <Check size={12} className="text-emerald-600" /> : <Copy size={12} />}
+                          </button>
+                        )}
+                      </div>
+                    ) : (
+                      <span className="text-text-muted">—</span>
+                    )}
+                  </td>
+                  <td className="py-3 px-4 align-top text-right relative">
+                    <button
+                      onClick={(event) => toggleRowMenu(event, entry.id)}
+                      className="p-1.5 rounded-full hover:bg-surface-100 text-text-muted inline-flex items-center justify-center"
+                      title="更多操作"
+                    >
+                      <MoreHorizontal size={16} />
+                    </button>
+                    {rowMenuId === entry.id && (
+                      <div className="absolute right-4 mt-1 w-32 rounded-lg border border-border bg-white shadow-lg text-[12px] z-10">
+                        <button
+                          onClick={() => { setRowMenuId(null); onEdit(entry); }}
+                          className="w-full px-3 py-2 text-left hover:bg-surface-50 flex items-center gap-2"
+                        >
+                          <Edit2 size={12} />
+                          编辑
+                        </button>
+                        <button
+                          onClick={() => { setRowMenuId(null); onDelete(entry.id); }}
+                          className="w-full px-3 py-2 text-left text-red-600 hover:bg-red-50 flex items-center gap-2"
+                        >
+                          <Trash2 size={12} />
+                          删除
+                        </button>
+                      </div>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
+        {entries.length > 0 && (
+          <div className="px-5 py-3 border-t border-border flex flex-col gap-2 text-[11px] text-text-muted">
+            <span>第 {normalizedPage} / {totalPages} 页 · 共 {entries.length} 条规则</span>
+            <Pagination
+              currentPage={normalizedPage}
+              totalPages={totalPages}
+              onPageChange={handlePageChange}
+              className="justify-end"
+            />
+          </div>
+        )}
       </div>
     </div>
   );

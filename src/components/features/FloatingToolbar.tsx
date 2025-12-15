@@ -1,5 +1,5 @@
 import React from 'react';
-import { ViewLayers, IndustryType } from '../../types/types';
+import { ViewLayers, IndustryType, INDUSTRY_LABELS, INDUSTRY_LIST } from '../../types/types';
 import { ScanEye, FileDiff, ZoomIn, ZoomOut, Maximize, ImagePlus, RotateCcw, Package } from 'lucide-react';
 
 interface FloatingToolbarProps {
@@ -36,13 +36,6 @@ export const FloatingToolbar: React.FC<FloatingToolbarProps> = ({
     }
   };
 
-  const industryLabels: Record<IndustryType, string> = {
-    cosmetics: '化妆品',
-    food: '食品',
-    pharma: '药品',
-    general: '通用'
-  };
-
   return (
     <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-4 z-30 pointer-events-none">
       <input
@@ -61,11 +54,11 @@ export const FloatingToolbar: React.FC<FloatingToolbarProps> = ({
           title="选择行业"
         >
           <Package size={16} />
-          <span className="text-xs font-medium">{industryLabels[industry]}</span>
+          <span className="text-xs font-medium">{INDUSTRY_LABELS[industry]}</span>
         </button>
         {showIndustryMenu && (
           <div className="absolute bottom-full mb-2 left-0 bg-slate-900/95 backdrop-blur-md border border-slate-700/50 rounded-lg shadow-2xl overflow-hidden">
-            {(Object.keys(industryLabels) as IndustryType[]).map((ind) => (
+            {INDUSTRY_LIST.map((ind) => (
               <button
                 key={ind}
                 onClick={() => {
@@ -78,7 +71,7 @@ export const FloatingToolbar: React.FC<FloatingToolbarProps> = ({
                     : 'text-slate-300 hover:bg-slate-800 hover:text-white'
                 }`}
               >
-                {industryLabels[ind]}
+                {INDUSTRY_LABELS[ind]}
               </button>
             ))}
           </div>

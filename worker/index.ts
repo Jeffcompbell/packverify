@@ -18,8 +18,8 @@ export default {
     }
 
     // SPA 路由 - 这些路由都是 React App 的路由，重定向到 /app/index.html
-    // /app/:productId, /config, /reports, /home 等
-    const appRoutes = ['/app/', '/config', '/reports', '/home'];
+    // /app/:productId, /config, /reports, /home, /reset-password 等
+    const appRoutes = ['/app/', '/config', '/reports', '/home', '/reset-password'];
     if (appRoutes.some(route => url.pathname.startsWith(route))) {
       return env.ASSETS.fetch(new Request(new URL('/app/index.html', request.url), request));
     }

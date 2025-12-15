@@ -2,13 +2,14 @@ import { useState, useCallback } from 'react';
 import imageCompression from 'browser-image-compression';
 import { diagnoseImage, fileToGenerativePart, localDiffSpecs, getModelId, setModelId, extractOcrOnly } from '../services/openaiService';
 import { useQuotaFirebase, getUserData, saveImageToCloud, updateImageInCloud, UserData } from '../services/cloudflare';
-import { ImageItem, ImageSpec, SourceField, DiffResult, IndustryType } from '../types/types';
+import { ImageItem, ImageSpec, SourceField, DiffResult, IndustryType, MarketType } from '../types/types';
 
 interface UseImageAnalysisProps {
   user: UserData | null;
   sessionId: string | null;
   cloudSyncEnabled: boolean;
   industry: IndustryType;
+  markets: MarketType[];
   manualSourceFields: SourceField[];
   onShowLogin: () => void;
   onError: (msg: string | null) => void;
@@ -28,7 +29,7 @@ interface UseImageAnalysisReturn {
 }
 
 export function useImageAnalysis({
-  user, sessionId, cloudSyncEnabled, industry, manualSourceFields,
+  user, sessionId, cloudSyncEnabled, industry, markets, manualSourceFields,
   onShowLogin, onError, onUserUpdate
 }: UseImageAnalysisProps): UseImageAnalysisReturn {
   const [isProcessing, setIsProcessing] = useState(false);
@@ -81,7 +82,9 @@ export function useImageAnalysis({
 
       const newImage: ImageItem = {
         id: newImageId, src: url, base64, file: processedFile,
-        specs: [], issues: [], diffs: [], issuesByModel: {}
+        specs: [], issues: [], diffs: [], issuesByModel: {},
+        industry,
+        markets
       };
 
       // 立即上传图片到云端（不等待 AI 分析）
@@ -107,7 +110,7 @@ export function useImageAnalysis({
       while (retryCount <= 1) {
         try {
           diagResult = await Promise.race([
-            diagnoseImage(base64, file.type, setProcessingStep, industry, false, (chunk) => setStreamText(prev => prev + chunk)),
+            diagnoseImage(base64, file.type, setProcessingStep, industry, markets, false, (chunk) => setStreamText(prev => prev + chunk)),
             new Promise<never>((_, reject) => setTimeout(() => reject(new Error('分析超时')), 60000))
           ]);
           break;
@@ -153,10 +156,15 @@ export function useImageAnalysis({
         (async () => {
           try {
             await updateImageInCloud(user.uid, sessionId, newImageId, {
-              description: diagResult.description, ocrText: diagResult.ocrText,
-              specs: imageSpecs, issues: diagResult.issues,
-              deterministicIssues: diagResult.deterministicIssues, diffs,
-              issuesByModel: finalImage.issuesByModel
+              description: diagResult.description,
+              ocrText: diagResult.ocrText,
+              specs: imageSpecs,
+              issues: diagResult.issues,
+              deterministicIssues: diagResult.deterministicIssues,
+              diffs,
+              issuesByModel: finalImage.issuesByModel,
+              industry,
+              markets
             });
           } catch (e) { console.error('Cloud sync failed:', e); }
         })();
@@ -176,7 +184,7 @@ export function useImageAnalysis({
       setProcessingImageId(null);
       setProcessingModelId(null);
     }
-  }, [user, sessionId, cloudSyncEnabled, industry, manualSourceFields, onShowLogin, onError, onUserUpdate]);
+  }, [user, sessionId, cloudSyncEnabled, industry, markets, manualSourceFields, onShowLogin, onError, onUserUpdate]);
 
   const retryAnalysis = useCallback(async (image: ImageItem, images: ImageItem[]) => {
     if (!user) { onShowLogin(); return; }
@@ -196,8 +204,10 @@ export function useImageAnalysis({
       let retryCount = 0;
       while (retryCount <= 1) {
         try {
+          const activeIndustry = image.industry || industry;
+          const activeMarkets = image.markets || markets;
           diagResult = await Promise.race([
-            diagnoseImage(image.base64, image.file.type, setProcessingStep, industry, manualSourceFields.length > 0),
+            diagnoseImage(image.base64, image.file.type, setProcessingStep, activeIndustry, activeMarkets, manualSourceFields.length > 0),
             new Promise<never>((_, reject) => setTimeout(() => reject(new Error('分析超时')), 60000))
           ]);
           break;
@@ -234,9 +244,15 @@ export function useImageAnalysis({
         (async () => {
           try {
             await updateImageInCloud(user.uid, sessionId, image.id, {
-              description: diagResult.description, ocrText: diagResult.ocrText,
-              specs: imageSpecs, issues: diagResult.issues,
-              deterministicIssues: diagResult.deterministicIssues, diffs, issuesByModel: newIssuesByModel
+              description: diagResult.description,
+              ocrText: diagResult.ocrText,
+              specs: imageSpecs,
+              issues: diagResult.issues,
+              deterministicIssues: diagResult.deterministicIssues,
+              diffs,
+              issuesByModel: newIssuesByModel,
+              industry: activeIndustry,
+              markets: activeMarkets
             });
           } catch (e) { console.error('Cloud sync failed:', e); }
         })();
@@ -252,7 +268,7 @@ export function useImageAnalysis({
       setProcessingImageId(null);
       setProcessingModelId(null);
     }
-  }, [user, sessionId, cloudSyncEnabled, industry, manualSourceFields, onShowLogin, onError, onUserUpdate]);
+  }, [user, sessionId, cloudSyncEnabled, industry, markets, manualSourceFields, onShowLogin, onError, onUserUpdate]);
 
   const addModelAnalysis = useCallback(async (image: ImageItem, modelId: string): Promise<Record<string, any> | null> => {
     if (!user) { onShowLogin(); return null; }
@@ -270,7 +286,9 @@ export function useImageAnalysis({
       const previousModel = getModelId();
       setModelId(modelId);
 
-      const diagResult = await diagnoseImage(image.base64, image.file.type, setProcessingStep, industry, manualSourceFields.length > 0);
+      const activeIndustry = image.industry || industry;
+      const activeMarkets = image.markets || markets;
+      const diagResult = await diagnoseImage(image.base64, image.file.type, setProcessingStep, activeIndustry, activeMarkets, manualSourceFields.length > 0);
       setModelId(previousModel);
 
       const newIssuesByModel = {
@@ -290,7 +308,7 @@ export function useImageAnalysis({
 
       if (cloudSyncEnabled && sessionId) {
         try {
-          await updateImageInCloud(user.uid, sessionId, image.id, { issuesByModel: newIssuesByModel });
+          await updateImageInCloud(user.uid, sessionId, image.id, { issuesByModel: newIssuesByModel, industry: activeIndustry, markets: activeMarkets });
         } catch (e) { console.error('Cloud sync failed:', e); }
       }
 
@@ -303,7 +321,7 @@ export function useImageAnalysis({
       setProcessingImageId(null);
       setProcessingModelId(null);
     }
-  }, [user, sessionId, cloudSyncEnabled, industry, manualSourceFields, onShowLogin, onError, onUserUpdate]);
+  }, [user, sessionId, cloudSyncEnabled, industry, markets, manualSourceFields, onShowLogin, onError, onUserUpdate]);
 
   return {
     isProcessing, processingImageId, processingModelId, processingStep, streamText, isSyncing,

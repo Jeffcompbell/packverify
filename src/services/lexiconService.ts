@@ -9,7 +9,7 @@ export interface LexiconEntry {
   id: string;
   pattern: string;
   patternType: 'keyword' | 'regex';
-  domain: 'general' | 'cosmetics' | 'food' | 'pharma' | 'supplement';
+  domain: 'general' | 'cosmetics' | 'food' | 'pharma' | 'supplement' | 'medical_device' | 'infant' | 'household';
   market: 'general' | 'US' | 'EU' | 'CN' | 'CA';
   severity: 'P0' | 'P1' | 'P2';
   reason: string;
@@ -38,18 +38,24 @@ const lexicon: LexiconEntry[] = lexiconData.entries as LexiconEntry[];
 export const matchLexicon = (
   text: string,
   domain?: string,
-  market?: string
+  markets?: string[],
+  enabledDomains?: string[]
 ): LexiconHit[] => {
   const hits: LexiconHit[] = [];
   const lowerText = text.toLowerCase();
+  const domainWhitelist = enabledDomains ? new Set(enabledDomains) : null;
+  const marketWhitelist = markets && markets.length ? new Set(markets.map(m => m.toLowerCase())) : null;
 
   for (const entry of lexicon) {
+    if (domainWhitelist && !domainWhitelist.has(entry.domain)) {
+      continue;
+    }
     // 过滤 domain（general 匹配所有）
     if (domain && entry.domain !== 'general' && entry.domain !== domain) {
       continue;
     }
     // 过滤 market（general 匹配所有）
-    if (market && entry.market !== 'general' && entry.market !== market) {
+    if (marketWhitelist && entry.market !== 'general' && !marketWhitelist.has(entry.market.toLowerCase())) {
       continue;
     }
 

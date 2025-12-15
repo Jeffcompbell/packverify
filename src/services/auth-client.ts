@@ -25,6 +25,16 @@ export const signOutUser = async () => {
   return authClient.signOut();
 };
 
+// 忘记密码 - 发送重置邮件
+export const forgotPassword = async (email: string) => {
+  return authClient.forgetPassword({ email, redirectTo: '/reset-password' });
+};
+
+// 重置密码
+export const resetPassword = async (token: string, newPassword: string) => {
+  return authClient.resetPassword({ token, newPassword });
+};
+
 // 获取当前用户
 export const getCurrentUser = async () => {
   const session = await authClient.getSession();

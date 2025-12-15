@@ -91,13 +91,55 @@ export interface CanvasTransform {
   scale: number;
 }
 
+export type MarketType = 'general' | 'US' | 'EU' | 'CA' | 'CN';
+
+export const MARKET_LABELS: Record<MarketType, string> = {
+  general: '通用',
+  US: '美国',
+  EU: '欧盟',
+  CA: '加拿大',
+  CN: '中国'
+};
+
+export const MARKET_LIST: MarketType[] = ['US', 'EU', 'CA', 'CN', 'general'];
+
 export interface ImageSpec {
   key: string;
   value: string;
   category: string;
 }
 
-export type IndustryType = 'cosmetics' | 'food' | 'pharma' | 'general';
+export type IndustryType =
+  | 'cosmetics'
+  | 'food'
+  | 'pharma'
+  | 'supplement'
+  | 'medical_device'
+  | 'infant'
+  | 'household'
+  | 'general';
+
+export const INDUSTRY_LABELS: Record<IndustryType, string> = {
+  cosmetics: '化妆品',
+  food: '食品',
+  pharma: '药品',
+  supplement: '保健品',
+  medical_device: '医疗器械',
+  infant: '婴幼儿配方',
+  household: '家清消杀',
+  general: '通用'
+};
+
+export const INDUSTRY_LIST: IndustryType[] = [
+  'cosmetics',
+  'food',
+  'pharma',
+  'supplement',
+  'medical_device',
+  'infant',
+  'household',
+  'general'
+];
 
 // 图片分析状态
 export type ImageStatus = 'pending' | 'analyzing' | 'completed' | 'failed';
@@ -123,6 +165,7 @@ export interface ImageItem {
   deterministicIssues?: DeterministicCheck[];
   diffs: DiffResult[];
   industry?: IndustryType; // 行业类型
+  markets?: MarketType[]; // 出口市场
   rotation?: number; // 旋转角度
   status?: ImageStatus; // 分析状态
   analyzingStartedAt?: number; // 分析开始时间戳（毫秒）

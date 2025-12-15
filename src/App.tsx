@@ -8,7 +8,7 @@ import {
   loadSessionFromCloud, clearSessionInCloud, CloudImageData, CloudSession,
   getUserSessions, createNewSession, updateSessionProductName, deleteSession, getQuotaUsageHistory, QuotaUsageRecord
 } from './services/cloudflare';
-import { SourceField, DiffResult, ImageItem, ImageSpec, BoundingBox, IndustryType } from './types/types';
+import { SourceField, DiffResult, ImageItem, ImageSpec, BoundingBox, IndustryType, INDUSTRY_LABELS, INDUSTRY_LIST, MarketType, MARKET_LABELS, MARKET_LIST } from './types/types';
 import { useImageAnalysis } from './hooks/useImageAnalysis';
 import { DiffSummary } from './components/features/DiffSummary';
 import { ComparisonPanel } from './components/features/ComparisonPanel';
@@ -18,7 +18,7 @@ import {
   ZoomIn, ZoomOut, RotateCcw, RotateCw, FileText, AlertTriangle, CheckCircle,
   ClipboardCheck, Image, Search, FileSpreadsheet, Loader2, Maximize2,
   Type, Brackets, ShieldAlert, GitCompare, LogOut, User as UserIcon, X, Cloud, CloudOff,
-  Menu, Home, List, Settings, Package, Bell, Plus
+  Menu, Home, List, Settings, Package, Bell, Plus, Check
 } from 'lucide-react';
 import { LoginModal, GoogleIcon } from './components/features/LoginModal';
 import { QuotaModal } from './components/features/QuotaModal';
@@ -149,12 +149,15 @@ const App: React.FC = () => {
   // UI State
   const [selectedIssueId, setSelectedIssueId] = useState<string | null>(null);
   const [industry, setIndustry] = useState<IndustryType>('general');
+  const [selectedMarkets, setSelectedMarkets] = useState<MarketType[]>(['US']);
   const [showModelSelector, setShowModelSelector] = useState(false);
   const [showIndustryMenu, setShowIndustryMenu] = useState(false);
+  const [showMarketMenu, setShowMarketMenu] = useState(false);
   const [qilProcessing, setQilProcessing] = useState(false);
 
   // Refs for click-outside detection
   const industryMenuRef = useRef<HTMLDivElement>(null);
+  const marketMenuRef = useRef<HTMLDivElement>(null);
   const hasLoadedCloudData = useRef(false); // 防止重复加载云端数据
   const [currentModel, setCurrentModel] = useState(getModelId());
   const [activeModelTab, setActiveModelTab] = useState<string>(currentModel);
@@ -181,12 +184,27 @@ const App: React.FC = () => {
   // Current image
   const currentImage = images[currentImageIndex] || null;
 
+  const toggleMarket = useCallback((market: MarketType) => {
+    setSelectedMarkets(prev => {
+      let next = prev.includes(market)
+        ? prev.filter(m => m !== market)
+        : [...prev, market];
+      if (!next.length) next = ['general'];
+      return Array.from(new Set(next));
+    });
+  }, []);
+
+  const marketSummary = useMemo(() => {
+    if (selectedMarkets.length === MARKET_LIST.length) return '全部市场';
+    return selectedMarkets.map(m => MARKET_LABELS[m]).join(' / ') || '通用';
+  }, [selectedMarkets]);
+
   // Image analysis hook
   const {
     isProcessing, processingImageId, processingModelId, processingStep, isSyncing,
     processFile, retryAnalysis, addModelAnalysis
   } = useImageAnalysis({
-    user, sessionId, cloudSyncEnabled, industry, manualSourceFields,
+    user, sessionId, cloudSyncEnabled, industry, markets: selectedMarkets, manualSourceFields,
     onShowLogin: () => setShowLoginModal(true),
     onError: setErrorMessage,
     onUserUpdate: setUser
@@ -654,6 +672,9 @@ const App: React.FC = () => {
       if (industryMenuRef.current && !industryMenuRef.current.contains(event.target as Node)) {
         setShowIndustryMenu(false);
       }
+      if (marketMenuRef.current && !marketMenuRef.current.contains(event.target as Node)) {
+        setShowMarketMenu(false);
+      }
     };
 
     document.addEventListener('mousedown', handleClickOutside);
@@ -890,27 +911,71 @@ const App: React.FC = () => {
 
           {/* Right: 行业选择 */}
           {analysisMode === 'detection' && (
-            <div ref={industryMenuRef} className="relative">
-              <button
-                onClick={() => setShowIndustryMenu(!showIndustryMenu)}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-text-secondary text-xs rounded-full hover:bg-surface-50 transition-colors"
-              >
-                <span>{{ cosmetics: '化妆品', food: '食品', pharma: '药品', general: '通用' }[industry]}</span>
-                <ChevronDown size={12} className={`transition-transform ${showIndustryMenu ? 'rotate-180' : ''}`} />
-              </button>
-              {showIndustryMenu && (
-                <div className="absolute top-full right-0 mt-1 bg-white rounded-lg shadow-lg overflow-hidden z-[100] border border-border min-w-[100px] py-1">
-                  {(['cosmetics', 'food', 'pharma', 'general'] as IndustryType[]).map((ind) => (
-                    <button
-                      key={ind}
-                      onClick={() => { setIndustry(ind); setShowIndustryMenu(false); }}
-                      className={`w-full px-3 py-1.5 text-left text-xs transition-colors ${industry === ind ? 'bg-surface-100 text-text-primary font-medium' : 'text-text-secondary hover:bg-surface-50'}`}
-                    >
-                      {{ cosmetics: '化妆品', food: '食品', pharma: '药品', general: '通用' }[ind]}
-                    </button>
-                  ))}
-                </div>
-              )}
+            <div className="flex items-center gap-2">
+              <div ref={industryMenuRef} className="relative">
+                <button
+                  onClick={() => setShowIndustryMenu(!showIndustryMenu)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-text-secondary text-xs rounded-full hover:bg-surface-50 transition-colors"
+                >
+                  <span>{INDUSTRY_LABELS[industry]}</span>
+                  <ChevronDown size={12} className={`transition-transform ${showIndustryMenu ? 'rotate-180' : ''}`} />
+                </button>
+                {showIndustryMenu && (
+                  <div className="absolute top-full right-0 mt-1 bg-white rounded-lg shadow-lg overflow-hidden z-[100] border border-border min-w-[120px] py-1">
+                    {INDUSTRY_LIST.map((ind) => (
+                      <button
+                        key={ind}
+                        onClick={() => { setIndustry(ind); setShowIndustryMenu(false); }}
+                        className={`w-full px-3 py-1.5 text-left text-xs transition-colors ${industry === ind ? 'bg-surface-100 text-text-primary font-medium' : 'text-text-secondary hover:bg-surface-50'}`}
+                      >
+                        {INDUSTRY_LABELS[ind]}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <div ref={marketMenuRef} className="relative">
+                <button
+                  onClick={() => setShowMarketMenu(!showMarketMenu)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-text-secondary text-xs rounded-full hover:bg-surface-50 transition-colors"
+                >
+                  <span className="truncate max-w-[120px]">{marketSummary}</span>
+                  <ChevronDown size={12} className={`transition-transform ${showMarketMenu ? 'rotate-180' : ''}`} />
+                </button>
+                {showMarketMenu && (
+                  <div className="absolute top-full right-0 mt-1 bg-white rounded-lg shadow-lg overflow-hidden z-[100] border border-border min-w-[140px] py-1">
+                    {MARKET_LIST.map((market) => {
+                      const active = selectedMarkets.includes(market);
+                      return (
+                        <button
+                          key={market}
+                          onClick={() => toggleMarket(market)}
+                          className={`w-full px-3 py-1.5 text-left text-xs flex items-center justify-between transition-colors ${
+                            active ? 'bg-surface-100 text-text-primary font-medium' : 'text-text-secondary hover:bg-surface-50'
+                          }`}
+                        >
+                          <span>{MARKET_LABELS[market]}</span>
+                          {active && <Check size={12} className="text-text-primary" />}
+                        </button>
+                      );
+                    })}
+                    <div className="border-t border-border flex">
+                      <button
+                        onClick={() => setSelectedMarkets(MARKET_LIST)}
+                        className="flex-1 px-3 py-1.5 text-[11px] text-text-secondary hover:bg-surface-50"
+                      >
+                        全选
+                      </button>
+                      <button
+                        onClick={() => setSelectedMarkets(['general'])}
+                        className="flex-1 px-3 py-1.5 text-[11px] text-text-secondary hover:bg-surface-50 border-l border-border"
+                      >
+                        仅通用
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           )}
           {analysisMode === 'comparison' && <div />}

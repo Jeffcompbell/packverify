@@ -2,6 +2,27 @@ import OpenAI from 'openai';
 import { DiagnosisIssue, DiffResult, SourceField, DiagnosisResult, DeterministicCheck, TokenUsage, LexiconIssue } from "../types/types";
 import { matchLexicon, lexiconHitsToIssues } from './lexiconService';
 
+const LEXICON_TOGGLE_KEY = 'packverify_lexicon_domain_toggles';
+
+const getEnabledLexiconDomains = (): string[] | null => {
+    if (typeof window === 'undefined' || !window.localStorage) {
+        return null;
+    }
+    try {
+        const stored = window.localStorage.getItem(LEXICON_TOGGLE_KEY);
+        if (!stored) return null;
+        const parsed = JSON.parse(stored);
+        if (!parsed || typeof parsed !== 'object') return null;
+        const enabledDomains = Object.entries(parsed)
+            .filter(([, enabled]) => enabled !== false)
+            .map(([domain]) => domain);
+        return enabledDomains.length ? enabledDomains : null;
+    } catch (error) {
+        console.warn('Failed to read lexicon toggle config', error);
+        return null;
+    }
+};
+
 // Helper to convert file to base64
 export const fileToGenerativePart = async (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
@@ -719,6 +740,7 @@ export const diagnoseImage = async (
     mimeType: string,
     onStepChange?: (step: number) => void,
     industry: string = 'general',
+    markets: string[] = [],
     includeOcr: boolean = false,  // 是否包含 OCR 原文
     onStream?: (chunk: string) => void,  // 流式输出回调
     customPrompt?: string  // 自定义检测提示词
@@ -747,9 +769,20 @@ export const diagnoseImage = async (
             cosmetics: 'cosmetics',
             food: 'food',
             pharma: 'pharma',
+            supplement: 'supplement',
+            medical_device: 'medical_device',
+            infant: 'infant',
+            household: 'household',
             general: 'general'
         };
-        const lexiconHits = matchLexicon(aiResult.ocrText, domainMap[industry] || 'general');
+        const enabledDomains = getEnabledLexiconDomains();
+        const targetDomain = domainMap[industry] || 'general';
+        const shouldRunLexicon = !enabledDomains ||
+            enabledDomains.includes(targetDomain) ||
+            enabledDomains.includes('general');
+        const lexiconHits = shouldRunLexicon
+            ? matchLexicon(aiResult.ocrText, targetDomain, markets, enabledDomains || undefined)
+            : [];
         const lexiconIssues = lexiconHitsToIssues(lexiconHits) as LexiconIssue[];
         console.log("Lexicon matches found:", lexiconIssues.length, "issues");
 
