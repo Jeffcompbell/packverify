@@ -1002,7 +1002,7 @@ export const LandingPage: React.FC = () => {
           <div className="nav-links">
             <a href="#pricing" onClick={(e) => handleSmoothScroll(e, '#pricing')}>定价</a>
             <a href="#about" onClick={(e) => handleSmoothScroll(e, '#about')}>关于</a>
-            <button onClick={() => setShowAuthModal(true)} className="btn btn-primary">登录</button>
+            <button onClick={() => setShowAuthModal(true)} className="btn btn-primary">立即使用</button>
           </div>
         </nav>
 
