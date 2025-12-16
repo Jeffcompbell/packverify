@@ -1,4 +1,6 @@
 import { betterAuth } from 'better-auth';
+import { D1Dialect } from 'kysely-d1';
+import { Kysely } from 'kysely';
 
 export interface AuthEnv {
   DB: D1Database;
@@ -10,13 +12,24 @@ export interface AuthEnv {
 }
 
 export function createAuth(env: AuthEnv) {
+  const db = new Kysely<any>({
+    dialect: new D1Dialect({ database: env.DB }),
+  });
+
   return betterAuth({
     database: {
-      provider: 'd1',
-      db: env.DB,
+      db,
+      type: 'sqlite',
     },
     baseURL: env.BETTER_AUTH_URL,
     secret: env.BETTER_AUTH_SECRET,
+    trustedOrigins: [
+      'https://packverify.likelinxin.workers.dev',
+      'https://packverify.pages.dev',
+      'http://localhost:5173',
+      'http://localhost:3001',
+      'http://localhost:3000',
+    ],
     emailAndPassword: {
       enabled: true,
       minPasswordLength: 6,
@@ -55,20 +68,9 @@ export function createAuth(env: AuthEnv) {
       expiresIn: 60 * 60 * 24 * 7, // 7 days
       updateAge: 60 * 60 * 24, // 1 day
     },
-    user: {
-      additionalFields: {
-        quota: {
-          type: 'number',
-          defaultValue: 10,
-        },
-        used: {
-          type: 'number',
-          defaultValue: 0,
-        },
-        isAdmin: {
-          type: 'boolean',
-          defaultValue: false,
-        },
+    account: {
+      accountLinking: {
+        enabled: true, // 同一邮箱的 Google 和邮箱密码登录自动合并
       },
     },
   });

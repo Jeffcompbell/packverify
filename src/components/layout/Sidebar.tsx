@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Search, Settings, FileText, HelpCircle, LogOut } from 'lucide-react';
+import { Search, Settings, FileText, HelpCircle, LogOut, User } from 'lucide-react';
 
 type AppView = 'products' | 'analysis' | 'detection-config' | 'batch-report' | 'home';
 
@@ -155,6 +155,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   <p className="text-xs text-text-primary truncate">{user.displayName || '用户'}</p>
                   {user.email && <p className="text-[10px] text-text-muted truncate">{user.email}</p>}
                 </div>
+                <Link
+                  to="/profile"
+                  onClick={() => setShowUserMenu(false)}
+                  className="w-full flex items-center gap-2 px-3 py-2 text-xs text-text-secondary hover:bg-surface-50 transition-colors"
+                >
+                  <User size={14} strokeWidth={1.5} />
+                  <span>个人设置</span>
+                </Link>
                 <button
                   onClick={() => { setShowUserMenu(false); onLogout?.(); }}
                   className="w-full flex items-center gap-2 px-3 py-2 text-xs text-text-secondary hover:bg-surface-50 transition-colors"

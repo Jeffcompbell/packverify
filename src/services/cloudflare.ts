@@ -113,6 +113,19 @@ export const useQuotaFirebase = async (
   }
 };
 
+// 简化的配额使用函数
+export const useQuota = async (type: string, imageName: string, count: number = 1): Promise<boolean> => {
+  try {
+    await apiRequest('/api/quota/use', {
+      method: 'POST',
+      body: JSON.stringify({ type, imageName, count })
+    });
+    return true;
+  } catch (error) {
+    return false;
+  }
+};
+
 // 获取配额使用记录
 export const getQuotaUsageHistory = async (
   uid: string,
@@ -628,14 +641,37 @@ export const uploadImageToBatchReport = async (reportId: string, file: File): Pr
 };
 
 // 更新批量报告状态
-export const updateBatchReportStatus = async (reportId: string, status: BatchReport['status']): Promise<boolean> => {
+export const updateBatchReportStatus = async (reportId: string, status: BatchReport['status'], processedImages?: number): Promise<boolean> => {
   try {
     await apiRequest(`/api/batch-reports/${reportId}`, {
       method: 'PUT',
-      body: JSON.stringify({ status })
+      body: JSON.stringify({ status, processedImages })
     });
     return true;
   } catch (error) {
     return false;
+  }
+};
+
+// 更新批量报告图片结果
+export const updateBatchReportImage = async (reportId: string, imageId: string, status: string, result: any): Promise<boolean> => {
+  try {
+    await apiRequest(`/api/batch-reports/${reportId}/images/${imageId}`, {
+      method: 'PUT',
+      body: JSON.stringify({ status, result })
+    });
+    return true;
+  } catch (error) {
+    return false;
+  }
+};
+
+// 获取批量报告图片数据（base64）
+export const getBatchReportImageData = async (reportId: string, imageId: string): Promise<{ base64: string; mimeType: string } | null> => {
+  try {
+    const data = await apiRequest(`/api/batch-reports/${reportId}/images/${imageId}/data`);
+    return data;
+  } catch (error) {
+    return null;
   }
 };

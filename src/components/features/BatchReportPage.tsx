@@ -1,6 +1,7 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { Loader2, X, FileText, Clock, CheckCircle, AlertCircle, Eye } from 'lucide-react';
-import { listBatchReports, createBatchReport, uploadImageToBatchReport, analyzeBatchWithCustomPrompt, updateBatchReportStatus, BatchReport } from '../../services/cloudflare';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { Loader2, X, FileText, Clock, CheckCircle, AlertCircle, Eye, Play } from 'lucide-react';
+import { listBatchReports, createBatchReport, uploadImageToBatchReport, updateBatchReportImage, updateBatchReportStatus, BatchReport, useQuota, getBatchReport, getBatchReportImageData } from '../../services/cloudflare';
+import { analyzeImageWithCustomPrompt, runDeterministicChecks } from '../../services/openaiService';
 
 interface BatchReportPageProps {
   onBack: () => void;
@@ -21,10 +22,22 @@ export const BatchReportPage: React.FC<BatchReportPageProps> = ({ onBack, onView
   const [progress, setProgress] = useState({ current: 0, total: 0 });
   const [reports, setReports] = useState<BatchReport[]>([]);
   const [isLoadingReports, setIsLoadingReports] = useState(true);
+  const [resumingReportId, setResumingReportId] = useState<string | null>(null);
+  const analyzingRef = useRef(false);
 
   useEffect(() => {
     loadReports();
   }, []);
+
+  // 页面加载时自动恢复 processing 状态的报告
+  useEffect(() => {
+    if (!isLoadingReports && reports.length > 0 && !analyzingRef.current) {
+      const processingReport = reports.find(r => r.status === 'processing');
+      if (processingReport) {
+        resumeAnalysis(processingReport.id);
+      }
+    }
+  }, [isLoadingReports, reports]);
 
   const loadReports = async () => {
     setIsLoadingReports(true);
@@ -51,29 +64,135 @@ export const BatchReportPage: React.FC<BatchReportPageProps> = ({ onBack, onView
     setUploadedImages(prev => prev.filter((_, i) => i !== index));
   };
 
+  // 将文件转为 base64
+  const fileToBase64 = (file: File): Promise<{ base64: string; mimeType: string }> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const dataUrl = reader.result as string;
+        const base64 = dataUrl.split(',')[1];
+        resolve({ base64, mimeType: file.type });
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  };
+
+  // 恢复分析（刷新页面后继续）
+  const resumeAnalysis = async (reportId: string) => {
+    if (analyzingRef.current) return;
+    analyzingRef.current = true;
+    setResumingReportId(reportId);
+    setIsAnalyzing(true);
+
+    try {
+      const { report, images } = await getBatchReport(reportId);
+      if (!report) return;
+
+      // 找出 pending 状态的图片
+      const pendingImages = images.filter((img: any) => img.status === 'pending');
+      if (pendingImages.length === 0) {
+        // 没有待处理的图片，标记为完成
+        await updateBatchReportStatus(reportId, 'completed', images.length);
+        await loadReports();
+        return;
+      }
+
+      setProgress({ current: 0, total: pendingImages.length });
+
+      // 并行分析所有 pending 图片
+      let completed = 0;
+      const analyzePromises = pendingImages.map(async (img: any) => {
+        try {
+          // 从后端获取图片数据
+          const imageData = await getBatchReportImageData(reportId, img.imageId);
+          if (!imageData) throw new Error('无法获取图片数据');
+
+          const aiResult = await analyzeImageWithCustomPrompt(imageData.base64, imageData.mimeType, '', false);
+          const deterministicIssues = runDeterministicChecks(aiResult.ocrText);
+
+          const result = {
+            description: aiResult.description,
+            ocrText: aiResult.ocrText,
+            issues: aiResult.issues,
+            deterministicIssues,
+            specs: aiResult.specs,
+            tokenUsage: aiResult.tokenUsage
+          };
+
+          await updateBatchReportImage(reportId, img.imageId, 'completed', result);
+          await useQuota('batch_analysis', `image_${img.imageId}`, 1);
+        } catch (error) {
+          await updateBatchReportImage(reportId, img.imageId, 'failed', { error: error instanceof Error ? error.message : 'Unknown error' });
+        }
+        completed++;
+        setProgress({ current: completed, total: pendingImages.length });
+      });
+
+      await Promise.all(analyzePromises);
+
+      // 更新报告状态为 completed
+      await updateBatchReportStatus(reportId, 'completed', images.length);
+      await loadReports();
+    } finally {
+      setIsAnalyzing(false);
+      setResumingReportId(null);
+      analyzingRef.current = false;
+    }
+  };
+
   const startAnalysis = async () => {
     if (uploadedImages.length === 0) return;
     setIsAnalyzing(true);
-    setProgress({ current: 0, total: uploadedImages.length });
+    setProgress({ current: 0, total: uploadedImages.length * 2 }); // 上传 + 分析
 
     const reportName = `批量报告 ${new Date().toLocaleString('zh-CN')}`;
     const report = await createBatchReport(reportName);
 
     if (report) {
-      const imageIds: string[] = [];
+      const uploadedItems: Array<{ imageId: string; file: File }> = [];
 
       // 1. 上传所有图片
       for (let i = 0; i < uploadedImages.length; i++) {
         const imageId = await uploadImageToBatchReport(report.id, uploadedImages[i]);
-        if (imageId) imageIds.push(imageId);
-        setProgress({ current: i + 1, total: uploadedImages.length });
+        if (imageId) uploadedItems.push({ imageId, file: uploadedImages[i] });
+        setProgress({ current: i + 1, total: uploadedImages.length * 2 });
       }
 
-      // 2. 触发批量分析（后台处理）
-      if (imageIds.length > 0) {
-        const defaultPrompt = '请分析这张图片，检查是否存在文字错误、排版问题或其他质量问题。';
-        await analyzeBatchWithCustomPrompt(report.id, imageIds, defaultPrompt);
-      }
+      // 2. 更新报告状态为 processing
+      await updateBatchReportStatus(report.id, 'processing', 0);
+
+      // 3. 并行分析所有图片（前端调用 AI）
+      let completed = 0;
+      const analyzePromises = uploadedItems.map(async ({ imageId, file }) => {
+        try {
+          const { base64, mimeType } = await fileToBase64(file);
+          const aiResult = await analyzeImageWithCustomPrompt(base64, mimeType, '', false);
+          const deterministicIssues = runDeterministicChecks(aiResult.ocrText);
+
+          const result = {
+            description: aiResult.description,
+            ocrText: aiResult.ocrText,
+            issues: aiResult.issues,
+            deterministicIssues,
+            specs: aiResult.specs,
+            tokenUsage: aiResult.tokenUsage
+          };
+
+          await updateBatchReportImage(report.id, imageId, 'completed', result);
+          // 扣减额度
+          await useQuota('batch_analysis', file.name, 1);
+        } catch (error) {
+          await updateBatchReportImage(report.id, imageId, 'failed', { error: error instanceof Error ? error.message : 'Unknown error' });
+        }
+        completed++;
+        setProgress({ current: uploadedImages.length + completed, total: uploadedImages.length * 2 });
+      });
+
+      await Promise.all(analyzePromises);
+
+      // 4. 更新报告状态为 completed
+      await updateBatchReportStatus(report.id, 'completed', uploadedItems.length);
 
       await loadReports();
       setUploadedImages([]);

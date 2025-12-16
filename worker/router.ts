@@ -4,9 +4,9 @@ import { handleCreateSession, handleGetSession, handleListSessions, handleUpdate
 import { handleUploadImage, handleUpdateImage, handleDeleteImage, handleGetImageData, handleGetImagePublic } from './handlers/images';
 import { handleUseQuota, handleGetQuotaHistory } from './handlers/quota';
 import { handleCreateConfig, handleListConfigs, handleGetConfig, handleUpdateConfig, handleDeleteConfig } from './handlers/detection-configs';
-import { handleCreateReport, handleListReports, handleGetReport, handleUpdateReport, handleDeleteReport, handleAddReportImage, handleUpdateReportImage, handleAnalyzeReport } from './handlers/batch-reports';
+import { handleCreateReport, handleListReports, handleGetReport, handleUpdateReport, handleDeleteReport, handleAddReportImage, handleUpdateReportImage, handleGetReportImageData, handleAnalyzeReport } from './handlers/batch-reports';
 
-export async function handleAPI(request: Request, env: Env): Promise<Response> {
+export async function handleAPI(request: Request, env: Env, ctx?: ExecutionContext): Promise<Response> {
   const url = new URL(request.url);
   const path = url.pathname;
   const method = request.method;
@@ -176,9 +176,16 @@ export async function handleAPI(request: Request, env: Env): Promise<Response> {
       return addCorsHeaders(response, corsHeaders);
     }
 
+    if (path.match(/^\/api\/batch-reports\/[^/]+\/images\/[^/]+\/data$/) && method === 'GET') {
+      const reportId = path.split('/')[3];
+      const imageId = path.split('/')[5];
+      const response = await requireAuth((req, env, uid) => handleGetReportImageData(req, env, uid, reportId, imageId))(request, env);
+      return addCorsHeaders(response, corsHeaders);
+    }
+
     if (path.match(/^\/api\/batch-reports\/[^/]+\/analyze$/) && method === 'POST') {
       const reportId = path.split('/')[3];
-      const response = await requireAuth((req, env, uid) => handleAnalyzeReport(req, env, uid, reportId))(request, env);
+      const response = await requireAuth((req, env, uid) => handleAnalyzeReport(req, env, uid, reportId, ctx))(request, env);
       return addCorsHeaders(response, corsHeaders);
     }
 

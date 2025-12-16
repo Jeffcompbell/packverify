@@ -45,9 +45,28 @@ export async function handleUpdateReport(request: Request, env: Env, uid: string
   const body = await request.json() as any;
   const now = Date.now();
 
+  // 动态构建更新语句，只更新传入的字段
+  const updates: string[] = ['updated_at = ?'];
+  const values: any[] = [now];
+
+  if (body.name !== undefined) {
+    updates.push('name = ?');
+    values.push(body.name);
+  }
+  if (body.status !== undefined) {
+    updates.push('status = ?');
+    values.push(body.status);
+  }
+  if (body.processedImages !== undefined) {
+    updates.push('processed_images = ?');
+    values.push(body.processedImages);
+  }
+
+  values.push(reportId, uid);
+
   await env.DB.prepare(
-    'UPDATE batch_reports SET name = ?, status = ?, processed_images = ?, updated_at = ? WHERE id = ? AND user_id = ?'
-  ).bind(body.name, body.status, body.processedImages, now, reportId, uid).run();
+    `UPDATE batch_reports SET ${updates.join(', ')} WHERE id = ? AND user_id = ?`
+  ).bind(...values).run();
 
   const report = await env.DB.prepare('SELECT * FROM batch_reports WHERE id = ?').bind(reportId).first();
 
@@ -119,10 +138,47 @@ export async function handleUpdateReportImage(request: Request, env: Env, uid: s
   });
 }
 
-// 触发批量分析
-export async function handleAnalyzeReport(request: Request, env: Env, uid: string, reportId: string): Promise<Response> {
-  const body = await request.json() as any;
-  const { prompt } = body;
+// 获取批量报告图片数据（base64）
+export async function handleGetReportImageData(request: Request, env: Env, uid: string, reportId: string, imageId: string): Promise<Response> {
+  // 验证报告属于当前用户
+  const report = await env.DB.prepare('SELECT * FROM batch_reports WHERE id = ? AND user_id = ?').bind(reportId, uid).first();
+  if (!report) {
+    return new Response(JSON.stringify({ error: 'Report not found' }), {
+      status: 404,
+      headers: { 'Content-Type': 'application/json' }
+    });
+  }
+
+  // 获取图片记录
+  const image = await env.DB.prepare('SELECT * FROM batch_report_images WHERE id = ? AND report_id = ?').bind(imageId, reportId).first() as any;
+  if (!image) {
+    return new Response(JSON.stringify({ error: 'Image not found' }), {
+      status: 404,
+      headers: { 'Content-Type': 'application/json' }
+    });
+  }
+
+  // 从 R2 获取图片
+  const obj = await env.IMAGES.get(image.storage_key);
+  if (!obj) {
+    return new Response(JSON.stringify({ error: 'Image data not found' }), {
+      status: 404,
+      headers: { 'Content-Type': 'application/json' }
+    });
+  }
+
+  const imageData = await obj.arrayBuffer();
+  const base64 = btoa(String.fromCharCode(...new Uint8Array(imageData)));
+  const mimeType = obj.httpMetadata?.contentType || 'image/png';
+
+  return new Response(JSON.stringify({ base64, mimeType }), {
+    headers: { 'Content-Type': 'application/json' }
+  });
+}
+
+// 触发批量分析（已废弃，分析逻辑移到前端）
+// 保留此接口用于兼容，实际分析由前端并行调用 AI 完成
+export async function handleAnalyzeReport(request: Request, env: Env, uid: string, reportId: string, ctx?: ExecutionContext): Promise<Response> {
   const now = Date.now();
 
   // 更新报告状态为 processing
@@ -130,77 +186,7 @@ export async function handleAnalyzeReport(request: Request, env: Env, uid: strin
     'UPDATE batch_reports SET status = ?, updated_at = ? WHERE id = ? AND user_id = ?'
   ).bind('processing', now, reportId, uid).run();
 
-  // 获取所有待处理的图片
-  const images = await env.DB.prepare(
-    'SELECT * FROM batch_report_images WHERE report_id = ? AND status = ?'
-  ).bind(reportId, 'pending').all();
-
-  // 逐个分析图片
-  for (const img of images.results as any[]) {
-    try {
-      // 从 R2 获取图片
-      const obj = await env.IMAGES.get(img.storage_key);
-      if (!obj) continue;
-
-      const imageData = await obj.arrayBuffer();
-      const base64 = btoa(String.fromCharCode(...new Uint8Array(imageData)));
-      const mimeType = obj.httpMetadata?.contentType || 'image/png';
-
-      // 调用 AI 分析
-      const aiResponse = await fetch(env.AI_API_URL, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${env.AI_API_KEY}`
-        },
-        body: JSON.stringify({
-          model: env.AI_MODEL || 'gpt-4o',
-          messages: [{
-            role: 'user',
-            content: [
-              { type: 'text', text: prompt || '请分析这张图片，检查是否存在文字错误、排版问题或其他质量问题。以JSON格式返回：{"issues": [{"type": "类型", "problem": "问题描述", "suggestion": "建议"}]}' },
-              { type: 'image_url', image_url: { url: `data:${mimeType};base64,${base64}` } }
-            ]
-          }],
-          max_tokens: 1000
-        })
-      });
-
-      const aiResult = await aiResponse.json() as any;
-      const content = aiResult.choices?.[0]?.message?.content || '{}';
-
-      // 解析结果
-      let result = { issues: [] };
-      try {
-        const jsonMatch = content.match(/\{[\s\S]*\}/);
-        if (jsonMatch) result = JSON.parse(jsonMatch[0]);
-      } catch (e) {
-        result = { issues: [{ type: '解析错误', problem: content, suggestion: '' }] };
-      }
-
-      // 更新图片状态
-      await env.DB.prepare(
-        'UPDATE batch_report_images SET status = ?, result = ? WHERE id = ?'
-      ).bind('completed', JSON.stringify(result), img.id).run();
-
-      // 更新已处理数量
-      await env.DB.prepare(
-        'UPDATE batch_reports SET processed_images = processed_images + 1, updated_at = ? WHERE id = ?'
-      ).bind(Date.now(), reportId).run();
-
-    } catch (error: any) {
-      await env.DB.prepare(
-        'UPDATE batch_report_images SET status = ?, result = ? WHERE id = ?'
-      ).bind('failed', JSON.stringify({ error: error.message }), img.id).run();
-    }
-  }
-
-  // 更新报告状态为 completed
-  await env.DB.prepare(
-    'UPDATE batch_reports SET status = ?, updated_at = ? WHERE id = ?'
-  ).bind('completed', Date.now(), reportId).run();
-
-  return new Response(JSON.stringify({ success: true }), {
+  return new Response(JSON.stringify({ success: true, message: '状态已更新' }), {
     headers: { 'Content-Type': 'application/json' }
   });
 }
