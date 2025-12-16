@@ -154,17 +154,18 @@ export const LandingPage: React.FC = () => {
       {/* Inline styles for landing page */}
       <style>{`
         .landing-page {
-          --bg: #09090b;
-          --bg-subtle: #18181b;
-          --bg-card: #1c1c1f;
-          --border: rgba(255,255,255,0.08);
-          --border-hover: rgba(255,255,255,0.15);
-          --text: #fafafa;
-          --text-muted: #a1a1aa;
-          --accent: #f59e0b;
-          --accent-hover: #fbbf24;
-          --success: #22c55e;
-          --error: #ef4444;
+          --bg: #fafbfc;
+          --bg-subtle: #ffffff;
+          --bg-card: #f4f6f8;
+          --border: rgba(0,0,0,0.08);
+          --border-hover: rgba(0,0,0,0.15);
+          --text: #1a1d21;
+          --text-muted: #5c6370;
+          --accent: #e67e22;
+          --accent-hover: #d35400;
+          --accent-light: rgba(230, 126, 34, 0.08);
+          --success: #27ae60;
+          --error: #e74c3c;
 
           font-family: 'DM Sans', -apple-system, sans-serif;
           background: var(--bg);
@@ -191,13 +192,15 @@ export const LandingPage: React.FC = () => {
           grid-template-rows: auto 1fr;
         }
 
-        nav {
+        .landing-page nav {
           grid-column: 1 / -1;
-          padding: 1rem 2rem;
+          padding: 16px 48px !important;
           display: flex;
           justify-content: space-between;
           align-items: center;
           border-bottom: 1px solid var(--border);
+          background: var(--bg-subtle);
+          box-sizing: border-box;
         }
 
         .logo {
@@ -212,12 +215,13 @@ export const LandingPage: React.FC = () => {
         .logo-icon {
           width: 32px;
           height: 32px;
-          background: linear-gradient(135deg, var(--accent), #ea580c);
+          background: linear-gradient(135deg, var(--accent), #d35400);
           border-radius: 10px;
           display: flex;
           align-items: center;
           justify-content: center;
           font-size: 16px;
+          box-shadow: 0 2px 8px rgba(230, 126, 34, 0.25);
         }
 
         .nav-links {
@@ -254,12 +258,14 @@ export const LandingPage: React.FC = () => {
 
         .btn-primary {
           background: var(--accent);
-          color: #000;
+          color: #fff;
           font-weight: 600;
+          box-shadow: 0 2px 8px rgba(230, 126, 34, 0.3);
         }
 
         .btn-primary:hover {
           background: var(--accent-hover);
+          box-shadow: 0 4px 12px rgba(230, 126, 34, 0.4);
         }
 
         .btn-ghost {
@@ -284,6 +290,7 @@ export const LandingPage: React.FC = () => {
           flex-direction: column;
           justify-content: center;
           border-right: 1px solid var(--border);
+          background: var(--bg-subtle);
         }
 
         .hero-text {
@@ -309,8 +316,8 @@ export const LandingPage: React.FC = () => {
         }
 
         .upload-zone {
-          background: var(--bg-subtle);
-          border: 2px dashed var(--border);
+          background: var(--bg-card);
+          border: 2px dashed rgba(0,0,0,0.12);
           border-radius: 16px;
           padding: 3rem 2rem;
           text-align: center;
@@ -321,11 +328,11 @@ export const LandingPage: React.FC = () => {
 
         .upload-zone:hover, .upload-zone.dragover {
           border-color: var(--accent);
-          background: rgba(245, 158, 11, 0.03);
+          background: var(--accent-light);
         }
 
         .upload-zone.dragover {
-          background: rgba(245, 158, 11, 0.08);
+          background: rgba(230, 126, 34, 0.12);
           transform: scale(1.01);
         }
 
@@ -336,8 +343,8 @@ export const LandingPage: React.FC = () => {
         .upload-icon {
           width: 64px;
           height: 64px;
-          background: linear-gradient(135deg, rgba(245,158,11,0.15), rgba(245,158,11,0.05));
-          border: 1px solid rgba(245,158,11,0.2);
+          background: linear-gradient(135deg, rgba(230,126,34,0.15), rgba(230,126,34,0.05));
+          border: 1px solid rgba(230,126,34,0.25);
           border-radius: 16px;
           display: flex;
           align-items: center;
@@ -401,7 +408,7 @@ export const LandingPage: React.FC = () => {
         }
 
         .right-panel {
-          background: var(--bg-subtle);
+          background: var(--bg-card);
           padding: 2rem;
           display: flex;
           flex-direction: column;
@@ -438,9 +445,10 @@ export const LandingPage: React.FC = () => {
         }
 
         .showcase-tab.active {
-          background: var(--bg-card);
+          background: var(--bg-subtle);
           border-color: var(--border);
           color: var(--text);
+          box-shadow: 0 1px 3px rgba(0,0,0,0.08);
         }
 
         .showcase-tab:hover:not(.active) {
@@ -457,18 +465,19 @@ export const LandingPage: React.FC = () => {
 
         .showcase-main {
           flex: 1;
-          background: var(--bg-card);
+          background: var(--bg-subtle);
           border: 1px solid var(--border);
           border-radius: 16px;
           overflow: hidden;
           position: relative;
           min-height: 280px;
+          box-shadow: 0 4px 12px rgba(0,0,0,0.06);
         }
 
         .showcase-main-img {
           width: 100%;
           height: 100%;
-          background: linear-gradient(135deg, #27272a 0%, #1a1a1c 100%);
+          background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
           display: flex;
           align-items: center;
           justify-content: center;
@@ -481,7 +490,7 @@ export const LandingPage: React.FC = () => {
           left: 0;
           right: 0;
           padding: 1.5rem;
-          background: linear-gradient(to top, rgba(0,0,0,0.9) 0%, transparent 100%);
+          background: linear-gradient(to top, rgba(255,255,255,0.98) 0%, rgba(255,255,255,0.9) 60%, transparent 100%);
         }
 
         .showcase-overlay h3 {
@@ -528,7 +537,7 @@ export const LandingPage: React.FC = () => {
 
         .showcase-thumb {
           aspect-ratio: 1;
-          background: var(--bg-card);
+          background: var(--bg-subtle);
           border: 2px solid var(--border);
           border-radius: 10px;
           overflow: hidden;
@@ -539,6 +548,7 @@ export const LandingPage: React.FC = () => {
           justify-content: center;
           font-size: 1.5rem;
           position: relative;
+          box-shadow: 0 2px 6px rgba(0,0,0,0.04);
         }
 
         .showcase-thumb:hover {
@@ -577,7 +587,7 @@ export const LandingPage: React.FC = () => {
           display: none;
           position: fixed;
           inset: 0;
-          background: rgba(0,0,0,0.8);
+          background: rgba(0,0,0,0.4);
           backdrop-filter: blur(8px);
           z-index: 1000;
           align-items: center;
@@ -598,6 +608,7 @@ export const LandingPage: React.FC = () => {
           width: 100%;
           text-align: center;
           animation: modalIn 0.3s ease;
+          box-shadow: 0 20px 40px rgba(0,0,0,0.15);
         }
 
         @keyframes modalIn {
@@ -614,8 +625,8 @@ export const LandingPage: React.FC = () => {
         .modal-icon {
           width: 72px;
           height: 72px;
-          background: linear-gradient(135deg, rgba(245,158,11,0.2), rgba(245,158,11,0.05));
-          border: 1px solid rgba(245,158,11,0.3);
+          background: linear-gradient(135deg, rgba(230,126,34,0.15), rgba(230,126,34,0.05));
+          border: 1px solid rgba(230,126,34,0.25);
           border-radius: 20px;
           display: flex;
           align-items: center;
@@ -679,8 +690,9 @@ export const LandingPage: React.FC = () => {
         }
 
         .section {
-          padding: 5rem 2rem;
+          padding: 5rem 3rem;
           border-top: 1px solid var(--border);
+          background: var(--bg-subtle);
         }
 
         .section-inner {
@@ -726,15 +738,18 @@ export const LandingPage: React.FC = () => {
           border-radius: 16px;
           position: relative;
           transition: all 0.3s ease;
+          box-shadow: 0 2px 8px rgba(0,0,0,0.04);
         }
 
         .pricing-card:hover {
           border-color: var(--border-hover);
+          box-shadow: 0 4px 16px rgba(0,0,0,0.08);
         }
 
         .pricing-card.featured {
           border-color: var(--accent);
-          background: linear-gradient(180deg, rgba(245,158,11,0.08) 0%, var(--bg-subtle) 100%);
+          background: linear-gradient(180deg, rgba(230,126,34,0.06) 0%, var(--bg-subtle) 100%);
+          box-shadow: 0 4px 20px rgba(230,126,34,0.15);
         }
 
         .pricing-card.featured::before {
@@ -851,7 +866,7 @@ export const LandingPage: React.FC = () => {
         }
 
         .about-visual {
-          background: var(--bg-subtle);
+          background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
           border: 1px solid var(--border);
           border-radius: 16px;
           padding: 2rem;
@@ -860,11 +875,13 @@ export const LandingPage: React.FC = () => {
           justify-content: center;
           min-height: 300px;
           font-size: 4rem;
+          box-shadow: 0 4px 12px rgba(0,0,0,0.06);
         }
 
         footer {
-          padding: 2rem;
+          padding: 2rem 3rem;
           border-top: 1px solid var(--border);
+          background: var(--bg-subtle);
         }
 
         .footer-inner {
