@@ -1,0 +1,11 @@
+# 复制此文件为 .dev.vars 并填入真实值
+# Google OAuth (从 Google Cloud Console 获取)
+GOOGLE_CLIENT_ID=your-google-client-id.apps.googleusercontent.com
+GOOGLE_CLIENT_SECRET=your-google-client-secret
+
+# Better Auth
+BETTER_AUTH_SECRET=your-random-secret-string
+BETTER_AUTH_URL=http://localhost:3001
+
+# Resend (用于发送重置密码邮件)
+RESEND_API_KEY=re_xxxxxxxxxxxxx

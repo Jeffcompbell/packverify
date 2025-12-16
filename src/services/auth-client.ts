@@ -16,8 +16,12 @@ export const signUpWithEmail = async (email: string, password: string, name?: st
 };
 
 // Google 登录
-export const signInWithGoogle = async () => {
-  return authClient.signIn.social({ provider: 'google' });
+export const signInWithGoogle = async (callbackURL?: string) => {
+  const result = await authClient.signIn.social({
+    provider: 'google',
+    callbackURL: callbackURL || '/app'
+  });
+  return result;
 };
 
 // 登出

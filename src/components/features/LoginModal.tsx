@@ -30,16 +30,18 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLogin
     setIsLoading(true);
     setError(null);
     try {
-      await signInWithGoogle();
+      // Use absolute URL for callback to handle cross-origin OAuth
+      const callbackURL = `${window.location.origin}/app`;
+      const result = await signInWithGoogle(callbackURL);
+      // Better Auth returns { url, redirect: true } for social login
+      // The redirect should happen automatically via the redirectPlugin
+      // But if it doesn't, we handle it manually
+      if (result?.data?.url && result?.data?.redirect) {
+        window.location.href = result.data.url;
+      }
     } catch (err: any) {
       console.error('Google login error:', err);
-      try {
-        await onLogin();
-        onClose();
-      } catch (fallbackErr: any) {
-        setError(fallbackErr.message || '登录失败，请重试');
-      }
-    } finally {
+      setError(err.message || '登录失败，请重试');
       setIsLoading(false);
     }
   };

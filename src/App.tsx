@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { localDiffSpecs, getModelId, setModelId, extractOcrOnly } from './services/openaiService';
-import { signInWithGoogle, signOutUser, onAuthChange } from './services/firebase';
+// Firebase Auth 已移除，统一使用 Better Auth
 import {
   getOrCreateUser, getUserData, useQuotaFirebase, UserData,
   getOrCreateSession, updateImageInCloud, deleteImageFromCloud, saveQilToCloud,
@@ -230,32 +230,47 @@ const App: React.FC = () => {
     }
   }, [selectedIssueId]);
 
-  // 检查登录状态
+  // 检查登录状态 (只使用 Better Auth)
   useEffect(() => {
-    const unsubscribe = onAuthChange(async (firebaseUser) => {
-      if (firebaseUser) {
-        const userData = await getUserData(firebaseUser.uid);
-        if (userData) {
+    const checkAuth = async () => {
+      try {
+        const { getCurrentUser } = await import('./services/auth-client');
+        const betterAuthUser = await getCurrentUser();
+        if (betterAuthUser) {
+          // Better Auth 登录成功，转换为 UserData 格式
+          const userData: UserData = {
+            uid: betterAuthUser.id,
+            email: betterAuthUser.email,
+            displayName: betterAuthUser.name || betterAuthUser.email.split('@')[0],
+            photoURL: betterAuthUser.image || null,
+            quota: (betterAuthUser as any).quota || 50,
+            used: (betterAuthUser as any).used || 0,
+            isAdmin: (betterAuthUser as any).isAdmin || false,
+            createdAt: null,
+            lastLoginAt: null,
+          };
           setUser(userData);
         } else {
-          const newUserData = await getOrCreateUser(firebaseUser);
-          setUser(newUserData);
+          setUser(null);
+          setSessionId(null);
         }
-      } else {
+      } catch (e) {
+        console.log('Auth check failed:', e);
         setUser(null);
         setSessionId(null);
       }
       setIsCheckingAuth(false);
-    });
-    return () => unsubscribe();
+    };
+
+    checkAuth();
   }, []);
 
-  // 未登录时自动显示登录弹窗
+  // 未登录时重定向到首页
   useEffect(() => {
     if (!isCheckingAuth && !user) {
-      setShowLoginModal(true);
+      navigate('/');
     }
-  }, [isCheckingAuth, user]);
+  }, [isCheckingAuth, user, navigate]);
 
   // 用户登录后，加载云端会话数据（只执行一次）
   useEffect(() => {
@@ -758,26 +773,21 @@ const App: React.FC = () => {
   }), []);
 
   const handleLogout = useCallback(async () => {
-    await signOutUser();
+    try {
+      const { authClient } = await import('./services/auth-client');
+      await authClient.signOut();
+    } catch (e) {
+      console.error('Logout error:', e);
+    }
     setUser(null);
-    hasLoadedCloudData.current = false; // 重置，下次登录时重新加载
-    // 跳转到落地页
-    window.location.href = '/';
-  }, []);
+    hasLoadedCloudData.current = false;
+    navigate('/');
+  }, [navigate]);
 
   const handleLogin = useCallback(async () => {
-    try {
-      // signInWithGoogle 已经内部调用了 getOrCreateUser，直接返回 UserData
-      const userData = await signInWithGoogle();
-      if (userData) {
-        setUser(userData);
-        setShowLoginModal(false);
-      }
-    } catch (error) {
-      console.error('Login failed:', error);
-      throw error;
-    }
-  }, []);
+    // 重定向到首页登录
+    navigate('/');
+  }, [navigate]);
 
   const isCurrentProcessing = currentImage && processingImageId === currentImage.id;
 
