@@ -4,6 +4,7 @@ export interface Env {
   DB: D1Database;
   IMAGES: R2Bucket;
   R2: R2Bucket;
+  ASSETS: Fetcher;
   FIREBASE_PROJECT_ID: string;
   AI_API_URL: string;
   AI_API_KEY: string;
@@ -11,11 +12,15 @@ export interface Env {
   // Billing
   BILLING_MODE?: 'count' | 'tokens';
   TOKENS_PER_CREDIT?: string;
+  CREDITS_PER_CENT?: string;
   // Better Auth
   BETTER_AUTH_SECRET: string;
   BETTER_AUTH_URL: string;
   GOOGLE_CLIENT_ID?: string;
   GOOGLE_CLIENT_SECRET?: string;
+  // Stripe
+  STRIPE_SECRET_KEY: string;
+  STRIPE_WEBHOOK_SECRET: string;
 }
 
 // 验证 Better Auth session
