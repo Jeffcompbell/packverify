@@ -8,6 +8,9 @@ export interface Env {
   AI_API_URL: string;
   AI_API_KEY: string;
   AI_MODEL?: string;
+  // Billing
+  BILLING_MODE?: 'count' | 'tokens';
+  TOKENS_PER_CREDIT?: string;
   // Better Auth
   BETTER_AUTH_SECRET: string;
   BETTER_AUTH_URL: string;

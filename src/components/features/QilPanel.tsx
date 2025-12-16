@@ -179,8 +179,22 @@ export const QilPanel = forwardRef<QilPanelRef, QilPanelProps>(({
           ref={qilDropRef}
           className="qil-input-area flex-1 bg-white border-2 border-dashed border-border rounded flex flex-col cursor-pointer hover:border-surface-300 transition-colors relative overflow-hidden"
           tabIndex={0}
-          onClick={() => {
+          onClick={async () => {
+            // 优先尝试从剪贴板粘贴
             if (qilImages.length < 4) {
+              try {
+                const items = await navigator.clipboard.read();
+                for (const item of items) {
+                  const imageType = item.types.find(t => t.startsWith('image/'));
+                  if (imageType) {
+                    const blob = await item.getType(imageType);
+                    const file = new File([blob], `qil-paste-${Date.now()}.png`, { type: imageType });
+                    handleQilImageFile(file);
+                    return;
+                  }
+                }
+              } catch {}
+              // 剪贴板没有图片，打开文件选择器
               const input = document.createElement('input');
               input.type = 'file';
               input.accept = 'image/*';
@@ -250,8 +264,8 @@ export const QilPanel = forwardRef<QilPanelRef, QilPanelProps>(({
           ) : (
             <div className="flex-1 flex flex-col items-center justify-center">
               <Upload size={20} className="text-text-muted mb-1" />
-              <span className="text-[10px] text-text-muted">Ctrl+V 粘贴 QIL 截图</span>
-              <span className="text-[9px] text-slate-700 mt-1">或点击/拖拽上传（最多4张）</span>
+              <span className="text-[10px] text-text-muted">点击粘贴 QIL 截图</span>
+              <span className="text-[9px] text-slate-700 mt-1">或拖拽上传（最多4张）</span>
             </div>
           )}
         </div>

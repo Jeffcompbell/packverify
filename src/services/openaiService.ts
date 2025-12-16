@@ -213,6 +213,46 @@ const parseJSON = (text: string): any => {
     }
 };
 
+// 修复被截断的 JSON
+const repairTruncatedJSON = (text: string): any => {
+    // 提取 JSON 部分
+    let jsonStr = text;
+    const jsonMatch = text.match(/```(?:json)?\s*([\s\S]*)/);
+    if (jsonMatch) {
+        jsonStr = jsonMatch[1];
+    } else {
+        const braceStart = text.indexOf('{');
+        if (braceStart !== -1) {
+            jsonStr = text.substring(braceStart);
+        }
+    }
+
+    // 尝试补全括号
+    let openBraces = 0, openBrackets = 0;
+    let inString = false, escape = false;
+
+    for (const char of jsonStr) {
+        if (escape) { escape = false; continue; }
+        if (char === '\\') { escape = true; continue; }
+        if (char === '"') { inString = !inString; continue; }
+        if (inString) continue;
+        if (char === '{') openBraces++;
+        if (char === '}') openBraces--;
+        if (char === '[') openBrackets++;
+        if (char === ']') openBrackets--;
+    }
+
+    // 补全缺失的括号
+    let repaired = jsonStr;
+    // 如果在字符串中被截断，先关闭字符串
+    if (inString) repaired += '"';
+    // 补全数组和对象括号
+    repaired += ']'.repeat(Math.max(0, openBrackets));
+    repaired += '}'.repeat(Math.max(0, openBraces));
+
+    return JSON.parse(repaired);
+};
+
 // ============================================
 // 快速预检：判断是否为包装设计图片
 // ============================================
@@ -529,11 +569,60 @@ ${checkItemsList}
         let usedBackup = false;
         let fullText = '';
 
-        try {
-            if (onStream) {
-                // 流式输出
-                const stream = await client.chat.completions.create({
-                    model: modelId,
+	        try {
+	            if (onStream) {
+	                // 流式输出
+	                let streamFinishReason: string | null = null;
+	                let streamUsage: any | undefined;
+	                const stream = await client.chat.completions.create({
+	                    model: modelId,
+	                    messages: [
+	                        {
+                            role: "user",
+                            content: [
+                                { type: "text", text: prompt },
+                                {
+                                    type: "image_url",
+                                    image_url: {
+                                        url: `data:${mimeType};base64,${base64Image}`,
+                                        detail: "high"
+                                    }
+                                }
+                            ]
+                        }
+	                    ],
+	                    max_tokens: includeOcr ? 8000 : 6000,
+	                    temperature: 0.1,
+	                    stream: true,
+	                    // 尝试在流式场景下返回 usage（OpenAI 兼容实现会在最后一个 chunk 带上 usage）
+	                    // 若上游不支持，该字段会被忽略，不影响流式输出。
+	                    stream_options: { include_usage: true } as any,
+	                });
+
+	                for await (const chunk of stream) {
+	                    const content = chunk.choices[0]?.delta?.content || '';
+	                    const finishReason = chunk.choices[0]?.finish_reason ?? null;
+	                    if (finishReason) streamFinishReason = finishReason;
+	                    // usage 通常只在最后一个 chunk 出现
+	                    if ((chunk as any).usage) streamUsage = (chunk as any).usage;
+	                    if (content) {
+	                        fullText += content;
+	                        onStream(content);
+	                    }
+	                }
+
+	                // 构造完整响应
+	                response = {
+	                    choices: [{
+	                        message: { content: fullText },
+	                        finish_reason: streamFinishReason || 'stop'
+	                    }],
+	                    usage: streamUsage
+	                } as any;
+	            } else {
+	                // 非流式输出
+	                response = await client.chat.completions.create({
+	                    model: modelId,
                     messages: [
                         {
                             role: "user",
@@ -549,47 +638,7 @@ ${checkItemsList}
                             ]
                         }
                     ],
-                    max_tokens: includeOcr ? 4500 : 4000,
-                    temperature: 0.1,
-                    stream: true,
-                });
-
-                for await (const chunk of stream) {
-                    const content = chunk.choices[0]?.delta?.content || '';
-                    if (content) {
-                        fullText += content;
-                        onStream(content);
-                    }
-                }
-
-                // 构造完整响应
-                response = {
-                    choices: [{
-                        message: { content: fullText },
-                        finish_reason: 'stop'
-                    }],
-                    usage: { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 }
-                } as any;
-            } else {
-                // 非流式输出
-                response = await client.chat.completions.create({
-                    model: modelId,
-                    messages: [
-                        {
-                            role: "user",
-                            content: [
-                                { type: "text", text: prompt },
-                                {
-                                    type: "image_url",
-                                    image_url: {
-                                        url: `data:${mimeType};base64,${base64Image}`,
-                                        detail: "high"
-                                    }
-                                }
-                            ]
-                        }
-                    ],
-                    max_tokens: includeOcr ? 4500 : 4000,
+                    max_tokens: includeOcr ? 8000 : 6000,
                     temperature: 0.1,
                 });
             }
@@ -616,7 +665,7 @@ ${checkItemsList}
                         ]
                     }
                 ],
-                max_tokens: includeOcr ? 4500 : 4000,
+                max_tokens: includeOcr ? 8000 : 6000,
                 temperature: 0.1,
             });
         }
@@ -626,12 +675,12 @@ ${checkItemsList}
 
         // ✅ 检测是否被截断
         const finishReason = response.choices[0].finish_reason;
-        console.log(`🏁 Finish reason: ${finishReason}`);
+        const wasTruncated = finishReason === 'length';
+        console.log(`🏁 Finish reason: ${finishReason}${wasTruncated ? ' (TRUNCATED!)' : ''}`);
 
-        if (finishReason === 'length') {
-            console.error('⚠️  Output truncated! Response reached max_tokens limit.');
-            console.error(`   Max tokens: ${includeOcr ? 4500 : 4000}, Used: ${response.usage?.completion_tokens || 0}`);
-            throw new Error(`输出被截断：达到 token 上限 (${includeOcr ? 4500 : 4000})。请联系开发者增加限制。`);
+        if (wasTruncated) {
+            console.warn('⚠️  Output truncated! Will try to parse partial content.');
+            console.warn(`   Max tokens: ${includeOcr ? 8000 : 6000}, Used: ${response.usage?.completion_tokens || 0}`);
         }
 
         // 3. 提取 token 使用信息
@@ -667,9 +716,21 @@ ${checkItemsList}
         try {
             parsed = parseJSON(text);
         } catch (parseError) {
-            console.error('❌ JSON parsing failed:', parseError);
-            console.error('Response text:', text);
-            throw new Error('解析 AI 响应失败，可能输出被截断或格式错误');
+            if (wasTruncated) {
+                // 被截断时尝试修复 JSON
+                console.warn('⚠️  JSON parsing failed on truncated output, attempting repair...');
+                try {
+                    parsed = repairTruncatedJSON(text);
+                    console.log('✅ JSON repair successful');
+                } catch (repairError) {
+                    console.error('❌ JSON repair also failed:', repairError);
+                    parsed = { description: '分析结果被截断，无法解析', issues: [], specs: [] };
+                }
+            } else {
+                console.error('❌ JSON parsing failed:', parseError);
+                console.error('Response text:', text);
+                throw new Error('解析 AI 响应失败，可能输出被截断或格式错误');
+            }
         }
 
         perfLog['4_json_parsing'] = Date.now() - parseStart;
@@ -726,7 +787,8 @@ ${checkItemsList}
             ocrText: parsed.ocrText || '',
             issues,
             specs,
-            tokenUsage
+            tokenUsage,
+            truncated: wasTruncated
         };
     } catch (error) {
         console.error("Single-pass analysis failed:", error);
@@ -1142,7 +1204,7 @@ export const analyzeImageWithCustomPrompt = async (
                     { type: "image_url", image_url: { url: `data:${mimeType};base64,${base64Image}`, detail: "high" } }
                 ]
             }],
-            max_tokens: includeOcr ? 4500 : 4000,
+            max_tokens: includeOcr ? 8000 : 6000,
             temperature: 0.1
         });
 

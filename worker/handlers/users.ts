@@ -28,7 +28,7 @@ export async function handleCreateOrUpdateUser(request: Request, env: Env, uid: 
   } else {
     await env.DB.prepare(
       'INSERT INTO users (uid, email, display_name, photo_url, quota, used, is_admin, created_at, last_login_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
-    ).bind(uid, body.email, body.displayName, body.photoURL, body.quota || 10, 0, body.isAdmin ? 1 : 0, now, now).run();
+    ).bind(uid, body.email, body.displayName, body.photoURL, body.quota || 30, 0, body.isAdmin ? 1 : 0, now, now).run();
   }
 
   const user = await env.DB.prepare('SELECT * FROM users WHERE uid = ?').bind(uid).first();

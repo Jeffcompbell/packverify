@@ -101,12 +101,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {userQuota && (
           <div className="px-3 py-2.5 rounded-xl bg-surface-50 cursor-pointer hover:bg-surface-100 transition-colors" onClick={onOpenQuotaModal}>
             <div className="flex items-center justify-between text-[11px] mb-2">
-              <span className="text-text-muted">已用 {used} 次</span>
+              <span className="text-text-muted">剩余 {userQuota.remaining} 积分</span>
               <button
                 onClick={(e) => { e.stopPropagation(); onOpenUpgradeModal?.(); }}
                 className="text-text-secondary hover:text-text-primary transition-colors"
               >
-                升级
+                充值
               </button>
             </div>
             <div className="w-full bg-surface-200 rounded-full h-1.5 overflow-hidden">

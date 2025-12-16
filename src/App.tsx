@@ -230,6 +230,26 @@ const App: React.FC = () => {
     }
   }, [selectedIssueId]);
 
+  // 切换到参数对比模式时，自动提取缺少 OCR 的图片
+  useEffect(() => {
+    if (analysisMode !== 'comparison' || isProcessing) return;
+    const imagesNeedOcr = images.filter(img => img.description && !img.ocrText);
+    if (imagesNeedOcr.length === 0) return;
+
+    (async () => {
+      for (const img of imagesNeedOcr) {
+        try {
+          const ocrResult = await extractOcrOnly(img.base64, img.file.type);
+          setImages(prev => prev.map(image =>
+            image.id === img.id ? { ...image, ocrText: ocrResult.ocrText } : image
+          ));
+        } catch (error) {
+          console.error(`Failed to extract OCR for image ${img.id}:`, error);
+        }
+      }
+    })();
+  }, [analysisMode, images, isProcessing]);
+
   // 检查登录状态 (只使用 Better Auth)
   useEffect(() => {
     const checkAuth = async () => {
@@ -438,6 +458,50 @@ const App: React.FC = () => {
       setImages(prev => prev.filter(img => img.id !== placeholderId));
     }
   }, [processFile, images, currentModel]);
+
+  // 仅 OCR 提取（参数对比模式专用，不做完整分析）
+  const handleOcrOnlyUpload = useCallback(async (file: File) => {
+    if (!user) { setShowLoginModal(true); return; }
+    if (!file.type.startsWith('image/')) return;
+
+    const placeholderId = `img-${Date.now()}`;
+    const url = URL.createObjectURL(file);
+    const reader = new FileReader();
+
+    reader.onloadend = async () => {
+      const result = reader.result as string;
+      const base64 = result.split(',')[1] || result;
+
+      const newImage: ImageItem = {
+        id: placeholderId, src: url, base64, file,
+        specs: [], issues: [], diffs: [], issuesByModel: {},
+        description: '正在提取文字...'
+      };
+      setImages(prev => [...prev, newImage]);
+
+      try {
+        const ocrResult = await extractOcrOnly(base64, file.type);
+        setImages(prev => prev.map(img =>
+          img.id === placeholderId ? { ...img, ocrText: ocrResult.ocrText, description: '已提取文字' } : img
+        ));
+        // 消耗配额
+        if (ocrResult.tokenUsage) {
+          await useQuotaFirebase(user.uid, 1, file.name, 'ocr', {
+            promptTokens: ocrResult.tokenUsage.promptTokens,
+            completionTokens: ocrResult.tokenUsage.completionTokens,
+            totalTokens: ocrResult.tokenUsage.totalTokens,
+            model: ocrResult.tokenUsage.model
+          });
+          const updatedUser = await getUserData(user.uid);
+          if (updatedUser) setUser(updatedUser);
+        }
+      } catch (error: any) {
+        setErrorMessage(error.message || 'OCR 提取失败');
+        setImages(prev => prev.filter(img => img.id !== placeholderId));
+      }
+    };
+    reader.readAsDataURL(file);
+  }, [user]);
 
   const handleRetryAnalysis = useCallback(async (imageId: string) => {
     const image = images.find(img => img.id === imageId);
@@ -1117,6 +1181,7 @@ const App: React.FC = () => {
             onFieldsUpdate={handleUpdateQilFields}
             onError={setErrorMessage}
             onImageUpload={handleImageUpload}
+            onOcrOnlyUpload={handleOcrOnlyUpload}
           />
         ) : (
         <div className="flex-1 flex min-h-0 pb-14 md:pb-0">

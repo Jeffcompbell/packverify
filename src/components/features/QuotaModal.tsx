@@ -107,8 +107,8 @@ export const QuotaModal: React.FC<QuotaModalProps> = ({
           <div className="bg-gray-50 rounded-lg p-3 mb-4">
             <div className="flex items-baseline justify-between mb-2">
               <div>
-                <span className="text-gray-600 text-xs">剩余额度</span>
-                <span className="text-[9px] text-gray-400 ml-2">每次分析消耗 1 额度</span>
+                <span className="text-gray-600 text-xs">剩余积分</span>
+                <span className="text-[9px] text-gray-400 ml-2">按 Token 消耗计费</span>
               </div>
               <span className="text-xl font-semibold text-gray-900 tabular-nums">{user.quota - user.used}</span>
             </div>
@@ -119,8 +119,8 @@ export const QuotaModal: React.FC<QuotaModalProps> = ({
               />
             </div>
             <div className="flex justify-between text-[10px] text-gray-500">
-              <span>已用 {user.used}</span>
-              <span>总额 {user.quota}</span>
+              <span>已用 {user.used} 积分</span>
+              <span>总额 {user.quota} 积分</span>
             </div>
           </div>
 
@@ -147,7 +147,7 @@ export const QuotaModal: React.FC<QuotaModalProps> = ({
                         <th className="text-left py-2 px-3 font-medium">类型</th>
                         <th className="text-left py-2 px-3 font-medium">Token</th>
                         <th className="text-left py-2 px-3 font-medium">时间</th>
-                        <th className="text-right py-2 px-3 font-medium">额度</th>
+                        <th className="text-right py-2 px-3 font-medium">积分</th>
                       </tr>
                     </thead>
                     <tbody className="text-gray-700 divide-y divide-gray-100">

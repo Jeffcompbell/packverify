@@ -11,10 +11,11 @@ interface ComparisonPanelProps {
   onFieldsUpdate: (fields: SourceField[], rawText: string) => void;
   onError: (msg: string | null) => void;
   onImageUpload: (file: File) => void;
+  onOcrOnlyUpload?: (file: File) => void; // 仅 OCR 提取（参数对比模式专用）
 }
 
 export const ComparisonPanel: React.FC<ComparisonPanelProps> = ({
-  images, manualSourceFields, copiedId, onCopy, onFieldsUpdate, onError, onImageUpload
+  images, manualSourceFields, copiedId, onCopy, onFieldsUpdate, onError, onImageUpload, onOcrOnlyUpload
 }) => {
   const [expandedImages, setExpandedImages] = useState<Set<string>>(() => new Set(images.map(img => img.id)));
 
@@ -83,7 +84,12 @@ export const ComparisonPanel: React.FC<ComparisonPanelProps> = ({
                 )}
               </button>
               {expandedImages.has(img.id) && (
-                <div className="px-3 pb-3">
+                <div className="px-3 pb-3 space-y-2">
+                  {/* 图片预览 */}
+                  {img.src && (
+                    <img src={img.src} alt={`图片 ${idx + 1}`} className="w-full h-24 object-contain bg-white rounded border border-border" />
+                  )}
+                  {/* OCR 文本 */}
                   {img.ocrText ? (
                     <div className="relative group">
                       <pre className="text-[11px] text-text-secondary font-mono bg-white p-2 rounded border border-border whitespace-pre-wrap max-h-32 overflow-y-auto">
@@ -97,8 +103,8 @@ export const ComparisonPanel: React.FC<ComparisonPanelProps> = ({
                       </button>
                     </div>
                   ) : (
-                    <div className="text-[10px] text-text-muted text-center py-3">
-                      图片分析后自动提取 OCR
+                    <div className="text-[10px] text-text-muted text-center py-2 bg-amber-50 rounded border border-amber-200">
+                      点击上方按钮提取 OCR 文本
                     </div>
                   )}
                 </div>
@@ -106,15 +112,16 @@ export const ComparisonPanel: React.FC<ComparisonPanelProps> = ({
             </div>
           ))}
 
-          {/* 上传图片卡片 */}
+          {/* 上传图片卡片 - 参数对比模式只做 OCR */}
           <label className="flex flex-col items-center justify-center gap-2 p-4 border-2 border-dashed border-border rounded-lg cursor-pointer hover:border-blue-400 hover:bg-blue-50/50 transition-colors">
             <ImagePlus size={20} className="text-text-muted" />
             <span className="text-xs text-text-muted">上传图片</span>
+            <span className="text-[10px] text-text-muted">（仅提取文字）</span>
             <input
               type="file"
               accept="image/*"
               className="hidden"
-              onChange={(e) => e.target.files?.[0] && onImageUpload(e.target.files[0])}
+              onChange={(e) => e.target.files?.[0] && (onOcrOnlyUpload || onImageUpload)(e.target.files[0])}
             />
           </label>
         </div>

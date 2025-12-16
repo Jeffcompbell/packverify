@@ -99,7 +99,7 @@ export const useQuotaFirebase = async (
   uid: string,
   count: number = 1,
   imageName: string = '图片',
-  type: 'analyze' | 'retry' = 'analyze',
+  type: 'analyze' | 'retry' | 'ocr' = 'analyze',
   tokenUsage?: { promptTokens: number; completionTokens: number; totalTokens: number; model: string }
 ): Promise<boolean> => {
   try {

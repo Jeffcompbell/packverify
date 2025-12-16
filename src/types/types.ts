@@ -191,4 +191,5 @@ export interface DiagnosisResult {
   lexiconIssues?: LexiconIssue[];  // 词库命中问题
   specs: SourceField[]; // 产品规格（从单次 AI 调用中提取）
   tokenUsage?: TokenUsage; // Token 使用统计
+  truncated?: boolean;  // 输出是否被截断
 }
